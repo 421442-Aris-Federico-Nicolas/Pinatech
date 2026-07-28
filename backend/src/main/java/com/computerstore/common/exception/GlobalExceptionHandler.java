@@ -72,6 +72,11 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);
     }
 
+    @ExceptionHandler(AuthenticationFailureException.class)
+    ProblemDetail handleAuthenticationFailure(AuthenticationFailureException exception, HttpServletRequest request) {
+        return problem(HttpStatus.UNAUTHORIZED, "authentication-failed", "Authentication failed", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
         LOGGER.error("Unexpected error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);

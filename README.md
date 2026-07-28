@@ -166,6 +166,16 @@ npm run build
 - Error responses use RFC 9457 `ProblemDetail` without stack traces.
 - Future authentication will use short-lived JWT access tokens and refresh tokens in `HttpOnly` cookies.
 
+## Development users
+
+These accounts are seeded only in the `dev` profile. Do not use their passwords outside local development.
+
+| Role | Email | Password |
+|---|---|---|
+| Administrator | `admin@computerstore.local` | `Admin123!` |
+| Technician | `technician@computerstore.local` | `Technician123!` |
+| Customer | `customer@computerstore.local` | `Customer123!` |
+
 ## Architecture decisions
 
 - A modular monolith reduces operational complexity for the MVP.
