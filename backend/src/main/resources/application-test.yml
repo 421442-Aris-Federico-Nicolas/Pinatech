@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${TEST_DATABASE_URL:jdbc:tc:postgresql:17.10:///computer_store_test}
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.computerstore: WARN

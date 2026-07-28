@@ -1,0 +1,29 @@
+<main>
+  <section class="hero">
+    <p class="eyebrow">Etapa 1 completada</p>
+    <h1>Tienda informática y servicio técnico.</h1>
+    <p class="lead">
+      Base local preparada para catálogo, pedidos, inventario y reparaciones.
+    </p>
+  </section>
+
+  <mat-card appearance="outlined" class="api-card">
+    <mat-card-header>
+      <mat-card-title>Estado de la API</mat-card-title>
+      <mat-card-subtitle>GET /api/health</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (isLoading()) {
+        <p>Comprobando conexión...</p>
+      } @else if (health(); as response) {
+        <p class="success">Conectada: {{ response.status }}</p>
+        <p class="timestamp">{{ response.timestamp }}</p>
+      } @else {
+        <p class="error">{{ error() }}</p>
+      }
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button type="button" (click)="checkApi()">Reintentar</button>
+    </mat-card-actions>
+  </mat-card>
+</main>

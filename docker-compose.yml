@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:17.10-alpine
+    container_name: computer-store-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-computer_store}
+      POSTGRES_USER: ${POSTGRES_USER:-computer_store}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-computer_store}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - computer-store-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: computer-store-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-computer_store}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-computer_store}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-computer_store}
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:-http://localhost:4200}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-production}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - computer-store-network
+
+volumes:
+  postgres_data:
+
+networks:
+  computer-store-network:
+    driver: bridge

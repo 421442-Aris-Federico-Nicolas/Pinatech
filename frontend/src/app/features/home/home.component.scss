@@ -1,0 +1,66 @@
+:host {
+  display: block;
+}
+
+main {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: clamp(2rem, 7vw, 7rem) clamp(1rem, 5vw, 4rem);
+}
+
+.hero {
+  align-self: center;
+}
+
+.eyebrow {
+  color: #047857;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  color: #111827;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.lead {
+  color: #4b5563;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  max-width: 38rem;
+}
+
+.api-card {
+  align-self: center;
+  background: #ffffff;
+}
+
+.success {
+  color: #047857;
+  font-weight: 700;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.timestamp {
+  color: #6b7280;
+  font-family: monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}

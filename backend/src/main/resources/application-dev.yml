@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/computer_store}
+    username: ${SPRING_DATASOURCE_USERNAME:computer_store}
+    password: ${SPRING_DATASOURCE_PASSWORD:computer_store}
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+logging:
+  level:
+    com.computerstore: INFO
+    org.springframework.security: WARN

@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+mat-toolbar {
+  background: #111827;
+  color: #f9fafb;
+  padding-inline: clamp(1rem, 5vw, 4rem);
+}
+
+.brand {
+  color: inherit;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.stage {
+  color: #a7f3d0;
+  font-size: 0.875rem;
+}
