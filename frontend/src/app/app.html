@@ -1,6 +1,27 @@
 <mat-toolbar>
   <a class="brand" routerLink="/">Computer Store</a>
+  @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
+    <a class="nav-link" routerLink="/catalog">Catálogo</a>
+  }
   <span class="spacer"></span>
-  <span class="stage">MVP local</span>
+  @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
+    <a class="admin-link" routerLink="/cart">Carrito ({{ cart.count() }})</a>
+  }
+  @if (auth.user()?.roles?.includes('ADMIN')) {
+    <a class="admin-link" routerLink="/admin">Administración</a>
+  }
+  @if (auth.user()?.roles?.includes('ADMIN') || auth.user()?.roles?.includes('TECHNICIAN')) {
+    <a class="admin-link" routerLink="/technical">Panel técnico</a>
+  }
+  @if (auth.user()?.roles?.includes('CUSTOMER')) {
+    <a class="admin-link" routerLink="/orders">Mis pedidos</a>
+    <a class="admin-link" routerLink="/tickets">Servicio técnico</a>
+  }
+  @if (auth.isAuthenticated()) {
+    <span class="user-name">{{ auth.user()?.firstName }}</span>
+    <button mat-button type="button" (click)="logout()">Salir</button>
+  } @else {
+    <a mat-button routerLink="/login">Ingresar</a>
+  }
 </mat-toolbar>
 <router-outlet />

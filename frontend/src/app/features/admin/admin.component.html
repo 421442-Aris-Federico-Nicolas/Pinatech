@@ -1,0 +1,61 @@
+<main>
+  <header class="heading">
+    <div>
+      <p class="eyebrow">Operación interna</p>
+      <h1>Administración de catálogo</h1>
+      <p>Gestioná productos, estructura comercial y stock desde un único lugar.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="resetProduct()">Nuevo producto</button>
+  </header>
+
+  @if (error()) { <p class="message error">{{ error() }}</p> }
+  @if (success()) { <p class="message success">{{ success() }}</p> }
+
+  <section class="workspace">
+    <mat-card class="product-list">
+      <h2>Productos activos</h2>
+      <p class="muted">{{ products().length }} disponibles para editar</p>
+      <div class="items">
+        @for (product of products(); track product.id) {
+          <button type="button" class="product-row" [class.selected]="selected()?.id === product.id" (click)="select(product)">
+            <span>{{ product.name }}</span><small>{{ product.brandName }} · {{ product.price | number:'1.0-0' }}</small>
+          </button>
+        } @empty { <p class="muted">No hay productos activos.</p> }
+      </div>
+    </mat-card>
+
+    <mat-card class="editor">
+      <div class="card-title"><div><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2><p class="muted">Los campos marcados son obligatorios.</p></div>@if (selected()) { <button mat-button color="warn" type="button" (click)="deleteProduct()">Dar de baja</button> }</div>
+      <div class="product-form">
+        <mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="form.name" name="name" (input)="updateSlug()" required></mat-form-field>
+        <mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="form.slug" name="slug" required></mat-form-field>
+        <mat-form-field><mat-label>Precio</mat-label><input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.price" name="price" required></mat-form-field>
+        <mat-form-field><mat-label>Categoría</mat-label><mat-select [(ngModel)]="form.categoryId" name="categoryId" required>@for (category of categories(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }</mat-select></mat-form-field>
+        <mat-form-field class="wide"><mat-label>Marca</mat-label><mat-select [(ngModel)]="form.brandId" name="brandId" required>@for (brand of brands(); track brand.id) { <mat-option [value]="brand.id">{{ brand.name }}</mat-option> }</mat-select></mat-form-field>
+        <mat-form-field class="wide"><mat-label>Descripción</mat-label><textarea matInput rows="4" [(ngModel)]="form.description" name="description" required></textarea></mat-form-field>
+      </div>
+      <button mat-flat-button type="button" [disabled]="saving()" (click)="saveProduct()">{{ saving() ? 'Guardando...' : selected() ? 'Guardar cambios' : 'Crear producto' }}</button>
+    </mat-card>
+  </section>
+
+  <section class="operations">
+    <mat-card>
+      <h2>Inventario</h2>
+      @if (selected()) {
+        <p class="stock-name">{{ selected()!.name }}</p>
+        @if (inventory(); as current) { <p class="stock"><strong>{{ current.availableQuantity }}</strong> unidades disponibles <span>{{ current.reservedQuantity }} reservadas</span></p> }
+        <div class="stock-form"><mat-form-field><mat-label>Ajuste</mat-label><input matInput type="number" [(ngModel)]="adjustment" name="adjustment"></mat-form-field><mat-form-field><mat-label>Motivo</mat-label><input matInput [(ngModel)]="adjustmentReason" name="adjustmentReason"></mat-form-field><button mat-flat-button type="button" (click)="adjustStock()">Aplicar</button></div>
+      } @else { <p class="muted">Seleccioná un producto para ajustar su stock.</p> }
+    </mat-card>
+    <mat-card>
+      <h2>Categorías</h2>
+      <div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="categoryName" name="categoryName"></mat-form-field><mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="categorySlug" name="categorySlug"></mat-form-field><button mat-stroked-button type="button" (click)="addCategory()">Agregar</button></div>
+      <p class="tags">@for (category of categories(); track category.id) { <span>{{ category.name }}</span> }</p>
+    </mat-card>
+    <mat-card>
+      <h2>Marcas</h2>
+      <div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="brandName" name="brandName"></mat-form-field><button mat-stroked-button type="button" (click)="addBrand()">Agregar</button></div>
+      <p class="tags">@for (brand of brands(); track brand.id) { <span>{{ brand.name }}</span> }</p>
+    </mat-card>
+  </section>
+</main>

@@ -1,29 +1,25 @@
 <main>
   <section class="hero">
-    <p class="eyebrow">Etapa 1 completada</p>
-    <h1>Tienda informática y servicio técnico.</h1>
-    <p class="lead">
-      Base local preparada para catálogo, pedidos, inventario y reparaciones.
-    </p>
+    <div class="hero-copy">
+      <p class="eyebrow">Tecnología que acompaña</p>
+      <h1>Tu próxima mejora empieza acá.</h1>
+      <p class="lead">Componentes confiables, periféricos seleccionados y asesoramiento para armar la PC que necesitás.</p>
+      <div class="hero-actions">
+        <a mat-flat-button routerLink="/catalog">Ver catálogo</a>
+        @if (!auth.isAuthenticated()) { <a mat-stroked-button routerLink="/login">Iniciar sesión</a> }
+      </div>
+    </div>
+    <div class="hero-panel">
+      <span>Selección semanal</span>
+      <strong>Potenciá tu equipo</strong>
+      <p>Hardware para jugar, trabajar y crear sin límites.</p>
+    </div>
   </section>
 
-  <mat-card appearance="outlined" class="api-card">
-    <mat-card-header>
-      <mat-card-title>Estado de la API</mat-card-title>
-      <mat-card-subtitle>GET /api/health</mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      @if (isLoading()) {
-        <p>Comprobando conexión...</p>
-      } @else if (health(); as response) {
-        <p class="success">Conectada: {{ response.status }}</p>
-        <p class="timestamp">{{ response.timestamp }}</p>
-      } @else {
-        <p class="error">{{ error() }}</p>
-      }
-    </mat-card-content>
-    <mat-card-actions align="end">
-      <button mat-button type="button" (click)="checkApi()">Reintentar</button>
-    </mat-card-actions>
-  </mat-card>
+  <section class="featured">
+    <div class="section-heading"><div><p class="eyebrow">Destacados</p><h2>Equipá tu próximo proyecto</h2></div><a routerLink="/catalog">Explorar todo el catálogo</a></div>
+    @if (isLoading()) { <p class="status">Cargando productos...</p> }
+    @else if (error()) { <p class="status">No pudimos cargar los productos. <button mat-button type="button" (click)="loadFeatured()">Reintentar</button></p> }
+    @else { <div class="products">@for (product of featured(); track product.id) { <mat-card><mat-card-header><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle><mat-card-title>{{ product.name }}</mat-card-title></mat-card-header><mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.0-0' }} ARS</strong></mat-card-content></mat-card> } @empty { <p class="status">Próximamente habrá productos disponibles.</p> }</div> }
+  </section>
 </main>
