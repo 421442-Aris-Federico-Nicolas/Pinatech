@@ -1,8 +1,15 @@
 html,
 body {
-  background: #f3f4f6;
-  color: #111827;
-  font-family: Inter, Roboto, "Helvetica Neue", sans-serif;
+  --pin-navy: #062b47;
+  --pin-navy-deep: #041f34;
+  --pin-teal: #0097bd;
+  --pin-orange: #f58a08;
+  --pin-cream: #fff4df;
+  --pin-surface: #f6f8fa;
+  --pin-muted: #64748b;
+  background: var(--pin-surface);
+  color: var(--pin-navy);
+  font-family: Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   min-height: 100%;
 }
@@ -10,3 +17,10 @@ body {
 * {
   box-sizing: border-box;
 }
+
+button, input, textarea { font: inherit; }
+::selection { background: #a7f3d0; color: #064e3b; }
+
+mat-card, .mat-mdc-card { border-radius: 16px !important; }
+.mat-mdc-button, .mat-mdc-unelevated-button, .mat-mdc-outlined-button { border-radius: 10px !important; }
+iconify-icon { display: inline-block; line-height: 1; }

@@ -3,17 +3,49 @@
   min-height: 100dvh;
 }
 
+.utility-bar { align-items:center; background:#02070d; color:#8aa0b0; display:flex; font-size:.68rem; font-weight:700; justify-content:space-between; letter-spacing:.08em; padding:.42rem clamp(1rem,5vw,4rem); text-transform:uppercase; }
+
 mat-toolbar {
-  background: #111827;
+  background: var(--pin-navy-deep);
+  border-bottom: 2px solid var(--pin-orange);
   color: #f9fafb;
+  gap: .25rem;
+  min-height: 100px;
   padding-inline: clamp(1rem, 5vw, 4rem);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .brand {
+  align-items: center;
+  color: var(--pin-cream);
   color: inherit;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  display: inline-flex;
+  gap: .55rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-right: .75rem;
   text-decoration: none;
+}
+
+.brand-mark {
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 50%;
+  height: 75px;
+  overflow: hidden;
+  position: relative;
+  width: 75px;
+}
+
+.brand-logo {
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%;
+  transform: scale(1.36);
+  transform-origin: 50% 40%;
+  width: 100%;
 }
 
 .spacer {
@@ -25,16 +57,20 @@ mat-toolbar {
   font-size: 0.875rem;
 }
 
-.nav-link, .user-name {
-  color: #d1fae5;
-  font-size: 0.875rem;
-  margin-left: 1.5rem;
+.nav-link, .admin-link {
+  border-radius: 999px;
+  color: #d9edf4;
+  font-size: .82rem;
+  font-weight: 600;
+  margin: 0;
+  padding: .45rem .7rem;
   text-decoration: none;
 }
-
-.admin-link {
-  color: #d1fae5;
-  font-size: 0.875rem;
-  margin-right: 1.25rem;
-  text-decoration: none;
+.nav-link iconify-icon, .admin-link iconify-icon, button iconify-icon { font-size: 1rem; margin-right: .25rem; vertical-align: -.15em; }
+.nav-link:hover, .admin-link:hover { background: rgba(0, 151, 189, .22); color: var(--pin-cream); }
+.user-name { color: #7dd3e8; font-size: .82rem; margin: 0 .35rem; }
+@media (max-width: 760px) {
+  mat-toolbar { flex-wrap: wrap; gap: .1rem; padding-block: .45rem; }
+  .spacer { display: none; }
+  .brand { margin-right: auto; }
 }

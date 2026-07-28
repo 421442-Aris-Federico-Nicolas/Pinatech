@@ -10,6 +10,7 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home.component').then((component) => component.HomeComponent),
   },
   { path: 'catalog', title: 'Catálogo', loadComponent: () => import('./features/catalog/catalog.component').then((component) => component.CatalogComponent) },
+  { path: 'products/:id', title: 'Producto', loadComponent: () => import('./features/product/product.component').then((component) => component.ProductComponent) },
   { path: 'login', title: 'Iniciar sesión', loadComponent: () => import('./features/auth/login.component').then((component) => component.LoginComponent) },
   { path: 'cart', title: 'Carrito', loadComponent: () => import('./features/cart/cart.component').then((component) => component.CartComponent) },
   { path: 'orders', title: 'Mis pedidos', canActivate: [authGuard], loadComponent: () => import('./features/orders/orders.component').then((component) => component.OrdersComponent) },

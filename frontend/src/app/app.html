@@ -1,11 +1,15 @@
+<div class="utility-bar"><span>ENVÍO GRATIS EN COMPRAS SELECCIONADAS</span><span>Soporte técnico especializado · Córdoba, AR</span></div>
 <mat-toolbar>
-  <a class="brand" routerLink="/">Computer Store</a>
+  <a class="brand" routerLink="/">
+    <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="Logo de Pinatech"></span>
+    <span>Pinatech</span>
+  </a>
   @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
-    <a class="nav-link" routerLink="/catalog">Catálogo</a>
+    <a class="nav-link" routerLink="/catalog"><iconify-icon icon="line-md:search"></iconify-icon> Catálogo</a>
   }
   <span class="spacer"></span>
   @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
-    <a class="admin-link" routerLink="/cart">Carrito ({{ cart.count() }})</a>
+    <a class="admin-link" routerLink="/cart"><iconify-icon icon="line-md:shopping-cart"></iconify-icon> Carrito ({{ cart.count() }})</a>
   }
   @if (auth.user()?.roles?.includes('ADMIN')) {
     <a class="admin-link" routerLink="/admin">Administración</a>
@@ -19,9 +23,9 @@
   }
   @if (auth.isAuthenticated()) {
     <span class="user-name">{{ auth.user()?.firstName }}</span>
-    <button mat-button type="button" (click)="logout()">Salir</button>
+    <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out"></iconify-icon> Salir</button>
   } @else {
-    <a mat-button routerLink="/login">Ingresar</a>
+    <a mat-button routerLink="/login"><iconify-icon icon="line-md:account"></iconify-icon> Ingresar</a>
   }
 </mat-toolbar>
 <router-outlet />
