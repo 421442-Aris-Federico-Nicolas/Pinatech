@@ -4,13 +4,15 @@
 }
 
 .utility-bar { align-items:center; background:#02070d; color:#8aa0b0; display:flex; font-size:.68rem; font-weight:700; justify-content:space-between; letter-spacing:.08em; padding:.42rem clamp(1rem,5vw,4rem); text-transform:uppercase; }
+.skip-link { background:var(--pin-orange); color:#111; font-weight:800; left:1rem; padding:.7rem 1rem; position:fixed; top:-5rem; z-index:1000; }
+.skip-link:focus { top:1rem; }
 
 mat-toolbar {
   background: var(--pin-navy-deep);
   border-bottom: 2px solid var(--pin-orange);
   color: #f9fafb;
-  gap: .25rem;
-  min-height: 100px;
+  gap: 1rem;
+  min-height: 88px;
   padding-inline: clamp(1rem, 5vw, 4rem);
   position: sticky;
   top: 0;
@@ -48,9 +50,8 @@ mat-toolbar {
   width: 100%;
 }
 
-.spacer {
-  flex: 1;
-}
+nav { align-items:center; display:flex; flex:1; gap:.15rem; }
+.spacer { flex: 1; }
 
 .stage {
   color: #a7f3d0;
@@ -68,9 +69,19 @@ mat-toolbar {
 }
 .nav-link iconify-icon, .admin-link iconify-icon, button iconify-icon { font-size: 1rem; margin-right: .25rem; vertical-align: -.15em; }
 .nav-link:hover, .admin-link:hover { background: rgba(0, 151, 189, .22); color: var(--pin-cream); }
+.nav-link.active { background:rgba(0,151,189,.25); color:#fff; }
+.cart-count { align-items:center; background:var(--pin-orange); border-radius:99px; color:#101820; display:inline-flex; font-size:.7rem; height:1.35rem; justify-content:center; margin-left:.25rem; min-width:1.35rem; padding:0 .3rem; }
 .user-name { color: #7dd3e8; font-size: .82rem; margin: 0 .35rem; }
+.menu-toggle { background:transparent; border:1px solid #315268; border-radius:.5rem; color:#fff; display:none; font-size:1.6rem; padding:.4rem; }
 @media (max-width: 760px) {
-  mat-toolbar { flex-wrap: wrap; gap: .1rem; padding-block: .45rem; }
-  .spacer { display: none; }
-  .brand { margin-right: auto; }
+  .utility-bar span:first-child { display:none; }
+  .utility-bar { justify-content:center; }
+  mat-toolbar { min-height:72px; padding-block:.4rem; }
+  .brand { margin-right:auto; }
+  .brand-mark { height:56px; width:56px; }
+  .menu-toggle { display:inline-flex; }
+  nav { align-items:stretch; background:var(--pin-navy-deep); border-bottom:2px solid var(--pin-orange); display:none; flex-direction:column; left:0; padding:1rem; position:absolute; right:0; top:100%; }
+  nav.open { display:flex; }
+  .nav-link { padding:.8rem; }
+  .spacer { display:none; }
 }

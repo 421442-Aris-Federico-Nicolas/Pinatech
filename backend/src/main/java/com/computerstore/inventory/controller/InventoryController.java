@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -44,6 +45,13 @@ public class InventoryController {
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found.")));
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','TECHNICIAN')")
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> list() {
+        return repository.findAll().stream().map(this::toResponse).toList();
+    }
+
     @PostMapping("/adjustments")
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
@@ -51,7 +59,7 @@ public class InventoryController {
             @Valid @RequestBody InventoryAdjustmentRequest request,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        var inventory = repository.findById(request.productId())
+        var inventory = repository.findByProductIdForUpdate(request.productId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found."));
         inventory.adjust(request.quantity());
         var actor = userRepository.findById(user.id())

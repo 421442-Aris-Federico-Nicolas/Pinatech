@@ -1,0 +1,118 @@
+<div class="technical-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <aside class="technical-sidebar">
+    <div class="sidebar-head">
+      <div class="service-mark"><iconify-icon icon="line-md:cog-loop"></iconify-icon></div>
+      <div class="sidebar-copy"><strong>Pinatech Lab</strong><small>Service center</small></div>
+      <button class="collapse" type="button" (click)="sidebarCollapsed.update(value => !value)" [attr.aria-label]="sidebarCollapsed() ? 'Expandir navegación' : 'Contraer navegación'"><iconify-icon [icon]="sidebarCollapsed() ? 'line-md:chevron-small-double-right' : 'line-md:chevron-small-double-left'"></iconify-icon></button>
+    </div>
+    <nav aria-label="Secciones del panel técnico">
+      <button type="button" [class.active]="section() === 'overview'" (click)="navigate('overview')"><iconify-icon icon="line-md:home-md"></iconify-icon><span>Resumen</span></button>
+      <button type="button" [class.active]="section() === 'queue'" (click)="navigate('queue')"><iconify-icon icon="line-md:clipboard-list"></iconify-icon><span>Bandeja</span><b>{{ activeTickets().length }}</b></button>
+      <button type="button" [class.active]="section() === 'mine'" (click)="navigate('mine')"><iconify-icon icon="line-md:account"></iconify-icon><span>Mi trabajo</span><b>{{ myTickets().length }}</b></button>
+    </nav>
+    <div class="sidebar-foot"><i></i><span>Laboratorio operativo</span></div>
+  </aside>
+
+  <main>
+    <header class="page-heading">
+      <div><p class="eyebrow">Operación técnica</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
+      <button class="refresh" type="button" (click)="load()"><iconify-icon icon="line-md:rotate-270"></iconify-icon> Actualizar</button>
+    </header>
+
+    @if(error()){<p class="message error" role="alert">{{ error() }}</p>}
+    @if(success()){<p class="message success" role="status">{{ success() }}</p>}
+    @if(loading()){<section class="loading-state"><span></span><p>Sincronizando laboratorio...</p></section>}
+
+    @if(!loading() && section() === 'overview'){
+      <section class="kpis" aria-label="Indicadores técnicos">
+        <article><div class="kpi-icon cyan"><iconify-icon icon="line-md:clipboard-list"></iconify-icon></div><p>Tickets activos</p><strong>{{ activeTickets().length }}</strong><span>{{ unassignedTickets() }} todavía sin asignar</span></article>
+        <article><div class="kpi-icon orange"><iconify-icon icon="line-md:alert-circle"></iconify-icon></div><p>Prioridad alta</p><strong>{{ urgentTickets() }}</strong><span>Casos altos y urgentes</span></article>
+        <article><div class="kpi-icon violet"><iconify-icon icon="line-md:cog-loop"></iconify-icon></div><p>Mi carga actual</p><strong>{{ myTickets().length }}</strong><span>Tickets bajo tu responsabilidad</span></article>
+        <article><div class="kpi-icon green"><iconify-icon icon="line-md:confirm-circle"></iconify-icon></div><p>Listos para retirar</p><strong>{{ readyTickets() }}</strong><span>{{ statusCount('DELIVERED') }} reparaciones entregadas</span></article>
+      </section>
+
+      <section class="overview-grid">
+        <article class="panel intake-chart">
+          <header><div><p class="panel-kicker">Últimos 7 días</p><h2>Ingreso de equipos</h2></div><strong>{{ tickets().length }} históricos</strong></header>
+          <div class="chart" aria-label="Tickets ingresados durante los últimos siete días">@for(day of intakeChart();track day.label){<div class="chart-column"><span>{{ day.count || '' }}</span><i [style.height.%]="day.height"></i><small>{{ day.label }}</small></div>}</div>
+        </article>
+        <article class="panel flow-panel">
+          <header><div><p class="panel-kicker">Flujo del laboratorio</p><h2>Trabajo en curso</h2></div></header>
+          <div class="flow-list">
+            <button type="button" (click)="statusFilter.set('RECEIVED'); navigate('queue')"><i data-status="RECEIVED"></i><span><strong>Recibidos</strong><small>Esperando diagnóstico</small></span><b>{{ statusCount('RECEIVED') }}</b></button>
+            <button type="button" (click)="statusFilter.set('UNDER_DIAGNOSIS'); navigate('queue')"><i data-status="UNDER_DIAGNOSIS"></i><span><strong>En diagnóstico</strong><small>Evaluación técnica</small></span><b>{{ statusCount('UNDER_DIAGNOSIS') }}</b></button>
+            <button type="button" (click)="statusFilter.set('IN_REPAIR'); navigate('queue')"><i data-status="IN_REPAIR"></i><span><strong>En reparación</strong><small>Intervención activa</small></span><b>{{ statusCount('IN_REPAIR') }}</b></button>
+            <button type="button" (click)="statusFilter.set('WAITING_FOR_PARTS'); navigate('queue')"><i data-status="WAITING_FOR_PARTS"></i><span><strong>Esperando repuesto</strong><small>Dependencia externa</small></span><b>{{ statusCount('WAITING_FOR_PARTS') }}</b></button>
+          </div>
+        </article>
+      </section>
+
+      <section class="dashboard-bottom">
+        <article class="panel recent-panel">
+          <header><div><p class="panel-kicker">Actividad reciente</p><h2>Últimos tickets</h2></div><button type="button" (click)="statusFilter.set('ACTIVE'); navigate('queue')">Abrir bandeja →</button></header>
+          <div class="recent-list">@for(ticket of recentTickets();track ticket.id){<button type="button" (click)="select(ticket,true)"><span class="ticket-id">#{{ ticket.id }}</span><span class="device"><strong>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</strong><small>{{ ticket.customerName }} · hace {{ age(ticket) }}</small></span><i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><span class="status-badge" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</span></button>}@empty{<p class="empty-row">No hay tickets registrados.</p>}</div>
+        </article>
+        <article class="panel workload-panel">
+          @if(isAdmin()){
+            <header><div><p class="panel-kicker">Distribución</p><h2>Carga por técnico</h2></div></header>
+            <div class="workload-list">@for(technician of teamWorkload();track technician.id){<div><span class="avatar">{{ technician.name.charAt(0) }}</span><span><strong>{{ technician.name }}</strong><small>{{ technician.count }} tickets activos</small></span><i><b [style.width.%]="activeTickets().length ? technician.count / activeTickets().length * 100 : 0"></b></i></div>}@empty{<p class="empty-row">No hay técnicos activos.</p>}</div>
+          }@else{
+            <header><div><p class="panel-kicker">Tu operación</p><h2>Mi mesa</h2></div></header>
+            <div class="personal-summary"><strong>{{ myTickets().length }}</strong><p>tickets activos asignados</p><button type="button" (click)="navigate('mine')">Ir a mi trabajo →</button></div>
+          }
+        </article>
+      </section>
+    }
+
+    @if(!loading() && section() !== 'overview'){
+      <section class="queue-toolbar">
+        <label class="search"><iconify-icon icon="line-md:search"></iconify-icon><input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Buscar ticket, cliente o equipo" aria-label="Buscar tickets"></label>
+        <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" aria-label="Filtrar por estado"><option value="ACTIVE">Activos</option><option value="ALL">Todos los estados</option>@for(status of statuses;track status){<option [value]="status">{{ statusLabel(status) }}</option>}<option value="CANCELLED">Cancelados</option></select>
+        <select [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)" aria-label="Filtrar por prioridad"><option value="ALL">Todas las prioridades</option>@for(priority of priorities;track priority){<option [value]="priority">{{ priorityLabel(priority) }}</option>}</select>
+      </section>
+
+      <section class="ticket-workspace">
+        <div class="ticket-list">
+          @for(ticket of filteredTickets();track ticket.id){
+            <button type="button" [class.selected]="selected()?.id === ticket.id" [class.urgent]="ticket.priority === 'URGENT'" (click)="select(ticket)">
+              <span class="ticket-top"><b>#{{ ticket.id }}</b><i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><small>hace {{ age(ticket) }}</small></span>
+              <strong>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</strong>
+              <span class="customer-line">{{ ticket.customerName }}</span>
+              <p>{{ ticket.reportedProblem }}</p>
+              <span class="ticket-foot"><i class="status-badge" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</i><small>{{ ticket.technicianName }}</small></span>
+            </button>
+          }@empty{<section class="empty-state"><iconify-icon icon="line-md:clipboard-list"></iconify-icon><h2>No hay tickets</h2><p>Ajustá los filtros para ampliar la búsqueda.</p></section>}
+        </div>
+
+        <aside class="ticket-detail">
+          @if(selected();as ticket){
+            <header>
+              <div><p class="panel-kicker">Ticket #{{ ticket.id }}</p><h2>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</h2><span>{{ ticket.customerName }} · {{ ticket.customerEmail }}</span></div>
+              <i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i>
+            </header>
+            <div class="progress"><i [style.width.%]="progress(ticket)"></i></div>
+            <div class="detail-meta"><span><small>Estado</small><strong>{{ statusLabel(ticket.status) }}</strong></span><span><small>Responsable</small><strong>{{ ticket.technicianName }}</strong></span><span><small>Ingreso</small><strong>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span>@if(ticket.serialNumber){<span><small>Número de serie</small><strong>{{ ticket.serialNumber }}</strong></span>}</div>
+
+            @if(!isAdmin() && ticket.technicianId === null){<button class="claim" mat-flat-button type="button" [disabled]="saving()" (click)="claim(ticket)">Tomar este ticket</button>}
+            @if(isAdmin() && technicians().length){<mat-form-field class="technician-select"><mat-label>Técnico responsable</mat-label><mat-select [ngModel]="ticket.technicianId" (ngModelChange)="assign($event)" [disabled]="saving()">@for(technician of technicians();track technician.id){<mat-option [value]="technician.id">{{ technician.name }}</mat-option>}</mat-select></mat-form-field>}
+
+            <section class="problem"><h3>Problema informado</h3><p>{{ ticket.reportedProblem }}</p></section>
+            <section class="technical-form">
+              <div class="section-title"><div><h3>Ficha técnica</h3><p>Diagnóstico, prioridad y presupuesto.</p></div>@if(!canEdit(ticket)){<span class="locked">Asignado a otro técnico</span>}</div>
+              <mat-form-field><mat-label>Prioridad</mat-label><mat-select [(ngModel)]="priority" [disabled]="!canEdit(ticket)">@for(item of priorities;track item){<mat-option [value]="item">{{ priorityLabel(item) }}</mat-option>}</mat-select></mat-form-field>
+              <mat-form-field class="wide"><mat-label>Diagnóstico técnico</mat-label><textarea matInput rows="4" [(ngModel)]="diagnosis" [disabled]="!canEdit(ticket)" placeholder="Hallazgos, pruebas realizadas y solución propuesta"></textarea></mat-form-field>
+              <div class="price-fields"><mat-form-field><mat-label>Presupuesto estimado</mat-label><input matInput type="number" min="0" [(ngModel)]="estimatedPrice" [disabled]="!canEdit(ticket)"><span matTextSuffix>ARS</span></mat-form-field><mat-form-field><mat-label>Precio final</mat-label><input matInput type="number" min="0" [(ngModel)]="finalPrice" [disabled]="!canEdit(ticket)"><span matTextSuffix>ARS</span></mat-form-field></div>
+              <button mat-stroked-button type="button" [disabled]="!canEdit(ticket) || saving()" (click)="saveDetails()">Guardar ficha técnica</button>
+            </section>
+
+            @if(statusActions(ticket.status).length){<section class="workflow-actions"><h3>Actualizar estado</h3><mat-form-field><mat-label>Nota para el historial (opcional)</mat-label><input matInput [(ngModel)]="statusComment" [disabled]="!canEdit(ticket)"></mat-form-field><div>@for(action of statusActions(ticket.status);track action.status){<button mat-flat-button type="button" [class.danger-action]="action.danger" [disabled]="!canEdit(ticket) || saving()" (click)="changeStatus(action)">{{ action.label }}</button>}</div></section>}
+
+            <section class="timeline"><h3>Historial</h3>@if(history().length){@for(item of history();track item.id){<article><i></i><div><strong>{{ statusLabel(item.newStatus) }}</strong><small>{{ item.changedAt | date:'dd/MM/yy, HH:mm' }} · {{ item.changedBy }}</small>@if(item.comment){<p>{{ item.comment }}</p>}</div></article>}}@else{<article><i></i><div><strong>{{ statusLabel(ticket.status) }}</strong><small>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</small><p>Estado actual. Este ticket es anterior al historial detallado.</p></div></article>}</section>
+          }@else{
+            <div class="detail-placeholder"><iconify-icon icon="line-md:arrow-left"></iconify-icon><h2>Seleccioná un ticket</h2><p>Acá vas a poder diagnosticar, presupuestar y actualizar su avance.</p></div>
+          }
+        </aside>
+      </section>
+    }
+  </main>
+</div>

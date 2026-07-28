@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+server:
+  forward-headers-strategy: framework
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  cors:
+    allowed-origin: ${CORS_ALLOWED_ORIGIN}
+  jwt:
+    secret: ${JWT_SECRET}
+  cookies:
+    secure: true
+
+logging:
+  level:
+    com.computerstore: INFO
+    org.springframework.security: WARN

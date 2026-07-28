@@ -52,6 +52,11 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    ProblemDetail handleInvalidRequest(InvalidRequestException exception, HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     ProblemDetail handleNotFound(ResourceNotFoundException exception, HttpServletRequest request) {
         return problem(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found", exception.getMessage(), request);

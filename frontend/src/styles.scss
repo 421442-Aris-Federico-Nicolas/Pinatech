@@ -18,9 +18,12 @@ body {
   box-sizing: border-box;
 }
 
-button, input, textarea { font: inherit; }
-::selection { background: #a7f3d0; color: #064e3b; }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #9ee8f3; color: var(--pin-navy-deep); }
+:focus-visible { outline: 3px solid var(--pin-orange); outline-offset: 3px; }
 
 mat-card, .mat-mdc-card { border-radius: 16px !important; }
 .mat-mdc-button, .mat-mdc-unelevated-button, .mat-mdc-outlined-button { border-radius: 10px !important; }
 iconify-icon { display: inline-block; line-height: 1; }
+.sr-only { height:1px; margin:-1px; overflow:hidden; padding:0; position:absolute; width:1px; clip:rect(0,0,0,0); white-space:nowrap; }

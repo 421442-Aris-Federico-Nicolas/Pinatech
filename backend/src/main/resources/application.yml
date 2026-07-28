@@ -44,5 +44,10 @@ app:
     secure: ${REFRESH_COOKIE_SECURE:false}
   auth-rate-limit:
     max-login-attempts: ${AUTH_MAX_LOGIN_ATTEMPTS:5}
+    max-registration-attempts: ${AUTH_MAX_REGISTRATION_ATTEMPTS:3}
     max-refresh-attempts: ${AUTH_MAX_REFRESH_ATTEMPTS:20}
     window-ms: ${AUTH_RATE_LIMIT_WINDOW_MS:60000}
+  orders:
+    reservation-ttl: ${ORDER_RESERVATION_TTL:PT15M}
+    expiration-batch-size: ${ORDER_EXPIRATION_BATCH_SIZE:100}
+    expiration-check-interval-ms: ${ORDER_EXPIRATION_CHECK_INTERVAL_MS:60000}

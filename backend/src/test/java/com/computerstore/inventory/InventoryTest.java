@@ -31,4 +31,16 @@ class InventoryTest {
 
         assertThrows(InsufficientStockException.class, () -> inventory.reserve(3));
     }
+
+    @Test
+    void consumesReservedStockWithoutReturningItToAvailableStock() {
+        Inventory inventory = new Inventory((Product) null);
+        inventory.adjust(8);
+        inventory.reserve(3);
+
+        inventory.consumeReserved(3);
+
+        assertEquals(5, inventory.getAvailableQuantity());
+        assertEquals(0, inventory.getReservedQuantity());
+    }
 }

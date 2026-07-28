@@ -1,9 +1,54 @@
 <main>
-  <header class="catalog-header"><div><p class="eyebrow">Pinatech hardware</p><h1>Catálogo</h1></div><p>{{ page()?.content?.length ?? 0 }} resultados en esta página</p></header>
-  <div class="search"><input [(ngModel)]="filters.search" (ngModelChange)="searchChanged($event)" (keyup.enter)="load()" placeholder="Buscar componentes, periféricos y más"><button mat-flat-button (click)="load()">Buscar</button></div>
+  <header class="catalog-header">
+    <div><p class="eyebrow">Pinatech hardware</p><h1>Catálogo</h1></div>
+    @if (page(); as result) { <p>{{ result.totalElements }} {{ result.totalElements === 1 ? 'producto' : 'productos' }}</p> }
+  </header>
+
+  <div class="toolbar">
+    <form class="search" (ngSubmit)="applyFilters()" role="search">
+      <label class="sr-only" for="catalog-search">Buscar productos</label>
+      <input id="catalog-search" name="search" [(ngModel)]="filters.search" (ngModelChange)="searchChanged($event)" placeholder="Buscar por nombre" autocomplete="off">
+      <button mat-flat-button type="submit">Buscar</button>
+    </form>
+    <button class="filter-toggle" mat-stroked-button type="button" [attr.aria-expanded]="filtersOpen()" aria-controls="catalog-filters" (click)="filtersOpen.update(open => !open)">Filtros</button>
+    <label class="sort">Ordenar
+      <select [ngModel]="sort()" (ngModelChange)="sort.set($event); applyFilters()" aria-label="Ordenar productos">
+        <option value="name,asc">Nombre A–Z</option><option value="name,desc">Nombre Z–A</option><option value="price,asc">Menor precio</option><option value="price,desc">Mayor precio</option>
+      </select>
+    </label>
+  </div>
+
+  <p class="sr-only" aria-live="polite">{{ feedback() }}</p>
   <section class="catalog-layout">
-    <aside class="filters"><div class="filter-heading"><h2>Filtros</h2><button mat-button type="button" (click)="clearFilters()">Limpiar</button></div><label>Categoría<select [(ngModel)]="filters.categoryId" (change)="load()"><option [ngValue]="null">Todas las categorías</option>@for(category of categories();track category.id){<option [ngValue]="category.id">{{category.name}}</option>}</select></label><label>Marca<select [(ngModel)]="filters.brandId" (change)="load()"><option [ngValue]="null">Todas las marcas</option>@for(brand of brands();track brand.id){<option [ngValue]="brand.id">{{brand.name}}</option>}</select></label><div class="price"><label>Desde<input type="number" min="0" [(ngModel)]="filters.minPrice" (change)="load()" placeholder="ARS"></label><label>Hasta<input type="number" min="0" [(ngModel)]="filters.maxPrice" (change)="load()" placeholder="ARS"></label></div></aside>
-    <section class="grid">@for (product of page()?.content ?? []; track product.id) { <mat-card><mat-card-header><mat-card-title><a [routerLink]="['/products', product.id]">{{ product.name }}</a></mat-card-title><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle></mat-card-header><mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} ARS</strong></mat-card-content><mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver producto</a><button mat-button (click)="cart.add(product)">Agregar</button></mat-card-actions></mat-card> }</section>
+    <aside id="catalog-filters" class="filters" [class.open]="filtersOpen()">
+      <div class="filter-heading"><h2>Filtros</h2><button type="button" (click)="clearFilters()">Limpiar</button></div>
+      @if (optionsError()) { <p class="filter-error">No se pudieron cargar las opciones de marca y categoría.</p> }
+      <label>Categoría<select [(ngModel)]="filters.categoryId" (change)="applyFilters()"><option [ngValue]="null">Todas</option>@for(category of categories();track category.id){<option [ngValue]="category.id">{{category.name}}</option>}</select></label>
+      <label>Marca<select [(ngModel)]="filters.brandId" (change)="applyFilters()"><option [ngValue]="null">Todas</option>@for(brand of brands();track brand.id){<option [ngValue]="brand.id">{{brand.name}}</option>}</select></label>
+      <div class="price"><label>Desde<input type="number" min="0" [(ngModel)]="filters.minPrice" (change)="applyFilters()" placeholder="ARS"></label><label>Hasta<input type="number" min="0" [(ngModel)]="filters.maxPrice" (change)="applyFilters()" placeholder="ARS"></label></div>
+    </aside>
+
+    <div>
+      @if (loading()) {
+        <section class="state" aria-live="polite"><span class="loader"></span><h2>Cargando productos</h2></section>
+      } @else if (error()) {
+        <section class="state error" role="alert"><h2>No pudimos cargar el catálogo</h2><p>Revisá tu conexión e intentá nuevamente.</p><button mat-flat-button type="button" (click)="retry()">Reintentar</button></section>
+      } @else if (page()?.content?.length) {
+        <section class="grid" aria-label="Resultados del catálogo">
+          @for (product of page()?.content ?? []; track product.id) {
+            <mat-card>
+              <a class="product-visual" [routerLink]="['/products', product.id]" [attr.aria-label]="'Ver ' + product.name"><span>{{ product.brandName }}</span><b aria-hidden="true">PIN</b></a>
+              <mat-card-header><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]">{{ product.name }}</a></mat-card-title></mat-card-header>
+              <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <small>ARS</small></strong></mat-card-content>
+              <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>
+            </mat-card>
+          }
+        </section>
+      } @else {
+        <section class="state"><h2>No encontramos productos</h2><p>Probá con otros términos o quitá los filtros actuales.</p><button mat-flat-button type="button" (click)="clearFilters()">Limpiar filtros</button></section>
+      }
+    </div>
   </section>
-  @if(page();as result){<footer><button mat-button [disabled]="result.number===0" (click)="load(result.number-1)">Anterior</button><span>{{ result.number+1 }} / {{ result.totalPages }}</span><button mat-button [disabled]="result.number+1>=result.totalPages" (click)="load(result.number+1)">Siguiente</button></footer>}
+
+  @if(page();as result){ @if (result.totalPages > 1) { <nav class="pagination" aria-label="Páginas del catálogo"><button mat-button [disabled]="result.number===0" (click)="applyFilters(result.number)">Anterior</button><span>Página {{ result.number+1 }} de {{ result.totalPages }}</span><button mat-button [disabled]="result.number+1>=result.totalPages" (click)="applyFilters(result.number+2)">Siguiente</button></nav> } }
 </main>

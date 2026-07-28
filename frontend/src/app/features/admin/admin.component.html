@@ -1,61 +1,120 @@
-<main>
-  <header class="heading">
-    <div>
-      <p class="eyebrow">Operación interna</p>
-      <h1>Administración de catálogo</h1>
-      <p>Gestioná productos, estructura comercial y stock desde un único lugar.</p>
+<div class="admin-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <aside class="admin-sidebar">
+    <div class="sidebar-head">
+      <div class="admin-mark">P</div>
+      <div class="sidebar-copy"><strong>Pinatech</strong><small>Control center</small></div>
+      <button class="collapse" type="button" (click)="sidebarCollapsed.update(value => !value)" [attr.aria-label]="sidebarCollapsed() ? 'Expandir navegación' : 'Contraer navegación'">
+        <iconify-icon [icon]="sidebarCollapsed() ? 'line-md:chevron-small-double-right' : 'line-md:chevron-small-double-left'"></iconify-icon>
+      </button>
     </div>
-    <button mat-stroked-button type="button" (click)="resetProduct()">Nuevo producto</button>
-  </header>
+    <nav aria-label="Secciones administrativas">
+      <button type="button" [class.active]="section() === 'overview'" (click)="navigate('overview')"><iconify-icon icon="line-md:home-md"></iconify-icon><span>Resumen</span></button>
+      <button type="button" [class.active]="section() === 'sales'" (click)="navigate('sales')"><iconify-icon icon="line-md:clipboard-list"></iconify-icon><span>Ventas</span><b>{{ activeOrders() }}</b></button>
+      <button type="button" [class.active]="section() === 'catalog'" (click)="navigate('catalog')"><iconify-icon icon="line-md:document-list"></iconify-icon><span>Catálogo</span></button>
+      <button type="button" [class.active]="section() === 'inventory'" (click)="navigate('inventory')"><iconify-icon icon="line-md:confirm-square"></iconify-icon><span>Inventario</span>@if(lowStock()){<b class="warning">{{ lowStock() }}</b>}</button>
+    </nav>
+    <div class="sidebar-foot"><i></i><span>Sistema operativo</span></div>
+  </aside>
 
-  @if (error()) { <p class="message error">{{ error() }}</p> }
-  @if (success()) { <p class="message success">{{ success() }}</p> }
+  <main>
+    <header class="page-heading">
+      <div><p class="eyebrow">Operación interna</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
+      <div class="heading-actions"><button class="refresh" type="button" (click)="reload()"><iconify-icon icon="line-md:rotate-270"></iconify-icon> Actualizar</button>@if(section() === 'catalog'){<button mat-flat-button type="button" (click)="openNewProduct()">Nuevo producto</button>}</div>
+    </header>
 
-  <section class="workspace">
-    <mat-card class="product-list">
-      <h2>Productos activos</h2>
-      <p class="muted">{{ products().length }} disponibles para editar</p>
-      <div class="items">
-        @for (product of products(); track product.id) {
-          <button type="button" class="product-row" [class.selected]="selected()?.id === product.id" (click)="select(product)">
-            <span>{{ product.name }}</span><small>{{ product.brandName }} · {{ product.price | number:'1.0-0' }}</small>
-          </button>
-        } @empty { <p class="muted">No hay productos activos.</p> }
-      </div>
-    </mat-card>
+    @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
+    @if (success()) { <p class="message success" role="status">{{ success() }}</p> }
+    @if (loading()) { <section class="loading-state"><span></span><p>Sincronizando operación...</p></section> }
 
-    <mat-card class="editor">
-      <div class="card-title"><div><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2><p class="muted">Los campos marcados son obligatorios.</p></div>@if (selected()) { <button mat-button color="warn" type="button" (click)="deleteProduct()">Dar de baja</button> }</div>
-      <div class="product-form">
-        <mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="form.name" name="name" (input)="updateSlug()" required></mat-form-field>
-        <mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="form.slug" name="slug" required></mat-form-field>
-        <mat-form-field><mat-label>Precio</mat-label><input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.price" name="price" required></mat-form-field>
-        <mat-form-field><mat-label>Categoría</mat-label><mat-select [(ngModel)]="form.categoryId" name="categoryId" required>@for (category of categories(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }</mat-select></mat-form-field>
-        <mat-form-field class="wide"><mat-label>Marca</mat-label><mat-select [(ngModel)]="form.brandId" name="brandId" required>@for (brand of brands(); track brand.id) { <mat-option [value]="brand.id">{{ brand.name }}</mat-option> }</mat-select></mat-form-field>
-        <mat-form-field class="wide"><mat-label>Descripción</mat-label><textarea matInput rows="4" [(ngModel)]="form.description" name="description" required></textarea></mat-form-field>
-      </div>
-      <button mat-flat-button type="button" [disabled]="saving()" (click)="saveProduct()">{{ saving() ? 'Guardando...' : selected() ? 'Guardar cambios' : 'Crear producto' }}</button>
-    </mat-card>
-  </section>
+    @if (!loading() && section() === 'overview') {
+      <section class="kpis" aria-label="Indicadores principales">
+        <article><div class="kpi-icon cyan"><iconify-icon icon="line-md:account"></iconify-icon></div><p>Ventas registradas</p><strong>{{ revenue() | number:'1.0-0' }} <small>ARS</small></strong><span>{{ soldOrders().length }} operaciones no canceladas</span></article>
+        <article><div class="kpi-icon orange"><iconify-icon icon="line-md:clipboard-list"></iconify-icon></div><p>Pedidos activos</p><strong>{{ activeOrders() }}</strong><span>{{ statusCount('PENDING_PAYMENT') }} pendientes de pago</span></article>
+        <article><div class="kpi-icon violet"><iconify-icon icon="line-md:coffee-half-empty-twotone-loop"></iconify-icon></div><p>Ticket promedio</p><strong>{{ averageTicket() | number:'1.0-0' }} <small>ARS</small></strong><span>Sobre pedidos pagados</span></article>
+        <article><div class="kpi-icon green"><iconify-icon icon="line-md:confirm-circle"></iconify-icon></div><p>Unidades disponibles</p><strong>{{ availableUnits() }}</strong><span [class.alert-text]="lowStock()">{{ lowStock() }} productos con stock bajo</span></article>
+      </section>
 
-  <section class="operations">
-    <mat-card>
-      <h2>Inventario</h2>
-      @if (selected()) {
-        <p class="stock-name">{{ selected()!.name }}</p>
-        @if (inventory(); as current) { <p class="stock"><strong>{{ current.availableQuantity }}</strong> unidades disponibles <span>{{ current.reservedQuantity }} reservadas</span></p> }
-        <div class="stock-form"><mat-form-field><mat-label>Ajuste</mat-label><input matInput type="number" [(ngModel)]="adjustment" name="adjustment"></mat-form-field><mat-form-field><mat-label>Motivo</mat-label><input matInput [(ngModel)]="adjustmentReason" name="adjustmentReason"></mat-form-field><button mat-flat-button type="button" (click)="adjustStock()">Aplicar</button></div>
-      } @else { <p class="muted">Seleccioná un producto para ajustar su stock.</p> }
-    </mat-card>
-    <mat-card>
-      <h2>Categorías</h2>
-      <div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="categoryName" name="categoryName"></mat-form-field><mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="categorySlug" name="categorySlug"></mat-form-field><button mat-stroked-button type="button" (click)="addCategory()">Agregar</button></div>
-      <p class="tags">@for (category of categories(); track category.id) { <span>{{ category.name }}</span> }</p>
-    </mat-card>
-    <mat-card>
-      <h2>Marcas</h2>
-      <div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="brandName" name="brandName"></mat-form-field><button mat-stroked-button type="button" (click)="addBrand()">Agregar</button></div>
-      <p class="tags">@for (brand of brands(); track brand.id) { <span>{{ brand.name }}</span> }</p>
-    </mat-card>
-  </section>
-</main>
+      <section class="overview-grid">
+        <article class="panel sales-chart">
+          <header><div><p class="panel-kicker">Últimos 7 días</p><h2>Ritmo de ventas</h2></div><strong>{{ revenue() | number:'1.0-0' }} ARS</strong></header>
+          <div class="chart" aria-label="Ventas registradas durante los últimos siete días">
+            @for(day of salesChart(); track day.label){<div class="chart-column"><span class="chart-value">{{ day.total ? (day.total | number:'1.0-0') : '' }}</span><i [style.height.%]="day.height"></i><small>{{ day.label }}</small></div>}
+          </div>
+        </article>
+        <article class="panel status-panel">
+          <header><div><p class="panel-kicker">Flujo operativo</p><h2>Estado de pedidos</h2></div></header>
+          <div class="status-list">
+            <button type="button" (click)="orderFilter.set('PENDING_PAYMENT'); navigate('sales')"><span class="status-dot pending"></span><div><strong>Pendientes</strong><small>Requieren seguimiento</small></div><b>{{ statusCount('PENDING_PAYMENT') }}</b></button>
+            <button type="button" (click)="orderFilter.set('PAID'); navigate('sales')"><span class="status-dot paid"></span><div><strong>Pagados</strong><small>Listos para preparar</small></div><b>{{ statusCount('PAID') }}</b></button>
+            <button type="button" (click)="orderFilter.set('PREPARING'); navigate('sales')"><span class="status-dot preparing"></span><div><strong>En preparación</strong><small>Trabajo en curso</small></div><b>{{ statusCount('PREPARING') }}</b></button>
+            <button type="button" (click)="orderFilter.set('READY'); navigate('sales')"><span class="status-dot ready"></span><div><strong>Listos</strong><small>Pendientes de entrega</small></div><b>{{ statusCount('READY') }}</b></button>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel recent-panel">
+        <header><div><p class="panel-kicker">Actividad reciente</p><h2>Últimos pedidos</h2></div><button type="button" (click)="orderFilter.set('ALL'); navigate('sales')">Ver todas las ventas →</button></header>
+        <div class="order-table compact">
+          <div class="table-head"><span>Pedido</span><span>Cliente</span><span>Fecha</span><span>Estado</span><span>Total</span></div>
+          @for(order of recentOrders(); track order.id){<button class="table-row" type="button" (click)="expandedOrder.set(order.id); navigate('sales')"><strong>#{{ order.id }}</strong><span><b>{{ order.customerName }}</b><small>{{ order.customerEmail }}</small></span><span>{{ order.createdAt | date:'dd MMM, HH:mm' }}</span><span><i class="status-badge" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</i></span><strong>{{ order.total | number:'1.0-0' }} ARS</strong></button>} @empty { <p class="empty-row">Todavía no hay pedidos registrados.</p> }
+        </div>
+      </section>
+    }
+
+    @if (!loading() && section() === 'sales') {
+      <section class="sales-toolbar">
+        <div class="filter-tabs"><button type="button" [class.active]="orderFilter() === 'ALL'" (click)="orderFilter.set('ALL')">Todos <span>{{ orders().length }}</span></button><button type="button" [class.active]="orderFilter() === 'PENDING_PAYMENT'" (click)="orderFilter.set('PENDING_PAYMENT')">Pendientes <span>{{ statusCount('PENDING_PAYMENT') }}</span></button><button type="button" [class.active]="orderFilter() === 'PAID'" (click)="orderFilter.set('PAID')">Pagados <span>{{ statusCount('PAID') }}</span></button><button type="button" [class.active]="orderFilter() === 'PREPARING'" (click)="orderFilter.set('PREPARING')">Preparando <span>{{ statusCount('PREPARING') }}</span></button><button type="button" [class.active]="orderFilter() === 'DELIVERED'" (click)="orderFilter.set('DELIVERED')">Entregados <span>{{ statusCount('DELIVERED') }}</span></button></div>
+      </section>
+      <section class="orders-list">
+        @for(order of filteredOrders(); track order.id){
+          <article class="order-card" [class.expanded]="expandedOrder() === order.id">
+            <button class="order-summary" type="button" (click)="expandedOrder.set(expandedOrder() === order.id ? null : order.id)">
+              <span class="order-number"><small>Pedido</small><strong>#{{ order.id }}</strong></span>
+              <span class="customer"><strong>{{ order.customerName }}</strong><small>{{ order.customerEmail }}</small></span>
+              <span><small>Fecha</small><strong>{{ order.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span>
+              <span><small>Artículos</small><strong>{{ totalItems(order) }}</strong></span>
+              <i class="status-badge" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</i>
+              <strong class="order-total">{{ order.total | number:'1.0-0' }} <small>ARS</small></strong>
+              <iconify-icon class="chevron" icon="line-md:chevron-small-down"></iconify-icon>
+            </button>
+            @if(expandedOrder() === order.id){
+              <div class="order-detail">
+                <div class="order-items"><h3>Detalle del pedido</h3>@for(item of order.items;track item.productId){<p><span>{{ item.quantity }} × {{ item.productName }}</span><strong>{{ item.subtotal | number:'1.0-0' }} ARS</strong></p>}</div>
+                <div class="order-actions"><p><span>Total</span><strong>{{ order.total | number:'1.0-0' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT'){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status);track action.status){<button mat-stroked-button type="button" [class.danger-action]="action.danger" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
+              </div>
+            }
+          </article>
+        } @empty { <section class="empty-state"><iconify-icon icon="line-md:clipboard-list"></iconify-icon><h2>No hay pedidos en este estado</h2><p>Probá seleccionando otro filtro.</p></section> }
+      </section>
+    }
+
+    @if (!loading() && section() === 'catalog') {
+      <section class="catalog-workspace">
+        <aside class="panel product-list">
+          <header><div><p class="panel-kicker">{{ products().length }} activos</p><h2>Productos</h2></div><button type="button" (click)="resetProduct()">+</button></header>
+          <div class="items">@for(product of products();track product.id){<button type="button" class="product-row" [class.selected]="selected()?.id === product.id" (click)="select(product)"><span class="product-avatar">{{ product.name.charAt(0) }}</span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ product.price | number:'1.0-0' }} ARS</small></span></button>}@empty{<p class="empty-row">No hay productos activos.</p>}</div>
+        </aside>
+        <section class="panel editor">
+          <header><div><p class="panel-kicker">{{ selected() ? 'Producto #' + selected()!.id : 'Alta de producto' }}</p><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2></div>@if(selected()){<button class="text-danger" type="button" (click)="deleteProduct()">Dar de baja</button>}</header>
+          <div class="product-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="form.name" name="name" (input)="updateSlug()" required></mat-form-field><mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="form.slug" name="slug" required></mat-form-field><mat-form-field><mat-label>Precio</mat-label><input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.price" name="price" required></mat-form-field><mat-form-field><mat-label>Categoría</mat-label><mat-select [(ngModel)]="form.categoryId" name="categoryId" required>@for(category of categories();track category.id){<mat-option [value]="category.id">{{ category.name }}</mat-option>}</mat-select></mat-form-field><mat-form-field><mat-label>Marca</mat-label><mat-select [(ngModel)]="form.brandId" name="brandId" required>@for(brand of brands();track brand.id){<mat-option [value]="brand.id">{{ brand.name }}</mat-option>}</mat-select></mat-form-field><mat-form-field class="wide"><mat-label>Descripción</mat-label><textarea matInput rows="5" [(ngModel)]="form.description" name="description" required></textarea></mat-form-field></div>
+          <footer><button mat-flat-button type="button" [disabled]="saving()" (click)="saveProduct()">{{ saving() ? 'Guardando...' : selected() ? 'Guardar cambios' : 'Crear producto' }}</button></footer>
+        </section>
+      </section>
+      <section class="taxonomy-grid">
+        <article class="panel"><header><div><p class="panel-kicker">Estructura</p><h2>Categorías</h2></div></header><div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="categoryName" name="categoryName"></mat-form-field><mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="categorySlug" name="categorySlug"></mat-form-field><button mat-stroked-button type="button" (click)="addCategory()">Agregar</button></div><div class="tags">@for(category of categories();track category.id){<span>{{ category.name }}</span>}</div></article>
+        <article class="panel"><header><div><p class="panel-kicker">Fabricantes</p><h2>Marcas</h2></div></header><div class="compact-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="brandName" name="brandName"></mat-form-field><button mat-stroked-button type="button" (click)="addBrand()">Agregar</button></div><div class="tags">@for(brand of brands();track brand.id){<span>{{ brand.name }}</span>}</div></article>
+      </section>
+    }
+
+    @if (!loading() && section() === 'inventory') {
+      <section class="inventory-layout">
+        <div class="inventory-products">
+          @for(product of products();track product.id){@if(stockFor(product.id);as stock){<button type="button" [class.selected]="selected()?.id === product.id" [class.low]="stock.availableQuantity <= 5" (click)="select(product)"><span class="stock-indicator"></span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }}</small></span><span class="stock-numbers"><strong>{{ stock.availableQuantity }}</strong><small>disponibles</small></span><span class="reserved"><strong>{{ stock.reservedQuantity }}</strong><small>reservadas</small></span></button>}}
+        </div>
+        <aside class="panel stock-editor">
+          @if(selected();as product){<p class="panel-kicker">Ajuste manual</p><h2>{{ product.name }}</h2>@if(inventory();as current){<div class="stock-summary"><div><strong>{{ current.availableQuantity }}</strong><span>Disponibles</span></div><div><strong>{{ current.reservedQuantity }}</strong><span>Reservadas</span></div></div>}<mat-form-field><mat-label>Cantidad a sumar o restar</mat-label><input matInput type="number" [(ngModel)]="adjustment" name="adjustment"></mat-form-field><mat-form-field><mat-label>Motivo del movimiento</mat-label><textarea matInput rows="3" [(ngModel)]="adjustmentReason" name="adjustmentReason"></textarea></mat-form-field><button mat-flat-button type="button" (click)="adjustStock()">Aplicar ajuste</button><small class="stock-help">Usá valores negativos para descontar unidades. Las reservas no se modifican manualmente.</small>}@else{<div class="select-prompt"><iconify-icon icon="line-md:arrow-left"></iconify-icon><h2>Seleccioná un producto</h2><p>Podrás consultar y ajustar su disponibilidad.</p></div>}
+        </aside>
+      </section>
+    }
+  </main>
+</div>

@@ -1,4 +1,18 @@
 package com.computerstore.inventory.dto;
+
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-public record InventoryAdjustmentRequest(@NotNull Long productId, @NotNull Integer quantity, @NotBlank String reason) {}
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
+public record InventoryAdjustmentRequest(
+        @NotNull @Positive Long productId,
+        @NotNull Integer quantity,
+        @NotBlank @Size(max = 500) String reason
+) {
+    @AssertTrue(message = "quantity must not be zero")
+    public boolean isQuantityNonZero() {
+        return quantity == null || quantity != 0;
+    }
+}

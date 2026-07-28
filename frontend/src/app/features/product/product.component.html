@@ -1,1 +1,28 @@
-<main>@if(product();as item){<a class="back" routerLink="/catalog">← Volver al catálogo</a><section class="product"><div class="visual"><span class="brand-chip">{{item.brandName}}</span><img src="/pinatech-banner.png" [alt]="item.name"><div class="scan"></div></div><div class="info"><div class="meta"><span>ENTREGA INMEDIATA</span><small>SKU: PIN-{{item.id}}</small></div><p class="category">{{item.categoryName}}</p><h1>{{item.name}}</h1><p class="description">{{item.description}}</p><div class="price"><span>Precio Pinatech</span><strong>{{item.price|number:'1.2-2'}} <em>ARS</em></strong></div><p class="installments">Consultá cuotas y medios de pago al finalizar la compra.</p><div class="stock"><iconify-icon icon="line-md:confirm-circle"></iconify-icon> Disponible para compra online</div><div class="purchase"><div class="quantity"><button type="button" (click)="changeQuantity(-1)">−</button><span>{{quantity()}}</span><button type="button" (click)="changeQuantity(1)">+</button></div><button mat-flat-button type="button" (click)="addToCart()">Agregar al carrito</button></div><div class="specs"><h2>Especificaciones</h2><dl><div><dt>Marca</dt><dd>{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div><div><dt>SKU</dt><dd>PIN-{{item.id}}</dd></div><div><dt>Estado</dt><dd>Producto activo</dd></div></dl></div></div></section>}@else if(error()){<section class="not-found"><h1>Producto no encontrado</h1><a mat-flat-button routerLink="/catalog">Volver al catálogo</a></section>}@else{<p class="loading">Cargando producto...</p>}</main>
+<main>
+  @if(product();as item){
+    <a class="back" routerLink="/catalog">← Volver al catálogo</a>
+    <section class="product">
+      <div class="visual" role="img" [attr.aria-label]="'Imagen no disponible para ' + item.name">
+        <span class="brand-chip">{{item.brandName}}</span><div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div><div class="scan"></div>
+      </div>
+      <div class="info">
+        <p class="category">{{item.categoryName}} · {{item.brandName}}</p>
+        <h1>{{item.name}}</h1>
+        @if (item.description) { <p class="description">{{item.description}}</p> } @else { <p class="description">Este producto no tiene una descripción publicada.</p> }
+        <div class="price"><span>Precio publicado</span><strong>{{item.price|number:'1.2-2'}} <em>ARS</em></strong></div>
+        <div class="purchase">
+          <div class="quantity" aria-label="Cantidad">
+            <button type="button" [disabled]="quantity() === 1" (click)="changeQuantity(-1)" aria-label="Disminuir cantidad">−</button><span aria-live="polite">{{quantity()}}</span><button type="button" [disabled]="quantity() === 99" (click)="changeQuantity(1)" aria-label="Aumentar cantidad">+</button>
+          </div>
+          <button mat-flat-button type="button" (click)="addToCart()">Agregar al carrito</button>
+        </div>
+        <p class="feedback" aria-live="polite">{{ feedback() }}</p>
+        <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd>{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
+      </div>
+    </section>
+  } @else if(error()) {
+    <section class="not-found" role="alert"><div class="code">404</div><h1>Producto no encontrado</h1><p>El producto no existe o ya no está publicado.</p><a mat-flat-button routerLink="/catalog">Volver al catálogo</a></section>
+  } @else {
+    <section class="loading" aria-live="polite"><span></span><p>Cargando producto…</p></section>
+  }
+</main>

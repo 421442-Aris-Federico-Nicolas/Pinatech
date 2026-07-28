@@ -1,44 +1,40 @@
 <main>
-  <section class="storefront" [class.filters-open]="categoriesOpen()">
-  <aside class="category-sidebar"><button class="sidebar-title" type="button" (click)="toggleCategories()">☰ SHOP BY CATEGORIES <span>{{ categoriesOpen() ? '−' : '+' }}</span></button>@if(categoriesOpen()){<nav><a routerLink="/catalog" class="active">Our Store</a><a routerLink="/catalog">PC Gaming <span>›</span></a><a routerLink="/catalog">Periféricos <span>›</span></a><a routerLink="/catalog">Monitores</a><a routerLink="/catalog">Audio & Streaming</a><a routerLink="/catalog">Accesorios <span>›</span></a></nav>}</aside>
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Pinatech gaming division</p>
-      <p class="kicker">PERFORMANCE WITHOUT LIMITS</p>
-      <h1>Elevá tu setup.<br><span>Dominá la partida.</span></h1>
-      <p class="lead">Hardware, periféricos y servicio técnico para quienes no se conforman con jugar en modo básico.</p>
-      <div class="hero-actions">
-        <a mat-flat-button routerLink="/catalog">Explorar hardware</a>
-        @if (!auth.isAuthenticated()) { <a mat-stroked-button routerLink="/login">Ingresar a Pinatech</a> }
-      </div>
-      <div class="hero-stats"><span><strong>24h</strong> respuesta técnica</span><span><strong>+100</strong> productos activos</span></div>
+      <p class="eyebrow">Pinatech tecnología</p>
+      <p class="kicker">HARDWARE PARA TU PRÓXIMO NIVEL</p>
+      <h1>Elevá tu setup.<br><span>Elegí con claridad.</span></h1>
+      <p class="lead">Explorá el catálogo real de hardware y periféricos disponible en Pinatech.</p>
+      <div class="hero-actions"><a mat-flat-button routerLink="/catalog">Explorar catálogo</a>@if (!auth.isAuthenticated()) { <a mat-stroked-button routerLink="/login">Ingresar</a> }</div>
     </div>
-    <div class="hero-visual"><img src="/pinatech-banner.png" alt="Pinatech, tecnología a tu alcance"><span class="scan-line"></span></div>
-    <div class="hero-dots"><i></i><i></i><i></i></div>
-  </section>
+    <div class="hero-visual"><img src="/pinatech-banner.png" alt="Identidad visual de Pinatech"><span class="scan-line"></span></div>
   </section>
 
-  <section class="quick-categories" aria-label="Categorías rápidas">
-    <a routerLink="/catalog"><iconify-icon icon="line-md:keyboard"></iconify-icon><span>Periféricos</span></a><a routerLink="/catalog"><iconify-icon icon="line-md:computer"></iconify-icon><span>PC Gaming</span></a><a routerLink="/catalog"><iconify-icon icon="line-md:monitor"></iconify-icon><span>Monitores</span></a><a routerLink="/catalog"><iconify-icon icon="line-md:headphones"></iconify-icon><span>Audio</span></a><a routerLink="/catalog"><iconify-icon icon="line-md:cog"></iconify-icon><span>Setup</span></a>
-  </section>
-
-  <section class="promo-grid">
-    <article class="promo teal"><p>UPGRADE WEEK</p><h2>Periféricos para<br>cada reflejo.</h2><a routerLink="/catalog">Ver selección ↗</a></article>
-    <article class="promo orange"><p>OFERTAS LIMITADAS</p><h2>Más potencia.<br>Menos excusas.</h2><a routerLink="/catalog">Comprar ahora ↗</a></article>
+  <section class="paths" aria-label="Secciones principales">
+    <a routerLink="/catalog"><iconify-icon icon="line-md:computer"></iconify-icon><span><b>Comprar tecnología</b><small>Buscar, filtrar y comparar el catálogo</small></span></a>
+    <a routerLink="/tickets"><iconify-icon icon="line-md:cog"></iconify-icon><span><b>Servicio técnico</b><small>Crear y consultar solicitudes</small></span></a>
   </section>
 
   <section class="featured">
-    <header class="section-heading"><div><p class="eyebrow">Selección Pinatech</p><h2>Trending products</h2></div><a routerLink="/catalog">Ver catálogo completo <span>→</span></a></header><div class="product-tabs"><button class="active">Todo</button><button>PC Gaming</button><button>Periféricos</button><button>Setup</button></div>
-    @if (isLoading()) { <p class="status">Sincronizando productos...</p> }
-    @else if (error()) { <p class="status">No pudimos cargar los productos. <button mat-button type="button" (click)="loadFeatured()">Reintentar</button></p> }
-    @else { <div class="products">@for (product of featured(); track product.id) { <mat-card><div class="product-top"><span>-20%</span><small>{{ product.categoryName }}</small></div><mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title>{{ product.name }}</mat-card-title></mat-card-header><mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.0-0' }} <em>ARS</em></strong></mat-card-content><mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver producto</a></mat-card-actions></mat-card> } @empty { <p class="status">Próximamente habrá productos disponibles.</p> }</div> }
+    <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2>Productos</h2></div><a routerLink="/catalog">Ver catálogo completo <span>→</span></a></header>
+    <p class="sr-only" aria-live="polite">{{ feedback() }}</p>
+    @if (isLoading()) {
+      <div class="status" aria-live="polite"><span class="loader"></span><p>Cargando productos…</p></div>
+    } @else if (error()) {
+      <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button mat-button type="button" (click)="loadFeatured()">Reintentar</button></div>
+    } @else {
+      <div class="products">
+        @for (product of featured(); track product.id) {
+          <mat-card>
+            <div class="product-visual"><span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b></div>
+            <mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title>{{ product.name }}</mat-card-title></mat-card-header>
+            <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <em>ARS</em></strong></mat-card-content>
+            <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>
+          </mat-card>
+        } @empty { <div class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></div> }
+      </div>
+    }
   </section>
 
-  <section class="collection"><div><p class="eyebrow">Pinatech service lab</p><h2>Tu equipo también<br>merece respawn.</h2><p>Diagnóstico, reparación y seguimiento de tu hardware en un mismo lugar.</p><a mat-stroked-button routerLink="/tickets">Solicitar servicio técnico</a></div></section>
-
-  <section class="brands"><p>TRABAJAMOS CON TECNOLOGÍA QUE JUEGA EN SERIO</p><div><span>AMD</span><span>INTEL</span><span>NVIDIA</span><span>LOGITECH</span><span>KINGSTON</span></div></section>
-
-  <section class="trust-bar"><article><b>↗</b><div><strong>Envío nacional</strong><small>En compras seleccionadas</small></div></article><article><b>◈</b><div><strong>Compra protegida</strong><small>Pagos seguros y trazables</small></div></article><article><b>↺</b><div><strong>Soporte postventa</strong><small>Atención de especialistas</small></div></article><article><b>◉</b><div><strong>Servicio técnico</strong><small>Seguimiento en tiempo real</small></div></article></section>
-
-  <section class="newsletter"><div><p class="eyebrow">Intel Pinatech</p><h2>Ofertas, lanzamientos y drops.</h2></div><form><input type="email" placeholder="Tu email"><button mat-flat-button type="button">Suscribirme</button></form></section>
+  <section class="service"><div><p class="eyebrow">Pinatech service lab</p><h2>Tu equipo también<br>merece respawn.</h2><p>Registrá una solicitud y consultá su seguimiento desde tu cuenta.</p><a mat-stroked-button routerLink="/tickets">Ir a servicio técnico</a></div></section>
 </main>

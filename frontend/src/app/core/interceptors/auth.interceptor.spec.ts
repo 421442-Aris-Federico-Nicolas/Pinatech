@@ -2,7 +2,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { environment } from '../../../environments/environment';
 import { authInterceptor } from './auth.interceptor';
@@ -11,8 +11,13 @@ describe('authInterceptor', () => {
   let http: HttpClient;
   let httpTesting: HttpTestingController;
   let token = 'initial-token';
+  let refreshFails = false;
+  let navigation: { commands: string[]; options: { queryParams?: { returnUrl: string } } } | null;
 
   beforeEach(() => {
+    token = 'initial-token';
+    refreshFails = false;
+    navigation = null;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -20,12 +25,16 @@ describe('authInterceptor', () => {
         { provide: AuthService, useValue: {
           getAccessToken: () => token,
           refreshSession: () => {
+            if (refreshFails) return throwError(() => new Error('Refresh failed'));
             token = 'refreshed-token';
             return of(void 0);
           },
           clearSession: () => undefined,
         } },
-        { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
+        { provide: Router, useValue: { url: '/orders?page=2', navigate: (commands: string[], options: { queryParams?: { returnUrl: string } }) => {
+          navigation = { commands, options };
+          return Promise.resolve(true);
+        } } },
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -54,5 +63,15 @@ describe('authInterceptor', () => {
     const retry = httpTesting.expectOne(url);
     expect(retry.request.headers.get('Authorization')).toBe('Bearer refreshed-token');
     retry.flush([]);
+  });
+
+  it('preserves the current URL when session refresh fails', () => {
+    refreshFails = true;
+    const url = `${environment.apiBaseUrl}/orders`;
+    http.get(url).subscribe({ error: () => undefined });
+
+    httpTesting.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(navigation).toEqual({ commands: ['/login'], options: { queryParams: { returnUrl: '/orders?page=2' } } });
   });
 });

@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.computerstore.common.exception.RateLimitExceededException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -12,20 +13,28 @@ public class AuthRateLimiter {
 
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
     private final int maxLoginAttempts;
+    private final int maxRegistrationAttempts;
     private final int maxRefreshAttempts;
     private final long windowMs;
     private final Clock clock;
 
+    @Autowired
     public AuthRateLimiter(
             @Value("${app.auth-rate-limit.max-login-attempts}") int maxLoginAttempts,
+            @Value("${app.auth-rate-limit.max-registration-attempts}") int maxRegistrationAttempts,
             @Value("${app.auth-rate-limit.max-refresh-attempts}") int maxRefreshAttempts,
             @Value("${app.auth-rate-limit.window-ms}") long windowMs
     ) {
-        this(maxLoginAttempts, maxRefreshAttempts, windowMs, Clock.systemUTC());
+        this(maxLoginAttempts, maxRegistrationAttempts, maxRefreshAttempts, windowMs, Clock.systemUTC());
     }
 
     AuthRateLimiter(int maxLoginAttempts, int maxRefreshAttempts, long windowMs, Clock clock) {
+        this(maxLoginAttempts, 3, maxRefreshAttempts, windowMs, clock);
+    }
+
+    AuthRateLimiter(int maxLoginAttempts, int maxRegistrationAttempts, int maxRefreshAttempts, long windowMs, Clock clock) {
         this.maxLoginAttempts = maxLoginAttempts;
+        this.maxRegistrationAttempts = maxRegistrationAttempts;
         this.maxRefreshAttempts = maxRefreshAttempts;
         this.windowMs = windowMs;
         this.clock = clock;
@@ -37,6 +46,10 @@ public class AuthRateLimiter {
 
     public void checkRefresh(String clientAddress) {
         check("refresh:" + clientAddress, maxRefreshAttempts);
+    }
+
+    public void checkRegistration(String clientAddress) {
+        check("register:" + clientAddress, maxRegistrationAttempts);
     }
 
     public void resetLogin(String clientAddress, String email) {

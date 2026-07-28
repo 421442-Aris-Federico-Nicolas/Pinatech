@@ -29,7 +29,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       switchMap(() => next(authenticate(request))),
       catchError((refreshError: unknown) => {
         auth.clearSession();
-        void router.navigate(['/login']);
+        const returnUrl = router.url.startsWith('/login') ? undefined : router.url;
+        void router.navigate(['/login'], { queryParams: returnUrl ? { returnUrl } : undefined });
         return throwError(() => refreshError);
       }),
     );

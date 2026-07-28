@@ -20,4 +20,15 @@ class AuthRateLimiterTest {
         limiter.resetLogin("127.0.0.1", "customer@example.com");
         assertDoesNotThrow(() -> limiter.checkLogin("127.0.0.1", "customer@example.com"));
     }
+
+    @Test
+    void limitsRegistrationsByClientAddress() {
+        AuthRateLimiter limiter = new AuthRateLimiter(5, 2, 20, 60_000, java.time.Clock.systemUTC());
+
+        limiter.checkRegistration("127.0.0.1");
+        limiter.checkRegistration("127.0.0.1");
+
+        assertThrows(RateLimitExceededException.class, () -> limiter.checkRegistration("127.0.0.1"));
+        assertDoesNotThrow(() -> limiter.checkRegistration("127.0.0.2"));
+    }
 }

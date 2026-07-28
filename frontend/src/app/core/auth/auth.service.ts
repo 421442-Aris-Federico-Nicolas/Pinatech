@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, finalize, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, AuthenticatedUser, LoginRequest } from './auth.models';
+import { AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest } from './auth.models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -13,7 +13,10 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.accessToken() !== null && this.user() !== null);
 
   login(request: LoginRequest) {
-    return this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/login`, request).pipe(tap((response) => this.apply(response)));
+    return this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/login`, request, { withCredentials: true }).pipe(tap((response) => this.apply(response)));
+  }
+  register(request: RegisterRequest) {
+    return this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/register`, request, { withCredentials: true }).pipe(tap((response) => this.apply(response)));
   }
   restoreSession() {
     return this.refreshSession().pipe(catchError(() => {
@@ -23,7 +26,7 @@ export class AuthService {
   }
   refreshSession(): Observable<void> {
     if (!this.refreshInFlight) {
-      this.refreshInFlight = this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/refresh`, {}).pipe(
+      this.refreshInFlight = this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/refresh`, {}, { withCredentials: true }).pipe(
         tap((response) => this.apply(response)),
         map(() => void 0),
         finalize(() => this.refreshInFlight = undefined),
@@ -33,7 +36,7 @@ export class AuthService {
     return this.refreshInFlight;
   }
   logout() {
-    return this.http.post<void>(`${environment.apiBaseUrl}/auth/logout`, {}).pipe(tap(() => this.clear()), catchError(() => { this.clear(); return of(void 0); }));
+    return this.http.post<void>(`${environment.apiBaseUrl}/auth/logout`, {}, { withCredentials: true }).pipe(tap(() => this.clear()), catchError(() => { this.clear(); return of(void 0); }));
   }
   getAccessToken(): string | null { return this.accessToken(); }
   clearSession(): void { this.clear(); }

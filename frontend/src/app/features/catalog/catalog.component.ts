@@ -1,27 +1,119 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatSelectModule } from '@angular/material/select';
-import { RouterLink } from '@angular/router';
-import { debounceTime, distinctUntilChanged, forkJoin, Subject } from 'rxjs';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
+import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
-import { Brand, CatalogFilters, CatalogService, Category, Page, Product } from './catalog.service';
+import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
 
-@Component({ imports: [DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatSelectModule, RouterLink], templateUrl: './catalog.component.html', styleUrl: './catalog.component.scss', changeDetection: ChangeDetectionStrategy.OnPush })
+const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
+
+@Component({
+  imports: [DecimalPipe, FormsModule, MatButtonModule, MatCardModule, RouterLink],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  templateUrl: './catalog.component.html',
+  styleUrl: './catalog.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
 export class CatalogComponent {
   private readonly service = inject(CatalogService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly searchChanges = new Subject<string>();
+  private request?: Subscription;
+
   readonly cart = inject(CartService);
   readonly filters: CatalogFilters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<Product> | null>(null);
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
-  constructor() { forkJoin({ categories: this.service.categories(), brands: this.service.brands() }).subscribe(({ categories, brands }) => { this.categories.set(categories); this.brands.set(brands); }); this.searchChanges.pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load()); this.load(); }
-  load(page = 0): void { this.service.getProducts(this.filters, page).subscribe(result => this.page.set(result)); }
+  readonly sort = signal<CatalogSort>('name,asc');
+  readonly loading = signal(true);
+  readonly error = signal(false);
+  readonly optionsError = signal(false);
+  readonly filtersOpen = signal(false);
+  readonly feedback = signal('');
+
+  constructor() {
+    forkJoin({ categories: this.service.categories(), brands: this.service.brands() })
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: ({ categories, brands }) => { this.categories.set(categories); this.brands.set(brands); },
+        error: () => this.optionsError.set(true),
+      });
+
+    this.searchChanges.pipe(debounceTime(350), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.applyFilters());
+
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      this.readParams(params);
+      this.loadPage(this.pageNumber(params));
+    });
+  }
+
   searchChanged(value: string): void { this.searchChanges.next(value); }
-  clearFilters(): void { Object.assign(this.filters, { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null }); this.load(); }
+
+  applyFilters(page = 1): void {
+    const queryParams: Record<string, string | number> = {};
+    const search = this.filters.search.trim();
+    if (search) queryParams['search'] = search;
+    if (this.filters.categoryId !== null) queryParams['category'] = this.filters.categoryId;
+    if (this.filters.brandId !== null) queryParams['brand'] = this.filters.brandId;
+    if (this.filters.minPrice !== null && this.filters.minPrice >= 0) queryParams['minPrice'] = this.filters.minPrice;
+    if (this.filters.maxPrice !== null && this.filters.maxPrice >= 0) queryParams['maxPrice'] = this.filters.maxPrice;
+    if (this.sort() !== 'name,asc') queryParams['sort'] = this.sort();
+    if (page > 1) queryParams['page'] = page;
+    void this.router.navigate([], { relativeTo: this.route, queryParams });
+  }
+
+  clearFilters(): void {
+    Object.assign(this.filters, { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null });
+    this.sort.set('name,asc');
+    this.applyFilters();
+  }
+
+  add(product: Product): void {
+    this.cart.add(product);
+    this.feedback.set(`${product.name} se agregó al carrito.`);
+  }
+
+  retry(): void { this.loadPage(this.page()?.number ?? 0); }
+
+  private loadPage(page: number): void {
+    this.request?.unsubscribe();
+    this.loading.set(true);
+    this.error.set(false);
+    this.request = this.service.getProducts(this.filters, page, this.sort())
+      .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
+      .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
+  }
+
+  private readParams(params: ParamMap): void {
+    this.filters.search = params.get('search') ?? '';
+    this.filters.categoryId = this.positiveNumber(params.get('category'));
+    this.filters.brandId = this.positiveNumber(params.get('brand'));
+    this.filters.minPrice = this.nonNegativeNumber(params.get('minPrice'));
+    this.filters.maxPrice = this.nonNegativeNumber(params.get('maxPrice'));
+    const sort = params.get('sort');
+    this.sort.set(SORTS.includes(sort as CatalogSort) ? sort as CatalogSort : 'name,asc');
+  }
+
+  private pageNumber(params: ParamMap): number {
+    const page = Number(params.get('page'));
+    return Number.isInteger(page) && page > 0 ? page - 1 : 0;
+  }
+
+  private positiveNumber(value: string | null): number | null {
+    const parsed = Number(value);
+    return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  private nonNegativeNumber(value: string | null): number | null {
+    const parsed = Number(value);
+    return value !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
 }

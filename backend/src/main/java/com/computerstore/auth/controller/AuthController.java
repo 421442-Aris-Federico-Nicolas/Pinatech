@@ -53,7 +53,8 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register a customer account")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
+        authRateLimiter.checkRegistration(servletRequest.getRemoteAddr());
         return withSession(HttpStatus.CREATED, authService.register(request));
     }
 

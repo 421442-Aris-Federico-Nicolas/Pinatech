@@ -60,9 +60,9 @@ sudo apt install openjdk-21-jdk
 java -version
 ```
 
-## Local startup with Docker
+## Production startup with Docker
 
-Docker Compose starts PostgreSQL and the backend. Environment defaults are safe only for local development.
+Docker Compose builds the Angular storefront, starts PostgreSQL and runs the backend with the `prod` profile. Copy `.env.example` to `.env`, set a strong database password and JWT secret, and set the real HTTPS storefront origin. Startup fails if any required value is absent. PostgreSQL is bound only to loopback and the API is exposed through the frontend reverse proxy.
 
 ```bash
 docker compose up -d --build
@@ -74,11 +74,11 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The API is available at `http://localhost:8080/api/health` and Swagger is available at `http://localhost:8080/swagger-ui/index.html`.
+The storefront is available at `http://localhost:${FRONTEND_PORT:-80}` and proxies `/api` to the backend container. The API is also bound to `127.0.0.1:${BACKEND_PORT:-8080}` so the Angular development server can use it without exposing it to the network. Seeder accounts, OpenAPI documents and Swagger UI are disabled in `prod`. Terminate TLS in front of the storefront for a public deployment.
 
 ## Manual startup
 
-1. Copy `.env.example` to `.env` and adjust local values if necessary.
+1. Export the datasource variables shown below, or run PostgreSQL with local credentials of your choice.
 2. Start PostgreSQL only:
 
 ```bash
@@ -89,16 +89,16 @@ docker compose up -d postgres
 docker compose up -d postgres
 ```
 
-3. Start the backend:
+3. Start the backend with the development profile and local datasource variables:
 
 ```bash
 cd backend
-./mvnw spring-boot:run
+SPRING_PROFILES_ACTIVE=dev SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/computer_store SPRING_DATASOURCE_USERNAME=computer_store SPRING_DATASOURCE_PASSWORD=computer_store ./mvnw spring-boot:run
 ```
 
 ```powershell
 cd backend
-.\mvnw.cmd spring-boot:run
+$env:SPRING_PROFILES_ACTIVE="dev"; $env:SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/computer_store"; $env:SPRING_DATASOURCE_USERNAME="computer_store"; $env:SPRING_DATASOURCE_PASSWORD="computer_store"; .\mvnw.cmd spring-boot:run
 ```
 
 4. Start Angular in a second terminal:
@@ -120,6 +120,12 @@ Open `http://localhost:4200`. The home page checks `GET /api/health` through the
 ## Database and Flyway
 
 Flyway executes `backend/src/main/resources/db/migration/V1__create_initial_schema.sql` automatically from an empty database. Hibernate is configured with `ddl-auto: validate`; it never creates or changes the schema.
+
+## Order reservations
+
+`POST /api/orders` accepts an optional `Idempotency-Key` header (1-100 characters). The storefront creates and persists this key while a checkout attempt is pending. Repeating the same key for the same user and payload returns the original order; reusing it with another payload returns `409`. Omitting the header preserves compatibility for other API clients.
+
+Stock is reserved for `ORDER_RESERVATION_TTL` (15 minutes by default) while an order is `PENDING_PAYMENT`. Expired reservations are cancelled and released automatically. A manual `PAID` state stops expiry; cancellation from `PENDING_PAYMENT` or `PAID` releases stock, and transition to `PREPARING` consumes it. Every operation writes an inventory movement.
 
 To reset local data, stop and remove the PostgreSQL volume:
 

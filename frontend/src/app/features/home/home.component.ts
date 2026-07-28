@@ -6,6 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { CartService } from '../../core/cart/cart.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
 
 @Component({
@@ -19,11 +20,12 @@ import { CatalogService, Product } from '../catalog/catalog.service';
 export class HomeComponent {
   private readonly catalog = inject(CatalogService);
   protected readonly auth = inject(AuthService);
+  protected readonly cart = inject(CartService);
 
   protected readonly featured = signal<Product[]>([]);
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
-  protected readonly categoriesOpen = signal(false);
+  protected readonly feedback = signal('');
 
   constructor() {
     this.loadFeatured();
@@ -45,7 +47,8 @@ export class HomeComponent {
       });
   }
 
-  protected toggleCategories(): void {
-    this.categoriesOpen.update((open) => !open);
+  protected add(product: Product): void {
+    this.cart.add(product);
+    this.feedback.set(`${product.name} se agregó al carrito.`);
   }
 }
