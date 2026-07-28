@@ -22,7 +22,8 @@ public class ProductController {
         if (brandId != null) spec = spec.and((r,q,cb) -> cb.equal(r.get("brand").get("id"), brandId));
         if (minPrice != null) spec = spec.and((r,q,cb) -> cb.greaterThanOrEqualTo(r.get("price"), minPrice));
         if (maxPrice != null) spec = spec.and((r,q,cb) -> cb.lessThanOrEqualTo(r.get("price"), maxPrice));
-        return repository.findAll(spec, pageable).map(this::toResponse);
+        Pageable boundedPageable = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100), pageable.getSort());
+        return repository.findAll(spec, boundedPageable).map(this::toResponse);
     }
     @GetMapping("/{id}") public ProductSummaryResponse detail(@PathVariable Long id) { return toResponse(repository.findById(id).filter(Product::isActive).orElseThrow(() -> new ResourceNotFoundException("Product not found."))); }
     private ProductSummaryResponse toResponse(Product p) { return new ProductSummaryResponse(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(), p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName()); }

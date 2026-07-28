@@ -8,6 +8,7 @@ import com.computerstore.auth.dto.LoginRequest;
 import com.computerstore.auth.dto.RegisterRequest;
 import com.computerstore.auth.service.AuthService;
 import com.computerstore.auth.service.AuthSession;
+import com.computerstore.auth.service.AuthRateLimiter;
 import com.computerstore.common.exception.AuthenticationFailureException;
 import com.computerstore.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -33,15 +35,18 @@ public class AuthController {
     private static final String REFRESH_COOKIE = "refresh_token";
 
     private final AuthService authService;
+    private final AuthRateLimiter authRateLimiter;
     private final long refreshExpirationMs;
     private final boolean secureCookie;
 
     public AuthController(
             AuthService authService,
+            AuthRateLimiter authRateLimiter,
             @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs,
             @Value("${app.cookies.secure}") boolean secureCookie
     ) {
         this.authService = authService;
+        this.authRateLimiter = authRateLimiter;
         this.refreshExpirationMs = refreshExpirationMs;
         this.secureCookie = secureCookie;
     }
@@ -54,15 +59,20 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate with email and password")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withSession(HttpStatus.OK, authService.login(request));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        authRateLimiter.checkLogin(servletRequest.getRemoteAddr(), request.email());
+        AuthSession session = authService.login(request);
+        authRateLimiter.resetLogin(servletRequest.getRemoteAddr(), request.email());
+        return withSession(HttpStatus.OK, session);
     }
 
     @PostMapping("/refresh")
     @Operation(summary = "Rotate the refresh token and issue a new access token")
     public ResponseEntity<AuthResponse> refresh(
-            @CookieValue(value = REFRESH_COOKIE, required = false) String refreshToken
+            @CookieValue(value = REFRESH_COOKIE, required = false) String refreshToken,
+            HttpServletRequest servletRequest
     ) {
+        authRateLimiter.checkRefresh(servletRequest.getRemoteAddr());
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AuthenticationFailureException("Refresh token is required.");
         }

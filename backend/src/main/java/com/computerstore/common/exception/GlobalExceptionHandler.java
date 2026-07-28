@@ -77,6 +77,19 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "authentication-failed", "Authentication failed", exception.getMessage(), request);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    ProblemDetail handleRateLimit(RateLimitExceededException exception, HttpServletRequest request) {
+        ProblemDetail problem = problem(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "rate-limit-exceeded",
+                "Too many requests",
+                exception.getMessage(),
+                request
+        );
+        problem.setProperty("retryAfterSeconds", 60);
+        return problem;
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
         LOGGER.error("Unexpected error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);

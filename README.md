@@ -4,7 +4,7 @@ MVP local de una tienda de productos informaticos y servicio tecnico. El proyect
 
 ## Estado
 
-La Etapa 1 esta implementada: infraestructura local, esquema inicial, Flyway, Swagger, manejo global de errores y comprobacion de conectividad Angular/API.
+El MVP funcional esta implementado: autenticacion con roles y refresh tokens rotativos, catalogo, inventario, ordenes y tickets de servicio tecnico. Incluye pruebas unitarias para la logica de autenticacion, stock, transiciones de orden y guards de Angular.
 
 ## Stack
 
@@ -162,9 +162,10 @@ npm run build
 
 - No real credentials or secrets are versioned.
 - CORS permits only `http://localhost:4200` by default.
-- Swagger and health are public during this bootstrap stage; all other endpoints are denied.
+- Catalog, health y autenticacion son publicos; los demas endpoints requieren autenticacion y el stock exacto solo esta disponible para administradores y tecnicos.
 - Error responses use RFC 9457 `ProblemDetail` without stack traces.
-- Future authentication will use short-lived JWT access tokens and refresh tokens in `HttpOnly` cookies.
+- Access tokens de corta duracion se mantienen solo en memoria; el frontend renueva la sesion una vez ante un 401 usando refresh tokens rotativos en cookies `HttpOnly`.
+- Login y refresh tienen limites de intentos en memoria configurables mediante `AUTH_MAX_LOGIN_ATTEMPTS`, `AUTH_MAX_REFRESH_ATTEMPTS` y `AUTH_RATE_LIMIT_WINDOW_MS`.
 
 ## Development users
 
@@ -182,24 +183,24 @@ These accounts are seeded only in the `dev` profile. Do not use their passwords 
 - Backend code is organized by feature.
 - PostgreSQL fits the relational domain.
 - Flyway owns schema changes.
-- Prices will always be recalculated on the backend.
-- Orders will retain product name and price snapshots.
-- Inventory movements will retain traceability.
+- Los precios se recalculan siempre en el backend.
+- Las ordenes retienen snapshots de nombre y precio del producto.
+- Los movimientos de inventario retienen trazabilidad.
 - Spring Security protects API endpoints; Angular guards are not a security boundary.
-- Passwords will be stored using secure hashes only.
+- Las contrasenas se almacenan usando BCrypt y los refresh tokens se almacenan como hashes SHA-256.
 
 ## Roadmap
 
-- Etapa 2: authentication, roles and JWT refresh flow.
-- Etapa 3: catalog, products, inventory and seed data.
-- Etapa 4: cart and order management.
-- Etapa 5: technical service tickets.
-- Etapa 6: full test suite, CI and visual polish.
+- Etapa 2: authentication, roles and JWT refresh flow. Implementada.
+- Etapa 3: catalog, products, inventory and seed data. Implementada.
+- Etapa 4: cart and order management. Implementada.
+- Etapa 5: technical service tickets. Implementada.
+- Etapa 6: ampliar pruebas de integracion, linting y pulido visual. En progreso.
 
 ## Screenshots
 
-`TODO`: Add screenshots after the catalog and administration screens are available.
+Pendiente de incorporar capturas actualizadas del catalogo, administracion y servicio tecnico.
 
 ## Team
 
-- Add project members here.
+- Pendiente de completar por el equipo del proyecto.

@@ -42,3 +42,7 @@ app:
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
   cookies:
     secure: ${REFRESH_COOKIE_SECURE:false}
+  auth-rate-limit:
+    max-login-attempts: ${AUTH_MAX_LOGIN_ATTEMPTS:5}
+    max-refresh-attempts: ${AUTH_MAX_REFRESH_ATTEMPTS:20}
+    window-ms: ${AUTH_RATE_LIMIT_WINDOW_MS:60000}
