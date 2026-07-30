@@ -49,12 +49,16 @@ export class AdminComponent {
   readonly error = signal('');
   readonly success = signal('');
   readonly saving = signal(false);
+  readonly taxonomySaving = signal(false);
+  readonly deletingTaxonomy = signal('');
   readonly deletingImage = signal<number | null>(null);
   readonly pendingImages = signal<PendingProductImage[]>([]);
   readonly form: ProductForm = this.emptyProduct();
   categoryName = '';
   categorySlug = '';
   brandName = '';
+  editingCategoryId: number | null = null;
+  editingBrandId: number | null = null;
   adjustment = 0;
   adjustmentReason = '';
 
@@ -127,7 +131,7 @@ export class AdminComponent {
   select(product: Product, openInventory = false): void {
     this.clearPendingImages();
     this.selected.set(product);
-    Object.assign(this.form, product);
+    Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })) });
     this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
     if (openInventory) this.navigate('inventory');
   }
@@ -145,6 +149,9 @@ export class AdminComponent {
 
   saveProduct(): void {
     this.clearMessages();
+    if (this.form.specifications.some((item) => !item.groupName.trim() || !item.name.trim() || !item.value.trim())) return this.fail('Completá grupo, característica y valor en todas las filas.');
+    const names = this.form.specifications.map((item) => item.name.trim().toLowerCase());
+    if (new Set(names).size !== names.length) return this.fail('No puede haber características con el mismo nombre.');
     this.saving.set(true);
     const request = this.selected()
       ? this.service.updateProduct(this.selected()!.id, this.form)
@@ -203,6 +210,24 @@ export class AdminComponent {
     this.pendingImages.update((items) => items.filter((_, currentIndex) => currentIndex !== index));
   }
 
+  addSpecification(): void {
+    if (this.form.specifications.length >= 60) return this.fail('Podés agregar hasta 60 características por producto.');
+    this.form.specifications = [...this.form.specifications, { groupName: 'Características generales', name: '', value: '', highlighted: false }];
+    this.clearMessages();
+  }
+
+  removeSpecification(index: number): void {
+    this.form.specifications = this.form.specifications.filter((_, current) => current !== index);
+  }
+
+  moveSpecification(index: number, change: number): void {
+    const target = index + change;
+    if (target < 0 || target >= this.form.specifications.length) return;
+    const specifications = [...this.form.specifications];
+    [specifications[index], specifications[target]] = [specifications[target], specifications[index]];
+    this.form.specifications = specifications;
+  }
+
   deleteImage(image: ProductImage): void {
     const product = this.selected();
     if (!product || this.deletingImage() !== null || !confirm(`¿Eliminar la imagen "${image.altText || image.id}"?`)) return;
@@ -229,21 +254,85 @@ export class AdminComponent {
   }
 
   addCategory(): void {
+    if (this.taxonomySaving()) return;
     const name = this.categoryName.trim();
     const slug = this.categorySlug.trim() || this.slug(name);
     if (!name || !slug) return this.fail('Indicá nombre y slug para la categoría.');
-    this.service.createCategory({ name, slug }).subscribe({
-      next: () => { this.categoryName = ''; this.categorySlug = ''; this.success.set('Categoría creada.'); this.reload(); },
-      error: () => this.fail('No se pudo crear la categoría.'),
+    const editing = this.editingCategoryId;
+    const request = editing === null
+      ? this.service.createCategory({ name, slug })
+      : this.service.updateCategory(editing, { name, slug });
+    this.taxonomySaving.set(true);
+    request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
+      next: () => { this.cancelCategoryEdit(); this.success.set(editing === null ? 'Categoría creada.' : 'Categoría actualizada.'); this.reload(); },
+      error: () => this.fail(editing === null ? 'No se pudo crear la categoría.' : 'No se pudo actualizar la categoría.'),
+    });
+  }
+
+  editCategory(category: Category): void {
+    this.editingCategoryId = category.id;
+    this.categoryName = category.name;
+    this.categorySlug = category.slug;
+    this.clearMessages();
+  }
+
+  cancelCategoryEdit(): void {
+    this.editingCategoryId = null;
+    this.categoryName = '';
+    this.categorySlug = '';
+  }
+
+  deleteCategory(category: Category): void {
+    const key = `category-${category.id}`;
+    if (this.deletingTaxonomy() || !confirm(`¿Eliminar la categoría "${category.name}"? Solo se puede eliminar si no tiene productos activos.`)) return;
+    this.deletingTaxonomy.set(key);
+    this.clearMessages();
+    this.service.deleteCategory(category.id).pipe(finalize(() => this.deletingTaxonomy.set(''))).subscribe({
+      next: () => {
+        if (this.editingCategoryId === category.id) this.cancelCategoryEdit();
+        this.categories.update((categories) => categories.filter((current) => current.id !== category.id));
+        this.success.set('Categoría eliminada.');
+      },
+      error: () => this.fail('No se puede eliminar la categoría mientras tenga productos activos.'),
     });
   }
 
   addBrand(): void {
+    if (this.taxonomySaving()) return;
     const name = this.brandName.trim();
     if (!name) return this.fail('Indicá un nombre para la marca.');
-    this.service.createBrand(name).subscribe({
-      next: () => { this.brandName = ''; this.success.set('Marca creada.'); this.reload(); },
-      error: () => this.fail('No se pudo crear la marca.'),
+    const editing = this.editingBrandId;
+    const request = editing === null ? this.service.createBrand(name) : this.service.updateBrand(editing, name);
+    this.taxonomySaving.set(true);
+    request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
+      next: () => { this.cancelBrandEdit(); this.success.set(editing === null ? 'Marca creada.' : 'Marca actualizada.'); this.reload(); },
+      error: () => this.fail(editing === null ? 'No se pudo crear la marca.' : 'No se pudo actualizar la marca.'),
+    });
+  }
+
+  editBrand(brand: Brand): void {
+    this.editingBrandId = brand.id;
+    this.brandName = brand.name;
+    this.clearMessages();
+  }
+
+  cancelBrandEdit(): void {
+    this.editingBrandId = null;
+    this.brandName = '';
+  }
+
+  deleteBrand(brand: Brand): void {
+    const key = `brand-${brand.id}`;
+    if (this.deletingTaxonomy() || !confirm(`¿Eliminar la marca "${brand.name}"? Solo se puede eliminar si no tiene productos activos.`)) return;
+    this.deletingTaxonomy.set(key);
+    this.clearMessages();
+    this.service.deleteBrand(brand.id).pipe(finalize(() => this.deletingTaxonomy.set(''))).subscribe({
+      next: () => {
+        if (this.editingBrandId === brand.id) this.cancelBrandEdit();
+        this.brands.update((brands) => brands.filter((current) => current.id !== brand.id));
+        this.success.set('Marca eliminada.');
+      },
+      error: () => this.fail('No se puede eliminar la marca mientras tenga productos activos.'),
     });
   }
 
@@ -294,14 +383,14 @@ export class AdminComponent {
   stockFor(productId: number): Inventory | undefined { return this.inventories().find((item) => item.productId === productId); }
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
-  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0 }; }
+  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0, specifications: [] }; }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
     this.products.update((products) => products.some((current) => current.id === product.id)
       ? products.map((current) => current.id === product.id ? product : current)
       : [...products, product]);
     if (preservePendingImages) {
       this.selected.set(product);
-      Object.assign(this.form, product);
+      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })) });
       this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
     } else {
       this.select(product);

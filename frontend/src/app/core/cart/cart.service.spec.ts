@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
 
 describe('CartService', () => {
   const user = signal<AuthenticatedUser | null>(null);
-  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [] };
+  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [] };
 
   beforeEach(() => {
     localStorage.clear();

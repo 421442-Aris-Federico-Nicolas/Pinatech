@@ -7,7 +7,8 @@ import { Order } from '../../core/orders/order.service';
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
 export interface Inventory { productId: number; availableQuantity: number; reservedQuantity: number; }
-export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; }
+export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
+export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; }
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -33,8 +34,10 @@ export class AdminService {
   }
   deleteProductImage(productId: number, imageId: number) { return this.http.delete<void>(`${this.baseUrl}/products/${productId}/images/${imageId}`); }
   createCategory(payload: Omit<Category, 'id'>) { return this.http.post<Category>(`${this.baseUrl}/categories`, payload); }
+  updateCategory(id: number, payload: Omit<Category, 'id'>) { return this.http.put<Category>(`${this.baseUrl}/categories/${id}`, payload); }
   deleteCategory(id: number) { return this.http.delete<void>(`${this.baseUrl}/categories/${id}`); }
   createBrand(name: string) { return this.http.post<Brand>(`${this.baseUrl}/brands`, { name }); }
+  updateBrand(id: number, name: string) { return this.http.put<Brand>(`${this.baseUrl}/brands/${id}`, { name }); }
   deleteBrand(id: number) { return this.http.delete<void>(`${this.baseUrl}/brands/${id}`); }
   inventory(productId: number) { return this.http.get<Inventory>(`${environment.apiBaseUrl}/inventory/${productId}`); }
   inventories() { return this.http.get<Inventory[]>(`${environment.apiBaseUrl}/inventory`); }

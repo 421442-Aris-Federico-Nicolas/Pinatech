@@ -7,7 +7,7 @@ import { CartComponent } from './cart.component';
 
 describe('CartComponent', () => {
   const item: CartItem = {
-    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [] },
+    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [] },
     quantity: 2,
   };
 

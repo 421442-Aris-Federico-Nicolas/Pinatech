@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.dto.ProductSummaryResponse;
 import com.computerstore.catalog.repository.ProductRepository;
+import com.computerstore.catalog.repository.ProductSpecificationRepository;
 import com.computerstore.catalog.service.ProductImageService;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import org.springframework.core.io.FileSystemResource;
@@ -27,8 +28,9 @@ import java.util.Map;
 @RequestMapping("/api/products")
 public class ProductController {
     private final ProductRepository repository;
+    private final ProductSpecificationRepository specifications;
     private final ProductImageService productImages;
-    public ProductController(ProductRepository repository, ProductImageService productImages) { this.repository = repository; this.productImages = productImages; }
+    public ProductController(ProductRepository repository, ProductSpecificationRepository specifications, ProductImageService productImages) { this.repository = repository; this.specifications = specifications; this.productImages = productImages; }
     @GetMapping public Page<ProductSummaryResponse> list(@RequestParam(required = false) String search, @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long brandId, @RequestParam(required = false) BigDecimal minPrice, @RequestParam(required = false) BigDecimal maxPrice, @PageableDefault(size = 12, sort = "name") Pageable pageable) {
         Specification<Product> spec = (root, query, cb) -> cb.isTrue(root.get("active"));
         if (search != null && !search.isBlank()) spec = spec.and((r,q,cb) -> cb.like(cb.lower(r.get("name")), "%" + search.trim().toLowerCase() + "%"));
@@ -38,14 +40,19 @@ public class ProductController {
         if (maxPrice != null) spec = spec.and((r,q,cb) -> cb.lessThanOrEqualTo(r.get("price"), maxPrice));
         Pageable boundedPageable = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100), pageable.getSort());
         Page<Product> products = repository.findAll(spec, boundedPageable);
+        List<Long> productIds = products.getContent().stream().map(Product::getId).toList();
         Map<Long, List<com.computerstore.catalog.dto.ProductImageResponse>> images = productImages.responsesByProductIds(
-                products.getContent().stream().map(Product::getId).toList());
-        return products.map(product -> toResponse(product, images.getOrDefault(product.getId(), List.of())));
+                productIds);
+        Map<Long, List<com.computerstore.catalog.dto.ProductSpecificationResponse>> productSpecifications = productIds.isEmpty()
+                ? Map.of()
+                : specificationResponses(specifications.findOrderedByProductIds(productIds));
+        return products.map(product -> toResponse(product, images.getOrDefault(product.getId(), List.of()),
+                productSpecifications.getOrDefault(product.getId(), List.of())));
     }
     @GetMapping("/{id}") public ProductSummaryResponse detail(@PathVariable Long id) {
         Product product = repository.findById(id).filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found."));
-        return toResponse(product, productImages.responsesForProduct(id));
+        return toResponse(product, productImages.responsesForProduct(id), specificationResponses(id));
     }
 
     @GetMapping("/images/{imageId}/content")
@@ -60,8 +67,23 @@ public class ProductController {
         return ResponseEntity.ok().headers(headers).body(new FileSystemResource(content.path()));
     }
 
-    private ProductSummaryResponse toResponse(Product p, List<com.computerstore.catalog.dto.ProductImageResponse> images) {
+    private ProductSummaryResponse toResponse(Product p, List<com.computerstore.catalog.dto.ProductImageResponse> images, List<com.computerstore.catalog.dto.ProductSpecificationResponse> productSpecifications) {
         return new ProductSummaryResponse(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
-                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(), images);
+                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(), images, productSpecifications);
+    }
+
+    private List<com.computerstore.catalog.dto.ProductSpecificationResponse> specificationResponses(Long productId) {
+        return specifications.findByProduct_IdOrderByDisplayOrderAscIdAsc(productId).stream().map(this::specificationResponse).toList();
+    }
+
+    private Map<Long, List<com.computerstore.catalog.dto.ProductSpecificationResponse>> specificationResponses(List<com.computerstore.catalog.domain.ProductSpecification> items) {
+        return items.stream().collect(java.util.stream.Collectors.groupingBy(
+                item -> item.getProduct().getId(),
+                java.util.LinkedHashMap::new,
+                java.util.stream.Collectors.mapping(this::specificationResponse, java.util.stream.Collectors.toList())));
+    }
+
+    private com.computerstore.catalog.dto.ProductSpecificationResponse specificationResponse(com.computerstore.catalog.domain.ProductSpecification item) {
+        return new com.computerstore.catalog.dto.ProductSpecificationResponse(item.getId(), item.getGroupName(), item.getName(), item.getValue(), item.isHighlighted(), item.getDisplayOrder());
     }
 }

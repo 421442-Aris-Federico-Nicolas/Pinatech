@@ -4,9 +4,25 @@
     <section class="product">
       <div class="gallery">
         @if (item.images.length) {
-          @for (image of item.images; track image.id) {
-            <figure><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name"></figure>
-          }
+          <section class="carousel" tabindex="0" aria-label="Galería de imágenes del producto" (keydown.arrowleft)="$event.preventDefault(); changeImage(-1)" (keydown.arrowright)="$event.preventDefault(); changeImage(1)">
+            @if (currentImage(); as image) {
+              <figure class="carousel-stage">
+                <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name">
+                @if (item.images.length > 1) {
+                  <button class="carousel-control previous" type="button" (click)="changeImage(-1)" aria-label="Ver imagen anterior">‹</button>
+                  <button class="carousel-control next" type="button" (click)="changeImage(1)" aria-label="Ver imagen siguiente">›</button>
+                  <span class="carousel-counter" aria-live="polite">{{ imageIndex() + 1 }} / {{ item.images.length }}</span>
+                }
+              </figure>
+            }
+            @if (item.images.length > 1) {
+              <div class="carousel-thumbnails" aria-label="Seleccionar imagen">
+                @for (image of item.images; track image.id; let index = $index) {
+                  <button type="button" [class.active]="imageIndex() === index" (click)="selectImage(index)" [attr.aria-label]="'Ver imagen ' + (index + 1)" [attr.aria-current]="imageIndex() === index ? 'true' : null"><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name"></button>
+                }
+              </div>
+            }
+          </section>
         } @else {
           <div class="visual" role="img" [attr.aria-label]="'Imagen no disponible para ' + item.name">
             <span class="brand-chip">{{item.brandName}}</span><div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div><div class="scan"></div>
@@ -16,7 +32,6 @@
       <div class="info">
         <p class="category">{{item.categoryName}} · {{item.brandName}}</p>
         <h1>{{item.name}}</h1>
-        @if (item.description) { <p class="description">{{item.description}}</p> } @else { <p class="description">Este producto no tiene una descripción publicada.</p> }
         <div class="price"><span>Precio publicado</span><strong>{{item.price|number:'1.2-2'}} <em>ARS</em></strong></div>
         <div class="purchase">
           <div class="quantity" aria-label="Cantidad">
@@ -27,6 +42,27 @@
         <p class="feedback" aria-live="polite">{{ feedback() }}</p>
         <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd>{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
       </div>
+    </section>
+    @if (item.specifications.length) {
+      <section class="characteristics">
+        <p class="section-kicker">Ficha técnica</p>
+        <h2>Características del producto</h2>
+        @if (highlightedSpecifications().length) {
+          <div class="characteristic-highlights">
+            @for (specification of highlightedSpecifications(); track specification.id) {<article><span aria-hidden="true">✓</span><p><small>{{ specification.name }}</small><strong>{{ specification.value }}</strong></p></article>}
+          </div>
+        }
+        <div class="characteristic-groups">
+          @for (group of specificationGroups(); track group.name) {
+            <article><h3>{{ group.name }}</h3><dl>@for (specification of group.specifications; track specification.id) {<div><dt>{{ specification.name }}</dt><dd>{{ specification.value }}</dd></div>}</dl></article>
+          }
+        </div>
+      </section>
+    }
+    <section class="product-description">
+      <p class="section-kicker">Información</p>
+      <h2>Descripción del producto</h2>
+      @if (item.description) { <p>{{ item.description }}</p> } @else { <p>Este producto no tiene una descripción publicada.</p> }
     </section>
   } @else if(error()) {
     <section class="not-found" role="alert"><div class="code">404</div><h1>Producto no encontrado</h1><p>El producto no existe o ya no está publicado.</p><a mat-flat-button routerLink="/catalog">Volver al catálogo</a></section>

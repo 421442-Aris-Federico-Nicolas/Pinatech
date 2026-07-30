@@ -10,6 +10,9 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
+    boolean existsByCategory_IdAndActiveTrue(Long categoryId);
+    boolean existsByBrand_IdAndActiveTrue(Long brandId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id")
     Optional<Product> findByIdForUpdate(Long id);

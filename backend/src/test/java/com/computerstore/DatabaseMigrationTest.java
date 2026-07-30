@@ -70,7 +70,14 @@ class DatabaseMigrationTest {
                   AND table_name = 'technical_service_tickets'
                   AND column_name = 'serial_number'
                 """, Integer.class));
-        assertEquals("11", jdbc.queryForObject(
+        assertEquals(3, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'product_specifications'
+                  AND column_name IN ('group_name', 'is_highlighted', 'display_order')
+                """, Integer.class));
+        assertEquals("12", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

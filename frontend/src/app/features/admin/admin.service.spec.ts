@@ -30,4 +30,36 @@ describe('AdminService product images', () => {
     expect(request.request.method).toBe('DELETE');
     request.flush(null);
   });
+
+  it('updates and deletes categories through admin catalog endpoints', () => {
+    const service = TestBed.inject(AdminService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.updateCategory(4, { name: 'Notebooks', slug: 'notebooks' }).subscribe();
+    const update = http.expectOne(`${environment.apiBaseUrl}/admin/catalog/categories/4`);
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body).toEqual({ name: 'Notebooks', slug: 'notebooks' });
+    update.flush({ id: 4, name: 'Notebooks', slug: 'notebooks' });
+
+    service.deleteCategory(4).subscribe();
+    const deletion = http.expectOne(`${environment.apiBaseUrl}/admin/catalog/categories/4`);
+    expect(deletion.request.method).toBe('DELETE');
+    deletion.flush(null);
+  });
+
+  it('updates and deletes brands through admin catalog endpoints', () => {
+    const service = TestBed.inject(AdminService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.updateBrand(5, 'Lenovo').subscribe();
+    const update = http.expectOne(`${environment.apiBaseUrl}/admin/catalog/brands/5`);
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body).toEqual({ name: 'Lenovo' });
+    update.flush({ id: 5, name: 'Lenovo' });
+
+    service.deleteBrand(5).subscribe();
+    const deletion = http.expectOne(`${environment.apiBaseUrl}/admin/catalog/brands/5`);
+    expect(deletion.request.method).toBe('DELETE');
+    deletion.flush(null);
+  });
 });
