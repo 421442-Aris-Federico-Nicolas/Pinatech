@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.computerstore.catalog.domain.Product;
+import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.FulfillmentStatus;
 import com.computerstore.order.domain.OrderItem;
@@ -31,9 +32,12 @@ class OrderExpirationWorkerTest {
         Product product = Mockito.mock(Product.class);
         when(product.getName()).thenReturn("Keyboard");
         when(product.getPrice()).thenReturn(BigDecimal.TEN);
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        when(variant.getProduct()).thenReturn(product);
+        when(variant.getColorName()).thenReturn("Black");
         CustomerOrder order = new CustomerOrder(
                 new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
-                List.of(new OrderItem(product, 1)),
+                List.of(new OrderItem(variant, 1)),
                 BigDecimal.TEN,
                 Instant.now().minusSeconds(1),
                 null,

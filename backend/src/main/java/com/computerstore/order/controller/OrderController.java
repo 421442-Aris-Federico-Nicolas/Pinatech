@@ -11,7 +11,7 @@ import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 
-import com.computerstore.catalog.repository.ProductRepository;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.common.exception.DuplicateResourceException;
 import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.ResourceNotFoundException;
@@ -43,20 +43,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final CustomerOrderRepository orders;
-    private final ProductRepository products;
+    private final ProductVariantRepository variants;
     private final UserAccountRepository users;
     private final OrderStockService stock;
     private final OrderProperties properties;
 
     public OrderController(
             CustomerOrderRepository orders,
-            ProductRepository products,
+            ProductVariantRepository variants,
             UserAccountRepository users,
             OrderStockService stock,
             OrderProperties properties
     ) {
         this.orders = orders;
-        this.products = products;
+        this.variants = variants;
         this.users = users;
         this.stock = stock;
         this.properties = properties;
@@ -87,18 +87,17 @@ public class OrderController {
         }
 
         var sortedInputs = request.items().stream()
-                .sorted(Comparator.comparing(CreateOrderRequest.Item::productId))
+                .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId))
                 .toList();
-        var productIds = new HashSet<Long>();
+        var variantIds = new HashSet<Long>();
         var items = new ArrayList<OrderItem>();
         for (var input : sortedInputs) {
-            if (!productIds.add(input.productId())) {
-                throw new InvalidRequestException("An order cannot contain the same product more than once.");
+            if (!variantIds.add(input.variantId())) {
+                throw new InvalidRequestException("An order cannot contain the same product variant more than once.");
             }
-            var product = products.findById(input.productId())
-                    .filter(productCandidate -> productCandidate.isActive())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found."));
-            items.add(new OrderItem(product, input.quantity()));
+            var variant = variants.findByIdAndActiveTrueAndProduct_ActiveTrue(input.variantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product variant not found."));
+            items.add(new OrderItem(variant, input.quantity()));
         }
 
         BigDecimal total = items.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -135,9 +134,9 @@ public class OrderController {
 
     private String requestHash(CreateOrderRequest request) {
         String canonicalRequest = request.items().stream()
-                .sorted(Comparator.comparing(CreateOrderRequest.Item::productId)
+                .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId)
                         .thenComparing(CreateOrderRequest.Item::quantity))
-                .map(item -> item.productId() + ":" + item.quantity())
+                .map(item -> item.variantId() + ":" + item.quantity())
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
         try {

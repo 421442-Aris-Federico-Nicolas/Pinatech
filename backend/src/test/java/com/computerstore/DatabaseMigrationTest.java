@@ -77,7 +77,15 @@ class DatabaseMigrationTest {
                   AND table_name = 'product_specifications'
                   AND column_name IN ('group_name', 'is_highlighted', 'display_order')
                 """, Integer.class));
-        assertEquals("12", jdbc.queryForObject(
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM products product
+                LEFT JOIN product_variants variant ON variant.product_id = product.id
+                LEFT JOIN inventory stock ON stock.variant_id = variant.id
+                WHERE variant.id IS NULL OR stock.variant_id IS NULL
+                """, Integer.class));
+        assertEquals(10, jdbc.queryForObject("SELECT MIN(available_quantity) FROM inventory", Integer.class));
+        assertEquals("13", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

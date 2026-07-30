@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record InventoryAdjustmentRequest(
-        @NotNull @Positive Long productId,
+        @NotNull @Positive Long variantId,
         @NotNull Integer quantity,
         @NotBlank @Size(max = 500) String reason
 ) {

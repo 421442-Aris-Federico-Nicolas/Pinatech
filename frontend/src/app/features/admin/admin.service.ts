@@ -6,9 +6,10 @@ import { Order } from '../../core/orders/order.service';
 
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
-export interface Inventory { productId: number; availableQuantity: number; reservedQuantity: number; }
+export interface Inventory { productId: number; variantId: number; colorName: string; colorHex: string | null; availableQuantity: number; reservedQuantity: number; }
 export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
-export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; }
+export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; }
+export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; variants: ProductVariantPayload[]; }
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -39,10 +40,10 @@ export class AdminService {
   createBrand(name: string) { return this.http.post<Brand>(`${this.baseUrl}/brands`, { name }); }
   updateBrand(id: number, name: string) { return this.http.put<Brand>(`${this.baseUrl}/brands/${id}`, { name }); }
   deleteBrand(id: number) { return this.http.delete<void>(`${this.baseUrl}/brands/${id}`); }
-  inventory(productId: number) { return this.http.get<Inventory>(`${environment.apiBaseUrl}/inventory/${productId}`); }
+  inventory(variantId: number) { return this.http.get<Inventory>(`${environment.apiBaseUrl}/inventory/${variantId}`); }
   inventories() { return this.http.get<Inventory[]>(`${environment.apiBaseUrl}/inventory`); }
-  adjustInventory(productId: number, quantity: number, reason: string) {
-    return this.http.post<Inventory>(`${environment.apiBaseUrl}/inventory/adjustments`, { productId, quantity, reason });
+  adjustInventory(variantId: number, quantity: number, reason: string) {
+    return this.http.post<Inventory>(`${environment.apiBaseUrl}/inventory/adjustments`, { variantId, quantity, reason });
   }
   orders() { return this.http.get<Order[]>(`${environment.apiBaseUrl}/admin/orders`); }
   updateOrderStatus(id: number, status: string) { return this.http.patch<Order>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }

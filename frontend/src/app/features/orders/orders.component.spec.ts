@@ -18,7 +18,7 @@ describe('OrdersComponent', () => {
     reservationExpiresAt: '2026-07-29T20:00:00Z',
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
-    items: [{ productId: 1, productName: 'Teclado', unitPrice: 1500, quantity: 2, subtotal: 3000 }],
+    items: [{ productId: 1, variantId: 11, productName: 'Teclado', colorName: 'Negro', colorHex: '#000000', unitPrice: 1500, quantity: 2, subtotal: 3000 }],
   };
 
   it('renders Spanish statuses and the expiration for pending payment', async () => {

@@ -1,13 +1,15 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService } from '../../core/cart/cart.service';
 import { CartComponent } from './cart.component';
 
 describe('CartComponent', () => {
   const item: CartItem = {
-    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [] },
+    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true }] },
+    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true },
     quantity: 2,
   };
 
@@ -20,6 +22,11 @@ describe('CartComponent', () => {
       removeItem: vi.fn(),
       clear: vi.fn(),
       checkout: vi.fn(),
+      reconcile: vi.fn(() => of(undefined)),
+      legacyCartDiscarded: signal(false),
+      dismissLegacyCartWarning: vi.fn(),
+      notice: signal(''),
+      dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CartComponent],

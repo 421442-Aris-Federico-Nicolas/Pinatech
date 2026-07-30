@@ -25,14 +25,14 @@
     } @else {
       <div class="products">
         @for (product of featured(); track product.id) {
-          <mat-card>
+          <mat-card (click)="openProduct(product.id)">
             <div class="product-visual">
               @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name"> }
               @else { <span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b> }
             </div>
-            <mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title>{{ product.name }}</mat-card-title></mat-card-header>
-            <mat-card-content><strong>{{ product.price | number:'1.2-2' }} <em>ARS</em></strong></mat-card-content>
-            <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>
+            <mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" (click)="$event.stopPropagation()">{{ product.name }}</a></mat-card-title></mat-card-header>
+            <mat-card-content><strong>{{ product.price | number:'1.2-2' }} <em>ARS</em></strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | number:'1.2-2' }} ARS</small></mat-card-content>
+            <mat-card-actions (click)="$event.stopPropagation()"><label class="variant-select">Color<select [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
           </mat-card>
         } @empty { <div class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></div> }
       </div>

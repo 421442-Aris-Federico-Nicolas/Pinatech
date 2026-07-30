@@ -5,8 +5,11 @@ import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.dto.ProductSummaryResponse;
 import com.computerstore.catalog.repository.ProductRepository;
 import com.computerstore.catalog.repository.ProductSpecificationRepository;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.catalog.service.ProductImageService;
 import com.computerstore.common.exception.ResourceNotFoundException;
+import com.computerstore.inventory.domain.Inventory;
+import com.computerstore.inventory.repository.InventoryRepository;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.*;
@@ -29,8 +32,10 @@ import java.util.Map;
 public class ProductController {
     private final ProductRepository repository;
     private final ProductSpecificationRepository specifications;
+    private final ProductVariantRepository variants;
+    private final InventoryRepository inventory;
     private final ProductImageService productImages;
-    public ProductController(ProductRepository repository, ProductSpecificationRepository specifications, ProductImageService productImages) { this.repository = repository; this.specifications = specifications; this.productImages = productImages; }
+    public ProductController(ProductRepository repository, ProductSpecificationRepository specifications, ProductVariantRepository variants, InventoryRepository inventory, ProductImageService productImages) { this.repository = repository; this.specifications = specifications; this.variants = variants; this.inventory = inventory; this.productImages = productImages; }
     @GetMapping public Page<ProductSummaryResponse> list(@RequestParam(required = false) String search, @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long brandId, @RequestParam(required = false) BigDecimal minPrice, @RequestParam(required = false) BigDecimal maxPrice, @PageableDefault(size = 12, sort = "name") Pageable pageable) {
         Specification<Product> spec = (root, query, cb) -> cb.isTrue(root.get("active"));
         if (search != null && !search.isBlank()) spec = spec.and((r,q,cb) -> cb.like(cb.lower(r.get("name")), "%" + search.trim().toLowerCase() + "%"));
@@ -46,13 +51,14 @@ public class ProductController {
         Map<Long, List<com.computerstore.catalog.dto.ProductSpecificationResponse>> productSpecifications = productIds.isEmpty()
                 ? Map.of()
                 : specificationResponses(specifications.findOrderedByProductIds(productIds));
+        Map<Long, List<com.computerstore.catalog.dto.ProductVariantResponse>> productVariants = variantResponses(productIds);
         return products.map(product -> toResponse(product, images.getOrDefault(product.getId(), List.of()),
-                productSpecifications.getOrDefault(product.getId(), List.of())));
+                productSpecifications.getOrDefault(product.getId(), List.of()), productVariants.getOrDefault(product.getId(), List.of())));
     }
     @GetMapping("/{id}") public ProductSummaryResponse detail(@PathVariable Long id) {
         Product product = repository.findById(id).filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found."));
-        return toResponse(product, productImages.responsesForProduct(id), specificationResponses(id));
+        return toResponse(product, productImages.responsesForProduct(id), specificationResponses(id), variantResponses(List.of(id)).getOrDefault(id,List.of()));
     }
 
     @GetMapping("/images/{imageId}/content")
@@ -67,9 +73,9 @@ public class ProductController {
         return ResponseEntity.ok().headers(headers).body(new FileSystemResource(content.path()));
     }
 
-    private ProductSummaryResponse toResponse(Product p, List<com.computerstore.catalog.dto.ProductImageResponse> images, List<com.computerstore.catalog.dto.ProductSpecificationResponse> productSpecifications) {
+    private ProductSummaryResponse toResponse(Product p, List<com.computerstore.catalog.dto.ProductImageResponse> images, List<com.computerstore.catalog.dto.ProductSpecificationResponse> productSpecifications, List<com.computerstore.catalog.dto.ProductVariantResponse> productVariants) {
         return new ProductSummaryResponse(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
-                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(), images, productSpecifications);
+                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(), images, productSpecifications, productVariants);
     }
 
     private List<com.computerstore.catalog.dto.ProductSpecificationResponse> specificationResponses(Long productId) {
@@ -85,5 +91,12 @@ public class ProductController {
 
     private com.computerstore.catalog.dto.ProductSpecificationResponse specificationResponse(com.computerstore.catalog.domain.ProductSpecification item) {
         return new com.computerstore.catalog.dto.ProductSpecificationResponse(item.getId(), item.getGroupName(), item.getName(), item.getValue(), item.isHighlighted(), item.getDisplayOrder());
+    }
+
+    private Map<Long,List<com.computerstore.catalog.dto.ProductVariantResponse>> variantResponses(List<Long> productIds) {
+        if (productIds.isEmpty()) return Map.of();
+        var activeVariants=variants.findActiveByProductIds(productIds);
+        Map<Long,Inventory> stock=inventory.findAllById(activeVariants.stream().map(com.computerstore.catalog.domain.ProductVariant::getId).toList()).stream().collect(java.util.stream.Collectors.toMap(Inventory::getVariantId,item->item));
+        return activeVariants.stream().collect(java.util.stream.Collectors.groupingBy(item->item.getProduct().getId(),java.util.LinkedHashMap::new,java.util.stream.Collectors.mapping(item->{ Inventory itemStock=stock.get(item.getId()); return new com.computerstore.catalog.dto.ProductVariantResponse(item.getId(),item.getColorName(),item.getColorHex(),itemStock!=null && itemStock.getAvailableQuantity()>0); },java.util.stream.Collectors.toList())));
     }
 }

@@ -27,7 +27,7 @@ export class CheckoutComponent {
   readonly submitError = signal('');
 
   constructor() {
-    if (this.cart.items().length) this.loadCapabilities();
+    this.cart.reconcile().subscribe(() => { if (this.cart.items().length) this.loadCapabilities(); });
   }
 
   loadCapabilities(): void {

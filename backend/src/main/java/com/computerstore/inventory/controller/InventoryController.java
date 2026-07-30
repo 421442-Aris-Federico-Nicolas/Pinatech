@@ -1,6 +1,7 @@
 package com.computerstore.inventory.controller;
 
 import com.computerstore.common.exception.ResourceNotFoundException;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.inventory.domain.InventoryMovement;
 import com.computerstore.inventory.dto.InventoryAdjustmentRequest;
 import com.computerstore.inventory.dto.InventoryResponse;
@@ -25,23 +26,27 @@ import java.util.List;
 @RequestMapping("/api/inventory")
 public class InventoryController {
     private final InventoryRepository repository;
+    private final ProductVariantRepository variants;
     private final InventoryMovementRepository movementRepository;
     private final UserAccountRepository userRepository;
 
     public InventoryController(
             InventoryRepository repository,
+            ProductVariantRepository variants,
             InventoryMovementRepository movementRepository,
             UserAccountRepository userRepository
     ) {
         this.repository = repository;
+        this.variants = variants;
         this.movementRepository = movementRepository;
         this.userRepository = userRepository;
     }
 
-    @GetMapping("/{productId}")
+    @GetMapping("/{variantId}")
     @PreAuthorize("hasAnyRole('ADMIN','TECHNICIAN')")
-    public InventoryResponse get(@PathVariable Long productId) {
-        return toResponse(repository.findById(productId)
+    @Transactional(readOnly = true)
+    public InventoryResponse get(@PathVariable Long variantId) {
+        return toResponse(repository.findById(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found.")));
     }
 
@@ -49,7 +54,7 @@ public class InventoryController {
     @PreAuthorize("hasAnyRole('ADMIN','TECHNICIAN')")
     @Transactional(readOnly = true)
     public List<InventoryResponse> list() {
-        return repository.findAll().stream().map(this::toResponse).toList();
+        return repository.findAllActive().stream().map(this::toResponse).toList();
     }
 
     @PostMapping("/adjustments")
@@ -59,18 +64,21 @@ public class InventoryController {
             @Valid @RequestBody InventoryAdjustmentRequest request,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        var inventory = repository.findByProductIdForUpdate(request.productId())
+        variants.findByIdAndActiveTrueAndProduct_ActiveTrue(request.variantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product variant not found."));
+        var inventory = repository.findByVariantIdForUpdate(request.variantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found."));
         inventory.adjust(request.quantity());
         var actor = userRepository.findById(user.id())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
         movementRepository.save(new InventoryMovement(
-                inventory.getProduct(), request.quantity(), request.reason().trim(), actor));
+                inventory.getVariant(), request.quantity(), request.reason().trim(), actor));
         return ResponseEntity.ok(toResponse(inventory));
     }
 
     private InventoryResponse toResponse(com.computerstore.inventory.domain.Inventory inventory) {
         return new InventoryResponse(
-                inventory.getProductId(), inventory.getAvailableQuantity(), inventory.getReservedQuantity());
+                inventory.getVariant().getProduct().getId(), inventory.getVariantId(), inventory.getVariant().getColorName(),
+                inventory.getVariant().getColorHex(), inventory.getAvailableQuantity(), inventory.getReservedQuantity());
     }
 }

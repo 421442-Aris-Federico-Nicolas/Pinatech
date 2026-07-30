@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.computerstore.catalog.domain.Product;
+import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.common.exception.InvalidStateTransitionException;
 import com.computerstore.user.domain.UserAccount;
 import org.junit.jupiter.api.Test;
@@ -88,9 +89,12 @@ class CustomerOrderTest {
         Product product = Mockito.mock(Product.class);
         Mockito.when(product.getName()).thenReturn("Keyboard");
         Mockito.when(product.getPrice()).thenReturn(BigDecimal.TEN);
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        Mockito.when(variant.getProduct()).thenReturn(product);
+        Mockito.when(variant.getColorName()).thenReturn("Black");
         return new CustomerOrder(
                 new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
-                List.of(new OrderItem(product, 1)),
+                List.of(new OrderItem(variant, 1)),
                 BigDecimal.TEN
         );
     }

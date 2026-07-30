@@ -15,6 +15,9 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
 
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM customer_orders customer_order JOIN order_items item ON item.order_id = customer_order.id WHERE item.variant_id = :variantId AND customer_order.status NOT IN ('DELIVERED', 'CANCELLED'))", nativeQuery = true)
+    boolean existsActiveByVariantId(@Param("variantId") Long variantId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id")
     Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);

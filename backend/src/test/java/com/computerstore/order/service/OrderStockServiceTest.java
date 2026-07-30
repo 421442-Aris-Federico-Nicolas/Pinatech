@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.computerstore.catalog.domain.Product;
+import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.inventory.domain.Inventory;
 import com.computerstore.inventory.repository.InventoryMovementRepository;
 import com.computerstore.inventory.repository.InventoryRepository;
@@ -21,25 +22,26 @@ import org.mockito.Mockito;
 class OrderStockServiceTest {
 
     @Test
-    void locksInventoryInStableProductOrderAndRecordsReservations() {
+    void locksIndependentVariantsInStableOrderAndRecordsReservations() {
         InventoryRepository inventories = Mockito.mock(InventoryRepository.class);
         InventoryMovementRepository movements = Mockito.mock(InventoryMovementRepository.class);
-        Product firstProduct = product(1L);
-        Product secondProduct = product(2L);
-        Inventory firstInventory = inventory(firstProduct);
-        Inventory secondInventory = inventory(secondProduct);
-        when(inventories.findByProductIdForUpdate(1L)).thenReturn(Optional.of(firstInventory));
-        when(inventories.findByProductIdForUpdate(2L)).thenReturn(Optional.of(secondInventory));
+        Product product = product(1L);
+        ProductVariant firstVariant = variant(1L, product);
+        ProductVariant secondVariant = variant(2L, product);
+        Inventory firstInventory = inventory(firstVariant);
+        Inventory secondInventory = inventory(secondVariant);
+        when(inventories.findByVariantIdForUpdate(1L)).thenReturn(Optional.of(firstInventory));
+        when(inventories.findByVariantIdForUpdate(2L)).thenReturn(Optional.of(secondInventory));
         CustomerOrder order = new CustomerOrder(
                 new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
-                List.of(new OrderItem(secondProduct, 2), new OrderItem(firstProduct, 1)),
+                List.of(new OrderItem(secondVariant, 2), new OrderItem(firstVariant, 1)),
                 new BigDecimal("30.00"));
 
         new OrderStockService(inventories, movements).reserve(order);
 
         var lockOrder = inOrder(inventories);
-        lockOrder.verify(inventories).findByProductIdForUpdate(1L);
-        lockOrder.verify(inventories).findByProductIdForUpdate(2L);
+        lockOrder.verify(inventories).findByVariantIdForUpdate(1L);
+        lockOrder.verify(inventories).findByVariantIdForUpdate(2L);
         assertEquals(1, firstInventory.getReservedQuantity());
         assertEquals(2, secondInventory.getReservedQuantity());
         Mockito.verify(movements, Mockito.times(2)).save(Mockito.any());
@@ -50,11 +52,12 @@ class OrderStockServiceTest {
         InventoryRepository inventories = Mockito.mock(InventoryRepository.class);
         InventoryMovementRepository movements = Mockito.mock(InventoryMovementRepository.class);
         Product product = product(1L);
-        Inventory inventory = inventory(product);
-        when(inventories.findByProductIdForUpdate(1L)).thenReturn(Optional.of(inventory));
+        ProductVariant variant = variant(1L, product);
+        Inventory inventory = inventory(variant);
+        when(inventories.findByVariantIdForUpdate(1L)).thenReturn(Optional.of(inventory));
         CustomerOrder order = new CustomerOrder(
                 new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
-                List.of(new OrderItem(product, 2)),
+                List.of(new OrderItem(variant, 2)),
                 new BigDecimal("20.00"));
         OrderStockService service = new OrderStockService(inventories, movements);
         service.reserve(order);
@@ -75,8 +78,16 @@ class OrderStockServiceTest {
         return product;
     }
 
-    private Inventory inventory(Product product) {
-        Inventory inventory = new Inventory(product);
+    private ProductVariant variant(Long id, Product product) {
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        when(variant.getId()).thenReturn(id);
+        when(variant.getProduct()).thenReturn(product);
+        when(variant.getColorName()).thenReturn("Black");
+        return variant;
+    }
+
+    private Inventory inventory(ProductVariant variant) {
+        Inventory inventory = new Inventory(variant);
         inventory.adjust(10);
         return inventory;
     }

@@ -22,40 +22,40 @@ public class OrderStockService {
     }
 
     public void reserve(CustomerOrder order) {
-        order.getItems().stream().sorted(byProductId()).forEach(item -> {
+        order.getItems().stream().sorted(byVariantId()).forEach(item -> {
             inventory(item).reserve(item.getQuantity());
-            movements.save(InventoryMovement.reservation(item.getProduct(), item.getQuantity(), order));
+            movements.save(InventoryMovement.reservation(item.getVariant(), item.getQuantity(), order));
         });
     }
 
     public void release(CustomerOrder order) {
-        order.getItems().stream().sorted(byProductId()).forEach(item -> {
+        order.getItems().stream().sorted(byVariantId()).forEach(item -> {
             inventory(item).release(item.getQuantity());
-            movements.save(InventoryMovement.release(item.getProduct(), item.getQuantity(), order));
+            movements.save(InventoryMovement.release(item.getVariant(), item.getQuantity(), order));
         });
     }
 
     public void consume(CustomerOrder order) {
-        order.getItems().stream().sorted(byProductId()).forEach(item -> {
+        order.getItems().stream().sorted(byVariantId()).forEach(item -> {
             inventory(item).consumeReserved(item.getQuantity());
-            movements.save(InventoryMovement.consumption(item.getProduct(), item.getQuantity(), order));
+            movements.save(InventoryMovement.consumption(item.getVariant(), item.getQuantity(), order));
         });
     }
 
     public void restore(CustomerOrder order) {
-        order.getItems().stream().sorted(byProductId()).forEach(item -> {
+        order.getItems().stream().sorted(byVariantId()).forEach(item -> {
             inventory(item).restore(item.getQuantity());
             movements.save(InventoryMovement.returnedFromCancelledOrder(
-                    item.getProduct(), item.getQuantity(), order));
+                    item.getVariant(), item.getQuantity(), order));
         });
     }
 
     private com.computerstore.inventory.domain.Inventory inventory(OrderItem item) {
-        return inventories.findByProductIdForUpdate(item.getProduct().getId())
+        return inventories.findByVariantIdForUpdate(item.getVariant().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found."));
     }
 
-    private Comparator<OrderItem> byProductId() {
-        return Comparator.comparing(item -> item.getProduct().getId());
+    private Comparator<OrderItem> byVariantId() {
+        return Comparator.comparing(item -> item.getVariant().getId());
     }
 }

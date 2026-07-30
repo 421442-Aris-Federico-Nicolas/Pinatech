@@ -14,7 +14,7 @@ public record CreateOrderRequest(
         @NotEmpty @Size(max = 50) List<@Valid Item> items
 ) {
     public record Item(
-            @NotNull @Positive Long productId,
+            @NotNull @Positive Long variantId,
             @NotNull @Min(1) @Max(99) Integer quantity
     ) {
     }

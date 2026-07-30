@@ -23,8 +23,11 @@ public final class OrderResponseMapper {
                 order.getUser().getEmail(),
                 order.getItems().stream()
                         .map(item -> new OrderResponse.Item(
-                                item.getProduct().getId(),
+                                item.getVariant().getProduct().getId(),
+                                item.getVariant().getId(),
                                 item.getProductName(),
+                                item.getVariantColorName(),
+                                item.getVariantColorHex(),
                                 item.getUnitPrice(),
                                 item.getQuantity(),
                                 item.getSubtotal()))

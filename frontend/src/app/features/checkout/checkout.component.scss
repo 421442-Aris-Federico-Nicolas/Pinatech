@@ -36,6 +36,8 @@ h1 {
 
 .page-header p:last-child { color: var(--pin-muted); margin-bottom: 0; }
 .page-header > a { color: #007e9f; font-weight: 800; white-space: nowrap; }
+.reconciliation-warning { background: #fff4dc; border: 1px solid #e0b75c; color: #654500; margin: 0 0 1.25rem; padding: .8rem 1rem; }
+.reconciliation-warning button { background: transparent; border: 0; color: inherit; cursor: pointer; float: right; font-weight: 800; text-decoration: underline; }
 .checkout-layout { align-items: start; display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr) 340px; }
 .details { display: grid; gap: 1rem; }
 .panel, .summary, .empty, .result { background: #fff; border: 1px solid #d9e4eb; }

@@ -4,7 +4,10 @@ import { environment } from '../../../environments/environment';
 
 export interface OrderItem {
   productId: number;
+  variantId: number;
   productName: string;
+  colorName: string;
+  colorHex: string | null;
   unitPrice: number;
   quantity: number;
   subtotal: number;

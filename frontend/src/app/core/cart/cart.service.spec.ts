@@ -10,7 +10,8 @@ import { environment } from '../../../environments/environment';
 
 describe('CartService', () => {
   const user = signal<AuthenticatedUser | null>(null);
-  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [] };
+  const variant = { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true };
+  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [variant] };
 
   beforeEach(() => {
     localStorage.clear();
@@ -28,27 +29,58 @@ describe('CartService', () => {
 
   it('ignores invalid persisted values and restores only safe cart items', () => {
     localStorage.setItem('pinatech-cart-guest', JSON.stringify([
-      { product, quantity: 2 },
-      { product: { ...product, price: 'free' }, quantity: 1 },
-      { product, quantity: -3 },
+      { product, variant, quantity: 2 },
+      { product: { ...product, price: 'free' }, variant, quantity: 1 },
+      { product, variant, quantity: -3 },
     ]));
 
     const cart = TestBed.inject(CartService);
 
-    expect(cart.items()).toEqual([{ product, quantity: 2 }]);
+    expect(cart.items()).toEqual([{ product, variant, quantity: 2 }]);
     expect(cart.total()).toBe(2000);
   });
 
   it('merges the guest cart into the customer cart after login', () => {
-    localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, quantity: 2 }]));
-    localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, quantity: 3 }]));
+    localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, variant, quantity: 2 }]));
+    localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 3 }]));
     const cart = TestBed.inject(CartService);
 
     user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
     TestBed.tick();
 
-    expect(cart.items()).toEqual([{ product, quantity: 5 }]);
+    expect(cart.items()).toEqual([{ product, variant, quantity: 5 }]);
     expect(localStorage.getItem('pinatech-cart-guest')).toBeNull();
+  });
+
+  it('keeps colors of the same product as independent cart lines', () => {
+    const cart = TestBed.inject(CartService);
+    const blue = { id: 12, colorName: 'Azul', colorHex: '#0000FF', inStock: true };
+
+    cart.add(product, variant);
+    cart.add({ ...product, variants: [variant, blue] }, blue, 2);
+
+    expect(cart.items().map((item) => [item.variant.id, item.quantity])).toEqual([[11, 1], [12, 2]]);
+  });
+
+  it('discards legacy lines that cannot be assigned to a color safely', () => {
+    localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, quantity: 2 }]));
+
+    const cart = TestBed.inject(CartService);
+
+    expect(cart.items()).toEqual([]);
+    expect(cart.legacyCartDiscarded()).toBe(true);
+  });
+
+  it('removes a persisted color that is no longer available', () => {
+    const cart = TestBed.inject(CartService);
+    cart.add(product, variant);
+
+    cart.reconcile().subscribe();
+    TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/products/1`)
+      .flush({ ...product, variants: [{ ...variant, inStock: false }] });
+
+    expect(cart.items()).toEqual([]);
+    expect(cart.notice()).toContain('ya no están disponibles');
   });
 
   it('does not restore an expired confirmation and removes it from storage', () => {
@@ -98,7 +130,7 @@ describe('CartService', () => {
   it('caps quantities and computes item count and total', () => {
     const cart = TestBed.inject(CartService);
 
-    cart.add(product, 120);
+    cart.add(product, variant, 120);
 
     expect(cart.count()).toBe(99);
     expect(cart.total()).toBe(99000);
@@ -106,11 +138,11 @@ describe('CartService', () => {
 
   it('clears the cart and persists the order confirmation after checkout', () => {
     const cart = TestBed.inject(CartService);
-    cart.add(product, 2);
+    cart.add(product, variant, 2);
     cart.checkout().subscribe();
 
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
-    expect(request.request.body).toEqual({ items: [{ productId: 1, quantity: 2 }] });
+    expect(request.request.body).toEqual({ items: [{ variantId: 11, quantity: 2 }] });
     expect(request.request.headers.get('Idempotency-Key')).toBeTruthy();
     request.flush({
       id: 42,
@@ -133,7 +165,7 @@ describe('CartService', () => {
   it('reuses the idempotency key when a checkout request is retried', () => {
     const cart = TestBed.inject(CartService);
     const http = TestBed.inject(HttpTestingController);
-    cart.add(product);
+    cart.add(product, variant);
 
     cart.checkout().subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);

@@ -14,9 +14,11 @@ import com.computerstore.catalog.repository.BrandRepository;
 import com.computerstore.catalog.repository.CategoryRepository;
 import com.computerstore.catalog.repository.ProductRepository;
 import com.computerstore.catalog.repository.ProductSpecificationRepository;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.catalog.service.ProductImageService;
 import com.computerstore.common.exception.BusinessRuleException;
 import com.computerstore.inventory.repository.InventoryRepository;
+import com.computerstore.order.repository.CustomerOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -37,7 +39,9 @@ class CatalogAdminControllerTest {
                 categories,
                 brands,
                 Mockito.mock(ProductSpecificationRepository.class),
+                Mockito.mock(ProductVariantRepository.class),
                 Mockito.mock(InventoryRepository.class),
+                Mockito.mock(CustomerOrderRepository.class),
                 Mockito.mock(ProductImageService.class));
     }
 

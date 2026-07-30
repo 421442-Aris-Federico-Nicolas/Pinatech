@@ -43,6 +43,7 @@ export class AdminComponent {
   readonly orders = signal<Order[]>([]);
   readonly selected = signal<Product | null>(null);
   readonly inventory = signal<Inventory | null>(null);
+  readonly selectedVariantId = signal<number | null>(null);
   readonly expandedOrder = signal<number | null>(null);
   readonly orderFilter = signal<string>('ALL');
   readonly orderUpdating = signal<number | null>(null);
@@ -110,7 +111,9 @@ export class AdminComponent {
         if (selectedId) {
           const product = products.content.find((candidate) => candidate.id === selectedId) ?? null;
           this.selected.set(product);
-          this.inventory.set(inventories.find((item) => item.productId === selectedId) ?? null);
+          const variantId = product?.variants.some((variant) => variant.id === this.selectedVariantId()) ? this.selectedVariantId() : product?.variants[0]?.id ?? null;
+          this.selectedVariantId.set(variantId);
+          this.inventory.set(inventories.find((item) => item.variantId === variantId) ?? null);
         }
       },
       error: () => this.fail('No se pudieron cargar los datos de administración.'),
@@ -128,11 +131,13 @@ export class AdminComponent {
 
   openNewProduct(): void { this.navigate('catalog'); this.resetProduct(); }
 
-  select(product: Product, openInventory = false): void {
+  select(product: Product, openInventory = false, variantId?: number): void {
     this.clearPendingImages();
     this.selected.set(product);
-    Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })) });
-    this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
+    Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) });
+    const selectedVariantId = variantId ?? product.variants[0]?.id ?? null;
+    this.selectedVariantId.set(selectedVariantId);
+    this.inventory.set(this.inventories().find((item) => item.variantId === selectedVariantId) ?? null);
     if (openInventory) this.navigate('inventory');
   }
 
@@ -140,6 +145,7 @@ export class AdminComponent {
     this.clearPendingImages();
     this.selected.set(null);
     this.inventory.set(null);
+    this.selectedVariantId.set(null);
     Object.assign(this.form, this.emptyProduct());
   }
 
@@ -152,6 +158,9 @@ export class AdminComponent {
     if (this.form.specifications.some((item) => !item.groupName.trim() || !item.name.trim() || !item.value.trim())) return this.fail('Completá grupo, característica y valor en todas las filas.');
     const names = this.form.specifications.map((item) => item.name.trim().toLowerCase());
     if (new Set(names).size !== names.length) return this.fail('No puede haber características con el mismo nombre.');
+    if (!this.form.variants.length || this.form.variants.some((variant) => !variant.colorName.trim())) return this.fail('Agregá al menos un color y completá todos sus nombres.');
+    const colors=this.form.variants.map((variant)=>variant.colorName.trim().toLowerCase());
+    if (new Set(colors).size !== colors.length) return this.fail('No puede haber colores repetidos.');
     this.saving.set(true);
     const request = this.selected()
       ? this.service.updateProduct(this.selected()!.id, this.form)
@@ -218,6 +227,25 @@ export class AdminComponent {
 
   removeSpecification(index: number): void {
     this.form.specifications = this.form.specifications.filter((_, current) => current !== index);
+  }
+
+  addVariant(): void {
+    if (this.form.variants.length >= 20) return this.fail('Podés agregar hasta 20 colores por producto.');
+    this.form.variants = [...this.form.variants, { colorName: '', colorHex: '#7D8798' }];
+    this.clearMessages();
+  }
+
+  removeVariant(index: number): void {
+    if (this.form.variants.length === 1) return this.fail('El producto debe conservar al menos un color.');
+    this.form.variants = this.form.variants.filter((_, current) => current !== index);
+  }
+
+  moveVariant(index: number, change: number): void {
+    const target=index+change;
+    if (target<0 || target>=this.form.variants.length) return;
+    const variants=[...this.form.variants];
+    [variants[index],variants[target]]=[variants[target],variants[index]];
+    this.form.variants=variants;
   }
 
   moveSpecification(index: number, change: number): void {
@@ -337,12 +365,12 @@ export class AdminComponent {
   }
 
   adjustStock(): void {
-    const product = this.selected();
-    if (!product || !this.adjustment || !this.adjustmentReason.trim()) return this.fail('Indicá un ajuste distinto de cero y su motivo.');
-    this.service.adjustInventory(product.id, Number(this.adjustment), this.adjustmentReason.trim()).subscribe({
+    const current = this.inventory();
+    if (!current || !this.adjustment || !this.adjustmentReason.trim()) return this.fail('Indicá un color, un ajuste distinto de cero y su motivo.');
+    this.service.adjustInventory(current.variantId, Number(this.adjustment), this.adjustmentReason.trim()).subscribe({
       next: (inventory) => {
         this.inventory.set(inventory);
-        this.inventories.update((items) => items.map((item) => item.productId === inventory.productId ? inventory : item));
+        this.inventories.update((items) => items.map((item) => item.variantId === inventory.variantId ? inventory : item));
         this.adjustment = 0;
         this.adjustmentReason = '';
         this.success.set('Stock actualizado.');
@@ -380,25 +408,26 @@ export class AdminComponent {
   }
 
   statusCount(status: string): number { return this.orders().filter((order) => order.status === status).length; }
-  stockFor(productId: number): Inventory | undefined { return this.inventories().find((item) => item.productId === productId); }
+  stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
-  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0, specifications: [] }; }
+  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null }] }; }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
     this.products.update((products) => products.some((current) => current.id === product.id)
       ? products.map((current) => current.id === product.id ? product : current)
       : [...products, product]);
     if (preservePendingImages) {
       this.selected.set(product);
-      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })) });
-      this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
+      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) });
+      this.selectedVariantId.set(product.variants[0]?.id ?? null);
+      this.inventory.set(this.inventories().find((item) => item.variantId === this.selectedVariantId()) ?? null);
     } else {
       this.select(product);
     }
     this.success.set(message);
     this.service.inventories().subscribe((inventories) => {
       this.inventories.set(inventories);
-      this.inventory.set(inventories.find((item) => item.productId === product.id) ?? null);
+      this.inventory.set(inventories.find((item) => item.variantId === this.selectedVariantId()) ?? null);
     });
   }
   private clearPendingImages(): void { this.revokePendingImages(); this.pendingImages.set([]); }

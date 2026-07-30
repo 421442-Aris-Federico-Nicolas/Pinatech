@@ -17,6 +17,8 @@ export class CartComponent {
   readonly cart = inject(CartService);
   readonly auth = inject(AuthService);
 
+  constructor() { this.cart.reconcile().subscribe(); }
+
   clear(): void {
     if (confirm('¿Vaciar todos los productos del carrito?')) this.cart.clear();
   }

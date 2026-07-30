@@ -1,4 +1,5 @@
 <main>
+  @if (cart.notice()) { <p class="reconciliation-warning" role="status">{{ cart.notice() }} <button type="button" (click)="cart.dismissNotice()">Cerrar</button></p> }
   @if (created(); as order) {
     <section class="result" aria-labelledby="request-title" role="status">
       <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
@@ -44,12 +45,12 @@
             <span>01</span>
             <div><p>Tu selección</p><h2 id="products-title">Productos</h2></div>
           </div>
-          @for (item of cart.items(); track item.product.id) {
+          @for (item of cart.items(); track item.variant.id) {
             <article>
               @if (item.product.images[0]; as image) {
                 <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name">
               } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
-              <div><strong>{{ item.product.name }}</strong><small>{{ item.product.brandName }} · Cantidad: {{ item.quantity }}</small></div>
+              <div><strong>{{ item.product.name }}</strong><small>{{ item.product.brandName }} · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
               <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
             </article>
           }

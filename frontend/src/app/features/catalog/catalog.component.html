@@ -36,14 +36,14 @@
       } @else if (page()?.content?.length) {
         <section class="grid" aria-label="Resultados del catálogo">
           @for (product of page()?.content ?? []; track product.id) {
-            <mat-card>
-              <a class="product-visual" [routerLink]="['/products', product.id]" [attr.aria-label]="'Ver ' + product.name">
+            <mat-card (click)="openProduct(product.id)">
+              <a class="product-visual" [routerLink]="['/products', product.id]" [attr.aria-label]="'Ver ' + product.name" (click)="$event.stopPropagation()">
                 @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name"> }
                 @else { <span>{{ product.brandName }}</span><b aria-hidden="true">PIN</b> }
               </a>
-              <mat-card-header><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]">{{ product.name }}</a></mat-card-title></mat-card-header>
-              <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <small>ARS</small></strong></mat-card-content>
-              <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>
+              <mat-card-header><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" (click)="$event.stopPropagation()">{{ product.name }}</a></mat-card-title></mat-card-header>
+              <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <small>ARS</small></strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | number:'1.2-2' }} ARS</small></mat-card-content>
+              <mat-card-actions (click)="$event.stopPropagation()"><label class="variant-select">Color<select [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
             </mat-card>
           }
         </section>

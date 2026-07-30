@@ -8,7 +8,8 @@ import { CheckoutCapabilities, CheckoutService } from './checkout.service';
 
 describe('CheckoutComponent', () => {
   const item: CartItem = {
-    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [] },
+    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true }] },
+    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true },
     quantity: 2,
   };
   const capabilities: CheckoutCapabilities = {
@@ -39,6 +40,9 @@ describe('CheckoutComponent', () => {
       total: signal(3000),
       confirmation: signal(null),
       checkout: vi.fn(() => of(order)),
+      reconcile: vi.fn(() => of(undefined)),
+      notice: signal(''),
+      dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],
@@ -69,6 +73,9 @@ describe('CheckoutComponent', () => {
       total: signal(3000),
       confirmation: signal(null),
       checkout: vi.fn(() => of(order)),
+      reconcile: vi.fn(() => of(undefined)),
+      notice: signal(''),
+      dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],
@@ -95,6 +102,9 @@ describe('CheckoutComponent', () => {
         reservationExpiresAt: '2000-01-01T20:00:00Z',
       }),
       dismissConfirmation: vi.fn(),
+      reconcile: vi.fn(() => of(undefined)),
+      notice: signal(''),
+      dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],

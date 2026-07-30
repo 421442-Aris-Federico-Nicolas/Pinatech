@@ -14,7 +14,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.computerstore.catalog.domain.Product;
-import com.computerstore.catalog.repository.ProductRepository;
+import com.computerstore.catalog.domain.ProductVariant;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.common.exception.DuplicateResourceException;
 import com.computerstore.order.config.OrderProperties;
 import com.computerstore.order.domain.CustomerOrder;
@@ -33,11 +34,11 @@ import org.springframework.http.HttpStatus;
 class OrderControllerTest {
 
     private final CustomerOrderRepository orders = Mockito.mock(CustomerOrderRepository.class);
-    private final ProductRepository products = Mockito.mock(ProductRepository.class);
+    private final ProductVariantRepository variants = Mockito.mock(ProductVariantRepository.class);
     private final UserAccountRepository users = Mockito.mock(UserAccountRepository.class);
     private final OrderStockService stock = Mockito.mock(OrderStockService.class);
     private final OrderController controller = new OrderController(
-            orders, products, users, stock, new OrderProperties(Duration.ofMinutes(15), 100));
+            orders, variants, users, stock, new OrderProperties(Duration.ofMinutes(15), 100));
     private final AuthenticatedUser authenticatedUser =
             new AuthenticatedUser(1L, "customer@example.com", List.of());
 
@@ -50,7 +51,8 @@ class OrderControllerTest {
     @Test
     void recalculatesTotalAndDelegatesTheStockReservation() {
         Product product = product(7L, "Keyboard", "125.50");
-        when(products.findById(7L)).thenReturn(Optional.of(product));
+        ProductVariant variant = variant(7L, product);
+        when(variants.findByIdAndActiveTrueAndProduct_ActiveTrue(7L)).thenReturn(Optional.of(variant));
         when(orders.save(any(CustomerOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = controller.create(
@@ -71,8 +73,9 @@ class OrderControllerTest {
     @Test
     void returnsTheOriginalOrderForAnIdempotentRetryWithoutReservingAgain() {
         Product product = product(7L, "Keyboard", "125.50");
+        ProductVariant variant = variant(7L, product);
         AtomicReference<CustomerOrder> saved = new AtomicReference<>();
-        when(products.findById(7L)).thenReturn(Optional.of(product));
+        when(variants.findByIdAndActiveTrueAndProduct_ActiveTrue(7L)).thenReturn(Optional.of(variant));
         when(orders.findByUserIdAndIdempotencyKey(1L, "checkout-1"))
                 .thenAnswer(invocation -> Optional.ofNullable(saved.get()));
         when(orders.save(any(CustomerOrder.class))).thenAnswer(invocation -> {
@@ -87,14 +90,15 @@ class OrderControllerTest {
         assertEquals(HttpStatus.CREATED, created.getStatusCode());
         assertEquals(HttpStatus.OK, retried.getStatusCode());
         verify(stock, times(1)).reserve(any(CustomerOrder.class));
-        verify(products, times(1)).findById(7L);
+        verify(variants, times(1)).findByIdAndActiveTrueAndProduct_ActiveTrue(7L);
     }
 
     @Test
     void rejectsReusingAnIdempotencyKeyWithAnotherPayload() {
         Product product = product(7L, "Keyboard", "125.50");
+        ProductVariant variant = variant(7L, product);
         AtomicReference<CustomerOrder> saved = new AtomicReference<>();
-        when(products.findById(7L)).thenReturn(Optional.of(product));
+        when(variants.findByIdAndActiveTrueAndProduct_ActiveTrue(7L)).thenReturn(Optional.of(variant));
         when(orders.findByUserIdAndIdempotencyKey(1L, "checkout-1"))
                 .thenAnswer(invocation -> Optional.ofNullable(saved.get()));
         when(orders.save(any(CustomerOrder.class))).thenAnswer(invocation -> {
@@ -119,5 +123,13 @@ class OrderControllerTest {
         when(product.getName()).thenReturn(name);
         when(product.getPrice()).thenReturn(new BigDecimal(price));
         return product;
+    }
+
+    private ProductVariant variant(Long id, Product product) {
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        when(variant.getId()).thenReturn(id);
+        when(variant.getProduct()).thenReturn(product);
+        when(variant.getColorName()).thenReturn("Black");
+        return variant;
     }
 }

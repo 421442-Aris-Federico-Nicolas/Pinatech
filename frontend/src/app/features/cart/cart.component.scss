@@ -26,6 +26,9 @@ h1 {
   margin: .4rem 0 2rem;
 }
 
+.cart-warning { background: #fff4dc; border: 1px solid #e0b75c; color: #654500; margin: -1rem 0 1.25rem; padding: .8rem 1rem; }
+.cart-warning button { background: transparent; border: 0; color: inherit; cursor: pointer; float: right; font-weight: 800; text-decoration: underline; }
+
 .cart-layout {
   align-items: start;
   display: grid;

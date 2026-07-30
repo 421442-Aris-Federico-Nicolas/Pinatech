@@ -6,7 +6,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { CartService } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
-import { CatalogService, Product } from '../catalog/catalog.service';
+import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
 
 @Component({
   imports: [DecimalPipe, MatButtonModule, RouterLink],
@@ -26,6 +26,9 @@ export class ProductComponent {
   readonly imageIndex = signal(0);
   readonly currentImage = computed(() => this.product()?.images[this.imageIndex()] ?? null);
   readonly quantity = signal(1);
+  readonly selectedVariantId = signal<number | null>(null);
+  readonly selectedVariant = computed<ProductVariant | null>(() => this.product()?.variants.find((variant) => variant.id === this.selectedVariantId()) ?? null);
+  readonly priceWithoutNationalTax = computed(() => (this.product()?.price ?? 0) / 1.105);
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly feedback = signal('');
@@ -52,6 +55,7 @@ export class ProductComponent {
       next: (product) => {
         this.product.set(product);
         this.imageIndex.set(0);
+        this.selectedVariantId.set(product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id ?? null);
         this.loading.set(false);
         this.title.setTitle(`${product.name} | Pinatech`);
         this.meta.updateTag({ name: 'description', content: product.description.slice(0, 155) || `${product.name} en Pinatech.` });
@@ -69,11 +73,13 @@ export class ProductComponent {
   }
 
   selectImage(index: number): void { this.imageIndex.set(index); }
+  selectVariant(variantId: number): void { this.selectedVariantId.set(variantId); this.feedback.set(''); }
 
   addToCart(): void {
     const product = this.product();
-    if (!product) return;
-    this.cart.add(product, this.quantity());
-    this.feedback.set(`${this.quantity()} ${this.quantity() === 1 ? 'unidad agregada' : 'unidades agregadas'} al carrito.`);
+    const variant = this.selectedVariant();
+    if (!product || !variant?.inStock) return;
+    this.cart.add(product, variant, this.quantity());
+    this.feedback.set(`${this.quantity()} ${this.quantity() === 1 ? 'unidad agregada' : 'unidades agregadas'} en color ${variant.colorName}.`);
   }
 }

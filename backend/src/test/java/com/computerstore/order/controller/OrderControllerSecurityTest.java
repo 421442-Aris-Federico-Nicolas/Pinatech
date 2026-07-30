@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
-import com.computerstore.catalog.repository.ProductRepository;
+import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.config.SecurityConfiguration;
 import com.computerstore.order.config.OrderProperties;
 import com.computerstore.order.repository.CustomerOrderRepository;
@@ -39,7 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class OrderControllerSecurityTest {
 
     @MockBean private CustomerOrderRepository orders;
-    @MockBean private ProductRepository products;
+    @MockBean private ProductVariantRepository variants;
     @MockBean private UserAccountRepository users;
     @MockBean private OrderStockService stock;
     @MockBean private OrderProperties properties;
@@ -54,7 +54,7 @@ class OrderControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"items\":[{\"productId\":1,\"quantity\":1}]}"))
+                        .content("{\"items\":[{\"variantId\":1,\"quantity\":1}]}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -67,7 +67,7 @@ class OrderControllerSecurityTest {
         mockMvc.perform(post("/api/orders")
                         .with(user(admin))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"items\":[{\"productId\":1,\"quantity\":1}]}"))
+                        .content("{\"items\":[{\"variantId\":1,\"quantity\":1}]}"))
                 .andExpect(status().isForbidden());
     }
 

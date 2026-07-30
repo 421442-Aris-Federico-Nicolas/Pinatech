@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { tap } from 'rxjs';
+import { catchError, forkJoin, map, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Product } from '../../features/catalog/catalog.service';
+import { Product, ProductVariant } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
 
-export interface CartItem { product: Product; quantity: number; }
+export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
 export interface OrderConfirmation {
   id: number;
   status: string;
@@ -27,11 +27,15 @@ export class CartService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private activeKey = GUEST_CART_KEY;
+  private readonly legacyCartDiscardedState = signal(false);
   private readonly itemsState = signal<CartItem[]>(this.restoreCart(GUEST_CART_KEY));
   private readonly confirmationState = signal<OrderConfirmation | null>(null);
+  private readonly noticeState = signal('');
 
   readonly items = this.itemsState.asReadonly();
   readonly confirmation = this.confirmationState.asReadonly();
+  readonly legacyCartDiscarded = this.legacyCartDiscardedState.asReadonly();
+  readonly notice = this.noticeState.asReadonly();
   readonly count = computed(() => this.itemsState().reduce((total, item) => total + item.quantity, 0));
   readonly total = computed(() => this.itemsState().reduce((total, item) => total + item.product.price * item.quantity, 0));
 
@@ -57,32 +61,63 @@ export class CartService {
     });
   }
 
-  add(product: Product, quantity = 1): void {
+  add(product: Product, variant: ProductVariant, quantity = 1): void {
     const amount = this.safeQuantity(quantity);
     const current = this.itemsState();
-    const found = current.find((item) => item.product.id === product.id);
+    const found = current.find((item) => item.variant.id === variant.id);
     this.update(found
-      ? current.map((item) => item.product.id === product.id
-        ? { product, quantity: Math.min(MAX_QUANTITY, item.quantity + amount) }
+      ? current.map((item) => item.variant.id === variant.id
+        ? { product, variant, quantity: Math.min(MAX_QUANTITY, item.quantity + amount) }
         : item)
-      : [...current, { product, quantity: amount }]);
+      : [...current, { product, variant, quantity: amount }]);
   }
 
-  setQuantity(id: number, quantity: number): void {
+  setQuantity(variantId: number, quantity: number): void {
     if (!Number.isFinite(quantity)) return;
     this.update(this.itemsState().flatMap((item) => {
-      if (item.product.id !== id) return [item];
+      if (item.variant.id !== variantId) return [item];
       return quantity <= 0 ? [] : [{ ...item, quantity: this.safeQuantity(quantity) }];
     }));
   }
 
-  removeItem(id: number): void { this.update(this.itemsState().filter((item) => item.product.id !== id)); }
+  removeItem(variantId: number): void { this.update(this.itemsState().filter((item) => item.variant.id !== variantId)); }
   clear(): void { this.update([]); }
+  dismissLegacyCartWarning(): void { this.legacyCartDiscardedState.set(false); }
+  dismissNotice(): void { this.noticeState.set(''); }
+
+  reconcile() {
+    const items = this.itemsState();
+    const storageKey = this.activeKey;
+    const productIds = [...new Set(items.map((item) => item.product.id))];
+    if (!productIds.length) return of(undefined);
+
+    return forkJoin(productIds.map((id) => this.http.get<Product>(`${environment.apiBaseUrl}/products/${id}`))).pipe(
+      map((products) => {
+        if (storageKey !== this.activeKey) return;
+        const byId = new Map(products.map((product) => [product.id, product]));
+        const current = this.itemsState();
+        const reconciled = current.flatMap((item) => {
+          const product = byId.get(item.product.id);
+          if (!product) return [item];
+          const variant = product.variants.find((candidate) => candidate.id === item.variant.id);
+          return variant?.inStock ? [{ product, variant, quantity: item.quantity }] : [];
+        });
+        if (reconciled.length !== current.length) {
+          this.noticeState.set('Quitamos del carrito los colores que ya no están disponibles.');
+          this.update(reconciled);
+        } else {
+          this.itemsState.set(reconciled);
+          this.persist(this.activeKey, reconciled);
+        }
+      }),
+      catchError(() => of(undefined)),
+    );
+  }
 
   checkout() {
     const idempotencyKey = this.checkoutAttempt();
     return this.http.post<OrderConfirmation>(`${environment.apiBaseUrl}/orders`, {
-      items: this.itemsState().map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+      items: this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity })),
     }, { headers: { 'Idempotency-Key': idempotencyKey } }).pipe(tap((confirmation) => {
       this.update([]);
       this.confirmationState.set(confirmation);
@@ -104,9 +139,9 @@ export class CartService {
   private merge(existing: CartItem[], incoming: CartItem[]): CartItem[] {
     const merged = [...existing];
     for (const item of incoming) {
-      const index = merged.findIndex((candidate) => candidate.product.id === item.product.id);
+      const index = merged.findIndex((candidate) => candidate.variant.id === item.variant.id);
       if (index === -1) merged.push(item);
-      else merged[index] = { product: item.product, quantity: Math.min(MAX_QUANTITY, merged[index].quantity + item.quantity) };
+      else merged[index] = { product: item.product, variant: item.variant, quantity: Math.min(MAX_QUANTITY, merged[index].quantity + item.quantity) };
     }
     return merged;
   }
@@ -152,10 +187,14 @@ export class CartService {
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
       if (!Array.isArray(parsed)) return [];
+      if (parsed.some((item) => this.isLegacyCartItem(item))) {
+        this.legacyCartDiscardedState.set(true);
+        this.remove(key);
+      }
       return parsed.filter((item): item is CartItem => this.isCartItem(item))
         .map((item) => ({
           ...item,
-          product: { ...item.product, images: Array.isArray(item.product.images) ? item.product.images : [] },
+          product: { ...item.product, images: Array.isArray(item.product.images) ? item.product.images : [], variants: Array.isArray(item.product.variants) ? item.product.variants : [] },
           quantity: this.safeQuantity(item.quantity),
         }));
     } catch {
@@ -207,15 +246,24 @@ export class CartService {
   private isCartItem(value: unknown): value is CartItem {
     if (!value || typeof value !== 'object') return false;
     const item = value as Record<string, unknown>;
-    if (!item['product'] || typeof item['product'] !== 'object' || typeof item['quantity'] !== 'number') return false;
+    if (!item['product'] || typeof item['product'] !== 'object' || !item['variant'] || typeof item['variant'] !== 'object' || typeof item['quantity'] !== 'number') return false;
     const product = item['product'] as Record<string, unknown>;
+    const variant = item['variant'] as Record<string, unknown>;
     return typeof product['id'] === 'number' && Number.isInteger(product['id']) && product['id'] > 0
       && typeof product['name'] === 'string' && typeof product['slug'] === 'string'
       && typeof product['description'] === 'string'
       && typeof product['price'] === 'number' && Number.isFinite(product['price']) && product['price'] >= 0
       && typeof product['categoryId'] === 'number' && typeof product['categoryName'] === 'string'
       && typeof product['brandId'] === 'number' && typeof product['brandName'] === 'string'
+      && typeof variant['id'] === 'number' && Number.isInteger(variant['id']) && variant['id'] > 0
+      && typeof variant['colorName'] === 'string'
       && Number.isFinite(item['quantity']) && item['quantity'] > 0;
+  }
+
+  private isLegacyCartItem(value: unknown): boolean {
+    if (!value || typeof value !== 'object') return false;
+    const item = value as Record<string, unknown>;
+    return !!item['product'] && typeof item['product'] === 'object' && !item['variant'];
   }
 
   private safeQuantity(quantity: number): number {

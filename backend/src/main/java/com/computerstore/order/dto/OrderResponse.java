@@ -21,7 +21,10 @@ public record OrderResponse(
 ) {
     public record Item(
             Long productId,
+            Long variantId,
             String productName,
+            String colorName,
+            String colorHex,
             BigDecimal unitPrice,
             int quantity,
             BigDecimal subtotal

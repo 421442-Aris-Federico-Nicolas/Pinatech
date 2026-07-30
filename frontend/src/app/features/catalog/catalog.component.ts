@@ -8,7 +8,7 @@ import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
-import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
+import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product, ProductVariant } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
@@ -39,6 +39,7 @@ export class CatalogComponent {
   readonly optionsError = signal(false);
   readonly filtersOpen = signal(false);
   readonly feedback = signal('');
+  readonly selectedVariants = signal<Record<number, number>>({});
 
   constructor() {
     forkJoin({ categories: this.service.categories(), brands: this.service.brands() })
@@ -79,9 +80,20 @@ export class CatalogComponent {
   }
 
   add(product: Product): void {
-    this.cart.add(product);
-    this.feedback.set(`${product.name} se agregó al carrito.`);
+    const variant = this.selectedVariant(product);
+    if (!variant?.inStock) { this.feedback.set('El color seleccionado no tiene stock disponible.'); return; }
+    this.cart.add(product, variant);
+    this.feedback.set(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
   }
+
+  selectedVariant(product: Product): ProductVariant | undefined {
+    const selectedId = this.selectedVariants()[product.id];
+    return product.variants.find((variant) => variant.id === selectedId) ?? product.variants.find((variant) => variant.inStock) ?? product.variants[0];
+  }
+
+  selectVariant(productId: number, variantId: number): void { this.selectedVariants.update((selected) => ({ ...selected, [productId]: variantId })); }
+
+  openProduct(productId: number): void { void this.router.navigate(['/products', productId]); }
 
   retry(): void { this.loadPage(this.page()?.number ?? 0); }
 
@@ -91,7 +103,7 @@ export class CatalogComponent {
     this.error.set(false);
     this.request = this.service.getProducts(this.filters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
-      .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
+      .subscribe({ next: (result) => { this.page.set(result); this.selectedVariants.update((selected) => ({ ...Object.fromEntries(result.content.map((product) => [product.id, product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id])), ...selected })); }, error: () => { this.page.set(null); this.error.set(true); } });
   }
 
   private readParams(params: ParamMap): void {

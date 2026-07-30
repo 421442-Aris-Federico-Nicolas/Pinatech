@@ -4,7 +4,8 @@ import { environment } from '../../../environments/environment';
 
 export interface ProductImage { id: number; contentUrl: string; altText: string; displayOrder: number; }
 export interface ProductSpecification { id: number; groupName: string; name: string; value: string; highlighted: boolean; displayOrder: number; }
-export interface Product { id: number; name: string; slug: string; description: string; price: number; categoryId: number; categoryName: string; brandId: number; brandName: string; images: ProductImage[]; specifications: ProductSpecification[]; }
+export interface ProductVariant { id: number; colorName: string; colorHex: string | null; inStock: boolean; }
+export interface Product { id: number; name: string; slug: string; description: string; price: number; categoryId: number; categoryName: string; brandId: number; brandName: string; images: ProductImage[]; specifications: ProductSpecification[]; variants: ProductVariant[]; }
 export interface Page<T> { content: T[]; totalPages: number; totalElements: number; number: number; size: number; }
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }

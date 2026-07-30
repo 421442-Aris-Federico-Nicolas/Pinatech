@@ -28,8 +28,8 @@
           }
 
           <div class="items">
-            @for (item of order.items; track item.productId) {
-              <div><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            @for (item of order.items; track item.variantId) {
+              <div><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
             }
           </div>
 
