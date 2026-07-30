@@ -2,7 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 
-export interface Product { id: number; name: string; slug: string; description: string; price: number; categoryId: number; categoryName: string; brandId: number; brandName: string; }
+export interface ProductImage { id: number; contentUrl: string; altText: string; displayOrder: number; }
+export interface Product { id: number; name: string; slug: string; description: string; price: number; categoryId: number; categoryName: string; brandId: number; brandName: string; images: ProductImage[]; }
 export interface Page<T> { content: T[]; totalPages: number; totalElements: number; number: number; size: number; }
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }

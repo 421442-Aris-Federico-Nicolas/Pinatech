@@ -43,4 +43,17 @@ class InventoryTest {
         assertEquals(5, inventory.getAvailableQuantity());
         assertEquals(0, inventory.getReservedQuantity());
     }
+
+    @Test
+    void restoresPreviouslyConsumedStock() {
+        Inventory inventory = new Inventory((Product) null);
+        inventory.adjust(8);
+        inventory.reserve(3);
+        inventory.consumeReserved(3);
+
+        inventory.restore(3);
+
+        assertEquals(8, inventory.getAvailableQuantity());
+        assertEquals(0, inventory.getReservedQuantity());
+    }
 }

@@ -42,6 +42,14 @@ public class OrderStockService {
         });
     }
 
+    public void restore(CustomerOrder order) {
+        order.getItems().stream().sorted(byProductId()).forEach(item -> {
+            inventory(item).restore(item.getQuantity());
+            movements.save(InventoryMovement.returnedFromCancelledOrder(
+                    item.getProduct(), item.getQuantity(), order));
+        });
+    }
+
     private com.computerstore.inventory.domain.Inventory inventory(OrderItem item) {
         return inventories.findByProductIdForUpdate(item.getProduct().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory not found."));

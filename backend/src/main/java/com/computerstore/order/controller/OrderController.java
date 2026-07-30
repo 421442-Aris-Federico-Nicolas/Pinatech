@@ -20,6 +20,7 @@ import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.OrderItem;
 import com.computerstore.order.dto.CreateOrderRequest;
 import com.computerstore.order.dto.OrderResponse;
+import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
 import com.computerstore.security.AuthenticatedUser;
@@ -28,6 +29,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,6 +63,7 @@ public class OrderController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Transactional
     public ResponseEntity<OrderResponse> create(
             @Valid @RequestBody CreateOrderRequest request,
@@ -79,7 +82,7 @@ public class OrderController {
                 if (!requestHash.equals(existing.get().getRequestHash())) {
                     throw new DuplicateResourceException("Idempotency key was already used for a different order.");
                 }
-                return ResponseEntity.ok(response(existing.get()));
+                return ResponseEntity.ok(OrderResponseMapper.toResponse(existing.get()));
             }
         }
 
@@ -107,13 +110,16 @@ public class OrderController {
                 idempotencyKey,
                 requestHash));
         stock.reserve(order);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response(order));
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponseMapper.toResponse(order));
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Transactional(readOnly = true)
     public List<OrderResponse> mine(@AuthenticationPrincipal AuthenticatedUser auth) {
-        return orders.findByUserIdOrderByCreatedAtDesc(auth.id()).stream().map(this::response).toList();
+        return orders.findByUserIdOrderByCreatedAtDesc(auth.id()).stream()
+                .map(OrderResponseMapper::toResponse)
+                .toList();
     }
 
     private String normalizeIdempotencyKey(String suppliedKey) {
@@ -142,23 +148,4 @@ public class OrderController {
         }
     }
 
-    private OrderResponse response(CustomerOrder order) {
-        return new OrderResponse(
-                order.getId(),
-                order.getStatus().name(),
-                order.getTotal(),
-                order.getCreatedAt(),
-                order.getReservationExpiresAt(),
-                order.getUser().getFirstName() + " " + order.getUser().getLastName(),
-                order.getUser().getEmail(),
-                order.getItems().stream()
-                        .map(item -> new OrderResponse.Item(
-                                item.getProduct().getId(),
-                                item.getProductName(),
-                                item.getUnitPrice(),
-                                item.getQuantity(),
-                                item.getSubtotal()))
-                        .toList()
-        );
-    }
 }

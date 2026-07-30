@@ -1,0 +1,22 @@
+@if (previews().length) {
+  <div class="attachment-gallery" aria-label="Imágenes adjuntas">
+    @for (item of previews(); track item.attachment.id) {
+      <article>
+        <div class="preview">
+          @if (item.url) {
+            <a [href]="item.url" target="_blank" rel="noopener" [attr.aria-label]="'Abrir ' + item.attachment.fileName">
+              <img [src]="item.url" [alt]="'Adjunto ' + item.attachment.fileName + ' subido por ' + item.attachment.uploadedByName">
+            </a>
+          } @else if (item.error) {
+            <span role="alert">No se pudo cargar</span>
+          } @else {
+            <span>Descargando…</span>
+          }
+        </div>
+        <strong>{{ item.attachment.fileName }}</strong>
+        <small>{{ item.attachment.uploadedByName }} · {{ roleLabel(item.attachment.uploaderRole) }}</small>
+        <small>{{ item.attachment.createdAt | date:'short' }} · {{ item.attachment.sizeBytes / 1048576 | number:'1.1-1' }} MiB</small>
+      </article>
+    }
+  </div>
+}

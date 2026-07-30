@@ -1,0 +1,29 @@
+<main>
+  <header><p class="eyebrow">Tu cuenta</p><h1>Mi perfil</h1><p>Datos asociados a tu sesión en Pinatech.</p></header>
+
+  @if (auth.user(); as user) {
+    <div class="profile-layout">
+      <section class="identity" aria-labelledby="identity-title">
+        <span class="monogram" aria-hidden="true">{{ user.firstName.charAt(0) }}{{ user.lastName.charAt(0) }}</span>
+        <div><p>Cuenta Pinatech</p><h2 id="identity-title">{{ user.firstName }} {{ user.lastName }}</h2><span>{{ user.roles.map(roleLabel).join(' · ') }}</span></div>
+      </section>
+
+      <section class="data" aria-labelledby="data-title">
+        <div class="section-heading"><p>Información personal</p><h2 id="data-title">Datos de contacto</h2></div>
+        <dl>
+          <div><dt>Nombre</dt><dd>{{ user.firstName }} {{ user.lastName }}</dd></div>
+          <div><dt>Email</dt><dd><a [href]="'mailto:' + user.email">{{ user.email }}</a></dd></div>
+          <div><dt>Teléfono</dt><dd>{{ user.phone || 'No informado' }}</dd></div>
+        </dl>
+        <p class="read-only">Estos datos son de solo lectura. No hay un endpoint de edición habilitado.</p>
+      </section>
+
+      <aside aria-labelledby="preferences-title">
+        <span class="aside-number">Próximamente</span>
+        <h2 id="preferences-title">Direcciones y preferencias</h2>
+        <p>Se habilitarán cuando estén definidas las modalidades y condiciones de entrega. Por ahora no necesitás cargar una dirección.</p>
+        @if (user.roles.includes('CUSTOMER')) { <a routerLink="/orders">Ver Mis pedidos</a> }
+      </aside>
+    </div>
+  }
+</main>

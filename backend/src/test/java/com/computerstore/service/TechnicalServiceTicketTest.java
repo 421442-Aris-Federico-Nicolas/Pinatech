@@ -43,6 +43,6 @@ class TechnicalServiceTicketTest {
     private TechnicalServiceTicket ticket() {
         return new TechnicalServiceTicket(
                 new UserAccount("Ada", "Lovelace", "ada@example.com", "hash", null),
-                "Notebook", "Pinatech", "Lab", null, "No enciende");
+                "Notebook", "Pinatech", "Lab", "No enciende");
     }
 }

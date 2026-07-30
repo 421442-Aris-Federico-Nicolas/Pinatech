@@ -1,6 +1,7 @@
 package com.computerstore.auth.domain;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import com.computerstore.user.domain.UserAccount;
 import jakarta.persistence.Column;
@@ -28,6 +29,9 @@ public class RefreshToken {
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
     private String tokenHash;
 
+    @Column(name = "family_id", nullable = false)
+    private UUID familyId;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
@@ -40,9 +44,10 @@ public class RefreshToken {
     protected RefreshToken() {
     }
 
-    public RefreshToken(UserAccount user, String tokenHash, Instant expiresAt) {
+    public RefreshToken(UserAccount user, String tokenHash, UUID familyId, Instant expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
+        this.familyId = familyId;
         this.expiresAt = expiresAt;
     }
 
@@ -56,9 +61,17 @@ public class RefreshToken {
     }
 
     public void revoke() {
-        revokedAt = Instant.now();
+        revoke(Instant.now());
+    }
+
+    public void revoke(Instant revokedAt) {
+        if (this.revokedAt == null) {
+            this.revokedAt = revokedAt;
+        }
     }
 
     public UserAccount getUser() { return user; }
     public String getTokenHash() { return tokenHash; }
+    public UUID getFamilyId() { return familyId; }
+    public boolean isRevoked() { return revokedAt != null; }
 }

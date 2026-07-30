@@ -4,7 +4,9 @@ MVP local de una tienda de productos informaticos y servicio tecnico. El proyect
 
 ## Estado
 
-El MVP funcional esta implementado: autenticacion con roles y refresh tokens rotativos, catalogo, inventario, ordenes y tickets de servicio tecnico. Incluye pruebas unitarias para la logica de autenticacion, stock, transiciones de orden y guards de Angular.
+El MVP funcional incluye autenticacion con roles, catalogo, inventario, reservas de stock, solicitudes de pedido y tickets de servicio tecnico. El checkout ya separa estado de pago y estado de entrega, pero no procesa pagos ni cotiza envios hasta seleccionar proveedores.
+
+See [payment and shipping integration](docs/payment-and-shipping-integration.md) for the provider-neutral design and [production checklist](docs/production-checklist.md) for the release gates.
 
 ## Stack
 
@@ -125,7 +127,13 @@ Flyway executes `backend/src/main/resources/db/migration/V1__create_initial_sche
 
 `POST /api/orders` accepts an optional `Idempotency-Key` header (1-100 characters). The storefront creates and persists this key while a checkout attempt is pending. Repeating the same key for the same user and payload returns the original order; reusing it with another payload returns `409`. Omitting the header preserves compatibility for other API clients.
 
-Stock is reserved for `ORDER_RESERVATION_TTL` (15 minutes by default) while an order is `PENDING_PAYMENT`. Expired reservations are cancelled and released automatically. A manual `PAID` state stops expiry; cancellation from `PENDING_PAYMENT` or `PAID` releases stock, and transition to `PREPARING` consumes it. Every operation writes an inventory movement.
+Stock is reserved for `ORDER_RESERVATION_TTL` (15 minutes by default) while an order is pending. Expired reservations are cancelled and released automatically. Orders store provider-neutral payment and fulfillment states while the legacy status keeps the existing administration flow compatible. Registering a request does not process a payment or include delivery.
+
+## Product and technical-service images
+
+Administrators can upload up to six optional JPEG/PNG images per product. Customers and technicians can attach up to ten optional JPEG/PNG images to each technical-service ticket. Files are validated from their decoded content, limited to 5 MiB and stored under generated UUIDs rather than user-provided filenames.
+
+Product images are public. Ticket attachments are private and downloaded through authenticated API requests with ticket ownership and role checks. Docker persists files in the `media_uploads` volume mounted at `/app/uploads`; manual backend runs use `FILE_STORAGE_ROOT` (default `./uploads`). Back up this storage together with PostgreSQL. Use managed object storage before horizontally scaling the backend.
 
 To reset local data, stop and remove the PostgreSQL volume:
 

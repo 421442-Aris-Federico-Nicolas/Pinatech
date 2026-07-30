@@ -63,7 +63,7 @@
 
     @if (!loading() && section() === 'sales') {
       <section class="sales-toolbar">
-        <div class="filter-tabs"><button type="button" [class.active]="orderFilter() === 'ALL'" (click)="orderFilter.set('ALL')">Todos <span>{{ orders().length }}</span></button><button type="button" [class.active]="orderFilter() === 'PENDING_PAYMENT'" (click)="orderFilter.set('PENDING_PAYMENT')">Pendientes <span>{{ statusCount('PENDING_PAYMENT') }}</span></button><button type="button" [class.active]="orderFilter() === 'PAID'" (click)="orderFilter.set('PAID')">Pagados <span>{{ statusCount('PAID') }}</span></button><button type="button" [class.active]="orderFilter() === 'PREPARING'" (click)="orderFilter.set('PREPARING')">Preparando <span>{{ statusCount('PREPARING') }}</span></button><button type="button" [class.active]="orderFilter() === 'DELIVERED'" (click)="orderFilter.set('DELIVERED')">Entregados <span>{{ statusCount('DELIVERED') }}</span></button></div>
+        <div class="filter-tabs"><button type="button" [class.active]="orderFilter() === 'ALL'" (click)="orderFilter.set('ALL')">Todos <span>{{ orders().length }}</span></button><button type="button" [class.active]="orderFilter() === 'PENDING_PAYMENT'" (click)="orderFilter.set('PENDING_PAYMENT')">Pendientes <span>{{ statusCount('PENDING_PAYMENT') }}</span></button><button type="button" [class.active]="orderFilter() === 'PAID'" (click)="orderFilter.set('PAID')">Pagados <span>{{ statusCount('PAID') }}</span></button><button type="button" [class.active]="orderFilter() === 'PREPARING'" (click)="orderFilter.set('PREPARING')">Preparando <span>{{ statusCount('PREPARING') }}</span></button><button type="button" [class.active]="orderFilter() === 'DELIVERED'" (click)="orderFilter.set('DELIVERED')">Entregados <span>{{ statusCount('DELIVERED') }}</span></button><button type="button" [class.active]="orderFilter() === 'CANCELLED'" (click)="orderFilter.set('CANCELLED')">Cancelados <span>{{ statusCount('CANCELLED') }}</span></button></div>
       </section>
       <section class="orders-list">
         @for(order of filteredOrders(); track order.id){
@@ -97,6 +97,19 @@
         <section class="panel editor">
           <header><div><p class="panel-kicker">{{ selected() ? 'Producto #' + selected()!.id : 'Alta de producto' }}</p><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2></div>@if(selected()){<button class="text-danger" type="button" (click)="deleteProduct()">Dar de baja</button>}</header>
           <div class="product-form"><mat-form-field><mat-label>Nombre</mat-label><input matInput [(ngModel)]="form.name" name="name" (input)="updateSlug()" required></mat-form-field><mat-form-field><mat-label>Slug</mat-label><input matInput [(ngModel)]="form.slug" name="slug" required></mat-form-field><mat-form-field><mat-label>Precio</mat-label><input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.price" name="price" required></mat-form-field><mat-form-field><mat-label>Categoría</mat-label><mat-select [(ngModel)]="form.categoryId" name="categoryId" required>@for(category of categories();track category.id){<mat-option [value]="category.id">{{ category.name }}</mat-option>}</mat-select></mat-form-field><mat-form-field><mat-label>Marca</mat-label><mat-select [(ngModel)]="form.brandId" name="brandId" required>@for(brand of brands();track brand.id){<mat-option [value]="brand.id">{{ brand.name }}</mat-option>}</mat-select></mat-form-field><mat-form-field class="wide"><mat-label>Descripción</mat-label><textarea matInput rows="5" [(ngModel)]="form.description" name="description" required></textarea></mat-form-field></div>
+          <section class="product-images">
+            <div class="section-label"><div><h3>Imágenes</h3><p>JPEG o PNG, hasta 5 MiB cada una y 6 en total.</p></div><label class="file-button" [class.disabled]="(selected()?.images?.length ?? 0) + pendingImages().length >= 6">Seleccionar imágenes<input type="file" accept="image/jpeg,image/png" multiple [disabled]="(selected()?.images?.length ?? 0) + pendingImages().length >= 6" (change)="selectProductImages($event)"></label></div>
+            @if (selected()?.images?.length || pendingImages().length) {
+              <div class="product-image-grid">
+                @for (image of selected()?.images ?? []; track image.id) {
+                  <article><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || selected()!.name"><span>{{ image.altText || 'Sin texto alternativo' }}</span><button type="button" [disabled]="deletingImage() === image.id" (click)="deleteImage(image)">{{ deletingImage() === image.id ? 'Eliminando…' : 'Eliminar' }}</button></article>
+                }
+                @for (item of pendingImages(); track item.previewUrl; let index = $index) {
+                  <article class="pending"><img [src]="item.previewUrl" [alt]="item.altText || 'Vista previa de ' + item.file.name"><span>{{ item.file.name }}</span><input [(ngModel)]="item.altText" [name]="'imageAlt' + index" placeholder="Texto alternativo (opcional)" [attr.aria-label]="'Texto alternativo para ' + item.file.name"><button type="button" (click)="removePendingImage(index)">Quitar</button></article>
+                }
+              </div>
+            } @else { <p class="image-empty">Este producto todavía no tiene imágenes.</p> }
+          </section>
           <footer><button mat-flat-button type="button" [disabled]="saving()" (click)="saveProduct()">{{ saving() ? 'Guardando...' : selected() ? 'Guardar cambios' : 'Crear producto' }}</button></footer>
         </section>
       </section>

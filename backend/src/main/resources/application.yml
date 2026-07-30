@@ -1,8 +1,10 @@
 spring:
   application:
     name: computer-store-api
-  profiles:
-    default: dev
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 52MB
   jackson:
     time-zone: UTC
   jpa:
@@ -32,8 +34,15 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
 
 app:
+  storage:
+    root: ${FILE_STORAGE_ROOT:./uploads}
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:4200}
   jwt:

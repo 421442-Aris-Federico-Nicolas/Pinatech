@@ -2,8 +2,16 @@
   @if(product();as item){
     <a class="back" routerLink="/catalog">← Volver al catálogo</a>
     <section class="product">
-      <div class="visual" role="img" [attr.aria-label]="'Imagen no disponible para ' + item.name">
-        <span class="brand-chip">{{item.brandName}}</span><div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div><div class="scan"></div>
+      <div class="gallery">
+        @if (item.images.length) {
+          @for (image of item.images; track image.id) {
+            <figure><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name"></figure>
+          }
+        } @else {
+          <div class="visual" role="img" [attr.aria-label]="'Imagen no disponible para ' + item.name">
+            <span class="brand-chip">{{item.brandName}}</span><div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div><div class="scan"></div>
+          </div>
+        }
       </div>
       <div class="info">
         <p class="category">{{item.categoryName}} · {{item.brandName}}</p>

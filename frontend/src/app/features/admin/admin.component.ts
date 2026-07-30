@@ -1,24 +1,28 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { finalize, forkJoin } from 'rxjs';
+import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
-import { Product } from '../catalog/catalog.service';
+import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
+import { Product, ProductImage } from '../catalog/catalog.service';
 import { AdminService, Brand, Category, Inventory, ProductPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
 interface ProductForm extends ProductPayload {}
+interface PendingProductImage { file: File; previewUrl: string; altText: string; }
 interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
 const REVENUE_STATUSES = new Set<OrderStatus>(['PAID', 'PREPARING', 'READY', 'DELIVERED']);
 
 @Component({
+  selector: 'app-admin',
   imports: [DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './admin.component.html',
@@ -27,6 +31,8 @@ const REVENUE_STATUSES = new Set<OrderStatus>(['PAID', 'PREPARING', 'READY', 'DE
 })
 export class AdminComponent {
   private readonly service = inject(AdminService);
+  private readonly destroyRef = inject(DestroyRef);
+  readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
   readonly sidebarCollapsed = signal(false);
   readonly loading = signal(true);
@@ -43,6 +49,8 @@ export class AdminComponent {
   readonly error = signal('');
   readonly success = signal('');
   readonly saving = signal(false);
+  readonly deletingImage = signal<number | null>(null);
+  readonly pendingImages = signal<PendingProductImage[]>([]);
   readonly form: ProductForm = this.emptyProduct();
   categoryName = '';
   categorySlug = '';
@@ -74,7 +82,10 @@ export class AdminComponent {
     return days.map((day) => ({ ...day, height: day.total ? Math.max(12, day.total / maximum * 100) : 4 }));
   });
 
-  constructor() { this.reload(); }
+  constructor() {
+    this.destroyRef.onDestroy(() => this.revokePendingImages());
+    this.reload();
+  }
 
   reload(): void {
     this.loading.set(true);
@@ -114,6 +125,7 @@ export class AdminComponent {
   openNewProduct(): void { this.navigate('catalog'); this.resetProduct(); }
 
   select(product: Product, openInventory = false): void {
+    this.clearPendingImages();
     this.selected.set(product);
     Object.assign(this.form, product);
     this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
@@ -121,6 +133,7 @@ export class AdminComponent {
   }
 
   resetProduct(): void {
+    this.clearPendingImages();
     this.selected.set(null);
     this.inventory.set(null);
     Object.assign(this.form, this.emptyProduct());
@@ -136,13 +149,73 @@ export class AdminComponent {
     const request = this.selected()
       ? this.service.updateProduct(this.selected()!.id, this.form)
       : this.service.createProduct(this.form);
-    request.pipe(finalize(() => this.saving.set(false))).subscribe({
+    const wasEditing = !!this.selected();
+    const pendingImages = [...this.pendingImages()];
+    request.subscribe({
       next: (product) => {
-        this.success.set(this.selected() ? 'Producto actualizado.' : 'Producto creado con stock inicial en cero.');
-        this.reload();
-        this.select(product);
+        if (!pendingImages.length) {
+          this.saving.set(false);
+          this.finishProductSave(product, wasEditing ? 'Producto actualizado.' : 'Producto creado con stock inicial en cero.');
+          return;
+        }
+
+        from(pendingImages).pipe(
+          concatMap((item) => this.service.uploadProductImage(product.id, item.file, item.altText).pipe(
+            map((uploaded): UploadResult<PendingProductImage, ProductImage> => ({ pending: item, uploaded })),
+            catchError(() => of<UploadResult<PendingProductImage, ProductImage>>({ pending: item, uploaded: null })),
+          )),
+          toArray(),
+          finalize(() => this.saving.set(false)),
+        ).subscribe((results) => {
+          const { uploaded, succeeded, failed } = summarizeUploadResults(results);
+          const updated = { ...product, images: [...(product.images ?? []), ...uploaded] };
+          const message = uploaded.length === pendingImages.length
+            ? `${wasEditing ? 'Producto actualizado' : 'Producto creado'} y ${uploaded.length} ${uploaded.length === 1 ? 'imagen subida' : 'imágenes subidas'}.`
+            : `${wasEditing ? 'El producto se actualizó' : 'El producto se creó'} correctamente, pero solo se subieron ${uploaded.length} de ${pendingImages.length} imágenes. Podés volver a intentar las restantes.`;
+          succeeded.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+          this.pendingImages.set(failed);
+          this.finishProductSave(updated, message, failed.length > 0);
+        });
       },
-      error: () => this.fail('No se pudo guardar el producto. Revisá los campos requeridos.'),
+      error: () => { this.saving.set(false); this.fail('No se pudo guardar el producto. Revisá los campos requeridos.'); },
+    });
+  }
+
+  selectProductImages(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+    const available = 6 - (this.selected()?.images.length ?? 0) - this.pendingImages().length;
+    if (files.length > available) return this.fail(`Podés agregar hasta ${Math.max(0, available)} imágenes más; el máximo es 6 por producto.`);
+    const invalidType = files.find((file) => !['image/jpeg', 'image/png'].includes(file.type));
+    if (invalidType) return this.fail(`"${invalidType.name}" no es JPEG ni PNG.`);
+    const oversized = files.find((file) => file.size > 5 * 1024 * 1024);
+    if (oversized) return this.fail(`"${oversized.name}" supera el máximo de 5 MiB.`);
+
+    this.clearMessages();
+    this.pendingImages.update((current) => [...current, ...files.map((file) => ({ file, previewUrl: URL.createObjectURL(file), altText: '' }))]);
+  }
+
+  removePendingImage(index: number): void {
+    const item = this.pendingImages()[index];
+    if (item) URL.revokeObjectURL(item.previewUrl);
+    this.pendingImages.update((items) => items.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  deleteImage(image: ProductImage): void {
+    const product = this.selected();
+    if (!product || this.deletingImage() !== null || !confirm(`¿Eliminar la imagen "${image.altText || image.id}"?`)) return;
+    this.deletingImage.set(image.id);
+    this.clearMessages();
+    this.service.deleteProductImage(product.id, image.id).pipe(finalize(() => this.deletingImage.set(null))).subscribe({
+      next: () => {
+        const updated = { ...product, images: product.images.filter((current) => current.id !== image.id) };
+        this.products.update((products) => products.map((current) => current.id === product.id ? updated : current));
+        this.selected.set(updated);
+        this.success.set('Imagen eliminada.');
+      },
+      error: () => this.fail('No se pudo eliminar la imagen.'),
     });
   }
 
@@ -190,7 +263,7 @@ export class AdminComponent {
   }
 
   changeOrderStatus(order: Order, action: OrderAction): void {
-    if (action.danger && !confirm(`¿Cancelar el pedido #${order.id}?`)) return;
+    if (action.danger && !confirm(`¿Cancelar el pedido #${order.id}? El stock reservado o preparado volverá a estar disponible.`)) return;
     this.clearMessages();
     this.orderUpdating.set(order.id);
     this.service.updateOrderStatus(order.id, action.status).pipe(finalize(() => this.orderUpdating.set(null))).subscribe({
@@ -207,8 +280,8 @@ export class AdminComponent {
     switch (status as OrderStatus) {
       case 'PENDING_PAYMENT': return [{ label: 'Marcar pagado', status: 'PAID' }, { label: 'Cancelar', status: 'CANCELLED', danger: true }];
       case 'PAID': return [{ label: 'Preparar pedido', status: 'PREPARING' }, { label: 'Cancelar', status: 'CANCELLED', danger: true }];
-      case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }];
-      case 'READY': return [{ label: 'Marcar entregado', status: 'DELIVERED' }];
+      case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }, { label: 'Cancelar venta', status: 'CANCELLED', danger: true }];
+      case 'READY': return [{ label: 'Marcar entregado', status: 'DELIVERED' }, { label: 'Cancelar venta', status: 'CANCELLED', danger: true }];
       default: return [];
     }
   }
@@ -222,6 +295,25 @@ export class AdminComponent {
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
   private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0 }; }
+  private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
+    this.products.update((products) => products.some((current) => current.id === product.id)
+      ? products.map((current) => current.id === product.id ? product : current)
+      : [...products, product]);
+    if (preservePendingImages) {
+      this.selected.set(product);
+      Object.assign(this.form, product);
+      this.inventory.set(this.inventories().find((item) => item.productId === product.id) ?? null);
+    } else {
+      this.select(product);
+    }
+    this.success.set(message);
+    this.service.inventories().subscribe((inventories) => {
+      this.inventories.set(inventories);
+      this.inventory.set(inventories.find((item) => item.productId === product.id) ?? null);
+    });
+  }
+  private clearPendingImages(): void { this.revokePendingImages(); this.pendingImages.set([]); }
+  private revokePendingImages(): void { this.pendingImages().forEach((item) => URL.revokeObjectURL(item.previewUrl)); }
   private slug(value: string): string { return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
   private clearMessages(): void { this.error.set(''); this.success.set(''); }
   private fail(message: string): void { this.success.set(''); this.error.set(message); }

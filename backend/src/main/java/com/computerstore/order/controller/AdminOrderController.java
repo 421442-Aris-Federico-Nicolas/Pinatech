@@ -8,6 +8,7 @@ import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.dto.OrderResponse;
+import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.dto.OrderStatusRequest;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
@@ -37,7 +38,9 @@ public class AdminOrderController {
     @GetMapping
     @Transactional(readOnly = true)
     public List<OrderResponse> list() {
-        return orders.findAllByOrderByCreatedAtDesc().stream().map(this::response).toList();
+        return orders.findAllByOrderByCreatedAtDesc().stream()
+                .map(OrderResponseMapper::toResponse)
+                .toList();
     }
 
     @PatchMapping("/{id}/status")
@@ -47,40 +50,24 @@ public class AdminOrderController {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         if (order.isReservationExpired(Instant.now())) {
             stock.release(order);
-            order.transitionTo(OrderStatus.CANCELLED);
+            order.expire();
             if (request.status() != OrderStatus.CANCELLED) {
                 throw new ReservationExpiredException("The order reservation has expired.");
             }
-            return response(order);
+            return OrderResponseMapper.toResponse(order);
         }
 
         OrderStatus previous = order.getStatus();
         order.transitionTo(request.status());
         if (request.status() == OrderStatus.CANCELLED && previous != OrderStatus.CANCELLED) {
-            stock.release(order);
+            if (previous == OrderStatus.PENDING_PAYMENT || previous == OrderStatus.PAID) {
+                stock.release(order);
+            } else if (previous == OrderStatus.PREPARING || previous == OrderStatus.READY) {
+                stock.restore(order);
+            }
         } else if (request.status() == OrderStatus.PREPARING && previous != OrderStatus.PREPARING) {
             stock.consume(order);
         }
-        return response(order);
-    }
-
-    private OrderResponse response(CustomerOrder order) {
-        return new OrderResponse(
-                order.getId(),
-                order.getStatus().name(),
-                order.getTotal(),
-                order.getCreatedAt(),
-                order.getReservationExpiresAt(),
-                order.getUser().getFirstName() + " " + order.getUser().getLastName(),
-                order.getUser().getEmail(),
-                order.getItems().stream()
-                        .map(item -> new OrderResponse.Item(
-                                item.getProduct().getId(),
-                                item.getProductName(),
-                                item.getUnitPrice(),
-                                item.getQuantity(),
-                                item.getSubtotal()))
-                        .toList()
-        );
+        return OrderResponseMapper.toResponse(order);
     }
 }

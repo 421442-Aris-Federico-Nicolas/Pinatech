@@ -25,5 +25,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 mat-card, .mat-mdc-card { border-radius: 16px !important; }
 .mat-mdc-button, .mat-mdc-unelevated-button, .mat-mdc-outlined-button { border-radius: 10px !important; }
+.mat-mdc-select-panel {
+  background: var(--pin-navy-deep) !important;
+  border: 1px solid #315268;
+  box-shadow: 0 18px 40px rgba(2, 7, 13, .45) !important;
+}
+.mat-mdc-option { color: #eef7fb !important; }
+.mat-mdc-option:hover:not(.mdc-list-item--disabled),
+.mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) { background: #0e4a63 !important; }
+.mat-mdc-option.mdc-list-item--disabled { color: #8298a8 !important; }
 iconify-icon { display: inline-block; line-height: 1; }
 .sr-only { height:1px; margin:-1px; overflow:hidden; padding:0; position:absolute; width:1px; clip:rect(0,0,0,0); white-space:nowrap; }
+
+app-admin .product-images{border-top:1px solid var(--admin-border);margin-top:1rem;padding:1.25rem 0}app-admin .section-label{align-items:center;display:flex;gap:1rem;justify-content:space-between}app-admin .section-label h3{font-size:.9rem;margin:0}app-admin .section-label p,app-admin .image-empty{color:var(--admin-muted);font-size:.7rem;margin:.3rem 0}app-admin .file-button{background:#123343;border:1px solid #286077;border-radius:8px;color:#83e6f4;cursor:pointer;font-size:.75rem;font-weight:800;padding:.65rem .8rem}app-admin .file-button.disabled{cursor:not-allowed;opacity:.45}app-admin .file-button input{height:1px;opacity:0;position:absolute;width:1px}app-admin .product-image-grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));margin-top:1rem}app-admin .product-image-grid article{background:#0a141d;border:1px solid var(--admin-border);display:grid;gap:.4rem;padding:.5rem}app-admin .product-image-grid img{aspect-ratio:4/3;object-fit:cover;width:100%}app-admin .product-image-grid span{color:#9bb0bd;font-size:.68rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}app-admin .product-image-grid input{background:#101f2b;border:1px solid #294657;color:#edf7fb;font:inherit;font-size:.7rem;min-width:0;padding:.5rem}app-admin .product-image-grid button{background:transparent;border:0;color:#fa8da9;cursor:pointer;font-size:.68rem;justify-self:start;padding:0}app-admin .product-image-grid button:disabled{cursor:wait;opacity:.5}
+app-technical .attachments-section{border-top:1px solid var(--tech-border);margin-top:1.2rem;padding-top:1.2rem}app-technical .attachments-section app-ticket-attachment-gallery{margin-top:1rem}app-technical .no-attachments{color:var(--tech-muted);font-size:.75rem}app-technical .attachment-upload{align-items:center;background:#0a141d;border:1px dashed #294657;display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1rem;padding:.75rem}app-technical .attachment-upload label{background:#123746;border:1px solid #286479;color:#7ce4f4;cursor:pointer;font-size:.72rem;font-weight:800;padding:.55rem .7rem}app-technical .attachment-upload input{height:1px;opacity:0;position:absolute;width:1px}app-technical .attachment-upload span{color:#8ba1af;flex:1;font-size:.7rem;min-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

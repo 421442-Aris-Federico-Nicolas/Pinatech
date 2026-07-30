@@ -2,7 +2,6 @@ package com.computerstore.order.service;
 
 import java.time.Instant;
 
-import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,7 +24,7 @@ public class OrderExpirationWorker {
                 .map(id -> {
                     var order = orders.findById(id).orElseThrow();
                     stock.release(order);
-                    order.transitionTo(OrderStatus.CANCELLED);
+                    order.expire();
                     return true;
                 })
                 .orElse(false);

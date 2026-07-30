@@ -7,6 +7,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
+import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
 import { TechnicalDetails, TechnicalService, TechnicalTicket, Technician, TicketHistory, TicketPriority, TicketStatus } from './technical.service';
 
 type TechnicalSection = 'overview' | 'queue' | 'mine';
@@ -16,7 +18,8 @@ const CLOSED = new Set<TicketStatus>(['DELIVERED', 'CANCELLED']);
 const WORKFLOW: TicketStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS', 'WAITING_FOR_APPROVAL', 'APPROVED', 'IN_REPAIR', 'WAITING_FOR_PARTS', 'READY_FOR_PICKUP', 'DELIVERED'];
 
 @Component({
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  selector: 'app-technical',
+  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, TicketAttachmentGalleryComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './technical.component.html',
   styleUrl: './technical.component.scss',
@@ -24,6 +27,7 @@ const WORKFLOW: TicketStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS', 'WAITING_FOR_AP
 })
 export class TechnicalComponent {
   private readonly service = inject(TechnicalService);
+  private readonly attachments = inject(TicketAttachmentService);
   readonly auth = inject(AuthService);
   readonly section = signal<TechnicalSection>('overview');
   readonly sidebarCollapsed = signal(false);
@@ -38,6 +42,8 @@ export class TechnicalComponent {
   readonly search = signal('');
   readonly error = signal('');
   readonly success = signal('');
+  readonly attachmentFile = signal<File | null>(null);
+  readonly uploadingAttachment = signal(false);
   readonly statuses = WORKFLOW;
   readonly priorities: TicketPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
   statusComment = '';
@@ -113,6 +119,7 @@ export class TechnicalComponent {
   select(ticket: TechnicalTicket, navigate = false): void {
     if (navigate) this.section.set('queue');
     this.applySelected(ticket);
+    this.attachmentFile.set(null);
     this.history.set([]);
     this.service.history(ticket.id).subscribe({ next: (history) => this.history.set(history), error: () => this.fail('No se pudo cargar el historial del ticket.') });
   }
@@ -166,6 +173,36 @@ export class TechnicalComponent {
     this.service.assign(ticket.id, technicianId).pipe(finalize(() => this.saving.set(false))).subscribe({
       next: (updated) => { this.replace(updated); this.success.set('Responsable actualizado.'); },
       error: () => this.fail('No se pudo asignar el técnico.'),
+    });
+  }
+
+  selectAttachment(event: Event, ticket: TechnicalTicket): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    this.attachmentFile.set(null);
+    if (!file) return;
+    if (!this.canEdit(ticket)) return this.fail('No tenés permisos para agregar imágenes a este ticket.');
+    if (ticket.attachments.length >= 10) return this.fail('El ticket ya alcanzó el máximo de 10 imágenes.');
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return this.fail('La imagen debe ser JPEG o PNG.');
+    if (file.size > 5 * 1024 * 1024) return this.fail('La imagen supera el máximo de 5 MiB.');
+    this.clearMessages();
+    this.attachmentFile.set(file);
+  }
+
+  uploadAttachment(): void {
+    const ticket = this.selected();
+    const file = this.attachmentFile();
+    if (!ticket || !file || !this.canEdit(ticket) || this.uploadingAttachment()) return;
+    this.clearMessages();
+    this.uploadingAttachment.set(true);
+    this.attachments.upload(ticket.id, file).pipe(finalize(() => this.uploadingAttachment.set(false))).subscribe({
+      next: (attachment) => {
+        this.replace({ ...ticket, attachments: [...ticket.attachments, attachment] });
+        this.attachmentFile.set(null);
+        this.success.set(`Imagen "${attachment.fileName}" agregada al ticket #${ticket.id}.`);
+      },
+      error: () => this.fail('No se pudo subir la imagen. Verificá el archivo e intentá nuevamente.'),
     });
   }
 

@@ -16,7 +16,7 @@ import { AuthService } from '../../core/auth/auth.service';
       <a class="back" routerLink="/">← Volver a Pinatech</a>
       <mat-card>
         <p class="eyebrow">Tu cuenta</p><h1>Iniciar sesión</h1>
-        @if (route.snapshot.queryParamMap.get('returnUrl') === '/cart') { <p class="context">Ingresá para confirmar el carrito. Tus productos se conservarán.</p> }
+        @if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') { <p class="context">Ingresá para continuar con tu carrito. Tus productos se conservarán.</p> }
         <form [formGroup]="form" (ngSubmit)="submit()">
           <mat-form-field><mat-label>Email</mat-label><input matInput type="email" formControlName="email" autocomplete="email" inputmode="email">@if(form.controls.email.touched && form.controls.email.invalid){<mat-error>Ingresá un email válido.</mat-error>}</mat-form-field>
           <mat-form-field><mat-label>Contraseña</mat-label><input matInput type="password" formControlName="password" autocomplete="current-password">@if(form.controls.password.touched && form.controls.password.invalid){<mat-error>Ingresá tu contraseña.</mat-error>}</mat-form-field>

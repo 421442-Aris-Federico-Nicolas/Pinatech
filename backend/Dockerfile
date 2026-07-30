@@ -12,7 +12,10 @@ RUN ./mvnw --batch-mode -DskipTests package
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
-RUN addgroup --system spring && adduser --system --ingroup spring spring
+RUN addgroup --system spring \
+    && adduser --system --ingroup spring spring \
+    && mkdir -p /app/uploads \
+    && chown spring:spring /app/uploads
 
 COPY --from=build /app/target/computer-store-api-*.jar application.jar
 

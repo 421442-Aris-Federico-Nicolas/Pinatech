@@ -63,6 +63,9 @@ class OrderControllerTest {
         verify(stock).reserve(savedOrder.getValue());
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(new BigDecimal("251.00"), savedOrder.getValue().getTotal());
+        assertEquals("ARS", response.getBody().currency());
+        assertEquals("PENDING", response.getBody().paymentStatus());
+        assertEquals("PENDING", response.getBody().fulfillmentStatus());
     }
 
     @Test

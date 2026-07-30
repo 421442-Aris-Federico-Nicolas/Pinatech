@@ -5,6 +5,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { CartService } from '../../core/cart/cart.service';
+import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { CatalogService, Product } from '../catalog/catalog.service';
 
 @Component({
@@ -14,6 +15,7 @@ import { CatalogService, Product } from '../catalog/catalog.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductComponent {
+  readonly imageUrl = resolveApiContentUrl;
   private readonly route = inject(ActivatedRoute);
   private readonly catalog = inject(CatalogService);
   private readonly title = inject(Title);

@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
 
 describe('CartService', () => {
   const user = signal<AuthenticatedUser | null>(null);
-  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca' };
+  const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [] };
 
   beforeEach(() => {
     localStorage.clear();
@@ -51,6 +51,50 @@ describe('CartService', () => {
     expect(localStorage.getItem('pinatech-cart-guest')).toBeNull();
   });
 
+  it('does not restore an expired confirmation and removes it from storage', () => {
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
+    localStorage.setItem('pinatech-order-user-7', JSON.stringify({
+      id: 42,
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'PENDING',
+      fulfillmentStatus: 'PENDING',
+      currency: 'ARS',
+      paymentMethod: null,
+      deliveryMethod: null,
+      total: 2000,
+      createdAt: '1999-12-31T20:00:00Z',
+      reservationExpiresAt: '2000-01-01T20:00:00Z',
+    }));
+
+    const cart = TestBed.inject(CartService);
+    TestBed.tick();
+
+    expect(cart.confirmation()).toBeNull();
+    expect(localStorage.getItem('pinatech-order-user-7')).toBeNull();
+  });
+
+  it('rejects an invalid confirmation expiration date', () => {
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
+    localStorage.setItem('pinatech-order-user-7', JSON.stringify({
+      id: 42,
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'PENDING',
+      fulfillmentStatus: 'PENDING',
+      currency: 'ARS',
+      paymentMethod: null,
+      deliveryMethod: null,
+      total: 2000,
+      createdAt: '2026-07-28T20:00:00Z',
+      reservationExpiresAt: 'not-a-date',
+    }));
+
+    const cart = TestBed.inject(CartService);
+    TestBed.tick();
+
+    expect(cart.confirmation()).toBeNull();
+    expect(localStorage.getItem('pinatech-order-user-7')).toBeNull();
+  });
+
   it('caps quantities and computes item count and total', () => {
     const cart = TestBed.inject(CartService);
 
@@ -68,7 +112,18 @@ describe('CartService', () => {
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
     expect(request.request.body).toEqual({ items: [{ productId: 1, quantity: 2 }] });
     expect(request.request.headers.get('Idempotency-Key')).toBeTruthy();
-    request.flush({ id: 42, total: 2000, createdAt: '2026-07-28T20:00:00Z' });
+    request.flush({
+      id: 42,
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'PENDING',
+      fulfillmentStatus: 'PENDING',
+      currency: 'ARS',
+      paymentMethod: null,
+      deliveryMethod: null,
+      total: 2000,
+      createdAt: '2026-07-28T20:00:00Z',
+      reservationExpiresAt: '2026-07-29T20:00:00Z',
+    });
 
     expect(cart.items()).toEqual([]);
     expect(cart.confirmation()?.id).toBe(42);
@@ -88,6 +143,17 @@ describe('CartService', () => {
     cart.checkout().subscribe();
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
-    retry.flush({ id: 42, total: 1000, createdAt: '2026-07-28T20:00:00Z' });
+    retry.flush({
+      id: 42,
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'PENDING',
+      fulfillmentStatus: 'PENDING',
+      currency: 'ARS',
+      paymentMethod: null,
+      deliveryMethod: null,
+      total: 1000,
+      createdAt: '2026-07-28T20:00:00Z',
+      reservationExpiresAt: '2026-07-29T20:00:00Z',
+    });
   });
 });

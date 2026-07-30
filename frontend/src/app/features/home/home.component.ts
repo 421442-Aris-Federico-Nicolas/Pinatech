@@ -7,6 +7,7 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartService } from '../../core/cart/cart.service';
+import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { CatalogService, Product } from '../catalog/catalog.service';
 
 @Component({
@@ -18,6 +19,7 @@ import { CatalogService, Product } from '../catalog/catalog.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent {
+  protected readonly imageUrl = resolveApiContentUrl;
   private readonly catalog = inject(CatalogService);
   protected readonly auth = inject(AuthService);
   protected readonly cart = inject(CartService);

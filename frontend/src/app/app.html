@@ -22,7 +22,7 @@
     }
     <span class="spacer"></span>
     @if (auth.isAuthenticated()) {
-      <span class="user-name">Hola, {{ auth.user()?.firstName }}</span>
+      <a class="user-name" routerLink="/profile">Hola, {{ auth.user()?.firstName }}</a>
       <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out"></iconify-icon> Salir</button>
     } @else {
       <a mat-button routerLink="/register">Crear cuenta</a>

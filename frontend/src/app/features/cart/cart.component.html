@@ -1,30 +1,25 @@
 <main>
   <header><p class="eyebrow">Tu selección</p><h1>Carrito</h1></header>
 
-  @if (cart.confirmation(); as order) {
-    <section class="confirmation" role="status">
-      <div><strong>Pedido #{{ order.id }} confirmado</strong><p>La solicitud quedó registrada por {{ order.total | number:'1.2-2' }} ARS. Podés seguirla desde Mis pedidos.</p></div>
-      <button mat-button type="button" (click)="cart.dismissConfirmation()" aria-label="Cerrar confirmación">Cerrar</button>
-    </section>
-  }
-
   @if (cart.items().length) {
     <div class="cart-layout">
       <section class="items" aria-label="Productos en el carrito">
         @for (item of cart.items(); track item.product.id) {
           <article>
-            <div class="placeholder" aria-hidden="true"><span>PIN</span></div>
+            @if (item.product.images[0]; as image) {
+              <img class="item-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name">
+            } @else { <div class="placeholder" aria-hidden="true"><span>PIN</span></div> }
             <div class="item-info">
               <small>{{ item.product.brandName }} · {{ item.product.categoryName }}</small>
               <a [routerLink]="['/products', item.product.id]">{{ item.product.name }}</a>
-              <span>{{ item.product.price | number:'1.2-2' }} ARS por unidad</span>
+              <span>{{ item.product.price | currency:'ARS':'symbol-narrow':'1.2-2' }} por unidad</span>
             </div>
             <div class="quantity" aria-label="Cantidad de {{ item.product.name }}">
               <button type="button" [disabled]="item.quantity === 1" (click)="cart.setQuantity(item.product.id, item.quantity - 1)" [attr.aria-label]="'Quitar una unidad de ' + item.product.name">−</button>
               <span aria-live="polite">{{ item.quantity }}</span>
               <button type="button" (click)="cart.setQuantity(item.product.id, item.quantity + 1)" [attr.aria-label]="'Agregar una unidad de ' + item.product.name">+</button>
             </div>
-            <strong class="subtotal">{{ item.product.price * item.quantity | number:'1.2-2' }} ARS</strong>
+            <strong class="subtotal">{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
             <button class="remove" type="button" (click)="cart.removeItem(item.product.id)" [attr.aria-label]="'Eliminar ' + item.product.name">Eliminar</button>
           </article>
         }
@@ -33,19 +28,18 @@
 
       <aside class="summary">
         <h2>Resumen</h2>
-        <div><span>Productos ({{ cart.count() }})</span><strong>{{ cart.total() | number:'1.2-2' }} ARS</strong></div>
-        <div class="total"><span>Total</span><strong>{{ cart.total() | number:'1.2-2' }} ARS</strong></div>
-        <p>El pedido no incluye pago ni envío. Pinatech registrará tu solicitud.</p>
+        <div><span>Productos ({{ cart.count() }})</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <p>En el próximo paso vas a revisar disponibilidad de entrega y pago antes de registrar la solicitud.</p>
         @if (auth.isAuthenticated()) {
-          <button mat-flat-button type="button" [disabled]="submitting()" (click)="checkout()">{{ submitting() ? 'Confirmando…' : 'Confirmar pedido' }}</button>
+          <a mat-flat-button routerLink="/checkout">Continuar</a>
         } @else {
-          <a mat-flat-button routerLink="/login" [queryParams]="{ returnUrl: '/cart' }">Ingresar para confirmar</a>
+          <a mat-flat-button routerLink="/login" [queryParams]="{ returnUrl: '/checkout' }">Ingresar para continuar</a>
           <small>Tu carrito se conservará al iniciar sesión.</small>
         }
-        @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
       </aside>
     </div>
-  } @else if (!cart.confirmation()) {
+  } @else {
     <section class="empty">
       <div class="placeholder large" aria-hidden="true"><span>PIN</span></div>
       <h2>Tu carrito está vacío</h2>

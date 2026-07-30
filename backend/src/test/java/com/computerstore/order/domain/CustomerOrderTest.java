@@ -18,12 +18,19 @@ class CustomerOrderTest {
     void permitsTheExpectedOrderLifecycle() {
         CustomerOrder order = order();
 
+        assertEquals(PaymentStatus.PENDING, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.PENDING, order.getFulfillmentStatus());
+        assertEquals("ARS", order.getCurrency());
         order.transitionTo(OrderStatus.PAID);
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
         order.transitionTo(OrderStatus.PREPARING);
+        assertEquals(FulfillmentStatus.PREPARING, order.getFulfillmentStatus());
         order.transitionTo(OrderStatus.READY);
+        assertEquals(FulfillmentStatus.READY, order.getFulfillmentStatus());
         order.transitionTo(OrderStatus.DELIVERED);
 
         assertEquals(OrderStatus.DELIVERED, order.getStatus());
+        assertEquals(FulfillmentStatus.DELIVERED, order.getFulfillmentStatus());
     }
 
     @Test
@@ -31,6 +38,50 @@ class CustomerOrderTest {
         CustomerOrder order = order();
 
         assertThrows(InvalidStateTransitionException.class, () -> order.transitionTo(OrderStatus.READY));
+    }
+
+    @Test
+    void cancellingAnApprovedOrderKeepsTheApprovedPayment() {
+        CustomerOrder order = order();
+        order.transitionTo(OrderStatus.PAID);
+
+        order.transitionTo(OrderStatus.CANCELLED);
+
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
+    }
+
+    @Test
+    void permitsCancellationWhilePreparingOrReady() {
+        CustomerOrder preparing = order();
+        preparing.transitionTo(OrderStatus.PAID);
+        preparing.transitionTo(OrderStatus.PREPARING);
+
+        preparing.transitionTo(OrderStatus.CANCELLED);
+
+        assertEquals(OrderStatus.CANCELLED, preparing.getStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, preparing.getFulfillmentStatus());
+
+        CustomerOrder ready = order();
+        ready.transitionTo(OrderStatus.PAID);
+        ready.transitionTo(OrderStatus.PREPARING);
+        ready.transitionTo(OrderStatus.READY);
+
+        ready.transitionTo(OrderStatus.CANCELLED);
+
+        assertEquals(OrderStatus.CANCELLED, ready.getStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, ready.getFulfillmentStatus());
+    }
+
+    @Test
+    void expirationMarksPaymentExpiredAndCancelsFulfillment() {
+        CustomerOrder order = order();
+
+        order.expire();
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(PaymentStatus.EXPIRED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
     }
 
     private CustomerOrder order() {

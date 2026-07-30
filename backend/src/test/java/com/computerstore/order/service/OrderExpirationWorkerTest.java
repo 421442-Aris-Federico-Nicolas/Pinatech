@@ -13,8 +13,10 @@ import java.util.Optional;
 
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.order.domain.CustomerOrder;
+import com.computerstore.order.domain.FulfillmentStatus;
 import com.computerstore.order.domain.OrderItem;
 import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentStatus;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.user.domain.UserAccount;
 import org.junit.jupiter.api.Test;
@@ -44,5 +46,7 @@ class OrderExpirationWorkerTest {
         assertTrue(expired);
         verify(stock).release(order);
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(PaymentStatus.EXPIRED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
     }
 }

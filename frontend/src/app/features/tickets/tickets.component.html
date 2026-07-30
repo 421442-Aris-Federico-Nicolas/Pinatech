@@ -1,0 +1,48 @@
+<main>
+  <section class="request-panel">
+    <p class="eyebrow">Servicio técnico</p>
+    <h1>Solicitá una reparación</h1>
+    <p class="lead">Contanos qué equipo necesitás revisar. Las imágenes son opcionales y privadas.</p>
+    <form (ngSubmit)="create()">
+      <mat-form-field><mat-label>Equipo</mat-label><mat-select [(ngModel)]="form.deviceType" (ngModelChange)="form.brand = ''; form.model = ''" name="deviceType" required><mat-option value="" disabled>Seleccioná un equipo</mat-option>@for (deviceType of deviceTypes; track deviceType) {<mat-option [value]="deviceType">{{ deviceType }}</mat-option>}</mat-select></mat-form-field>
+      @if (form.deviceType === 'Notebook') {<mat-form-field><mat-label>Marca</mat-label><input matInput [(ngModel)]="form.brand" name="brand" required></mat-form-field>}
+      @if (form.deviceType !== 'PC de escritorio') {<mat-form-field><mat-label>Modelo</mat-label><input matInput [(ngModel)]="form.model" name="model" required></mat-form-field>}
+      <mat-form-field class="wide"><mat-label>Problema informado</mat-label><textarea matInput rows="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" required></textarea></mat-form-field>
+      <div class="upload-field wide">
+        <div><strong>Imágenes del equipo</strong><small>Opcional · JPEG o PNG · 5 MiB por archivo · máximo 10</small></div>
+        <label>Seleccionar<input type="file" accept="image/jpeg,image/png" multiple (change)="selectCreateImages($event)"></label>
+      </div>
+      @if (createImages().length) {
+        <div class="local-previews wide">@for (image of createImages(); track image.previewUrl; let index = $index) {<article><img [src]="image.previewUrl" [alt]="'Vista previa de ' + image.file.name"><span>{{ image.file.name }}</span><button type="button" (click)="removeCreateImage(index)">Quitar</button></article>}</div>
+      }
+      <button mat-flat-button class="wide" type="submit" [disabled]="creating()">{{ creating() ? 'Creando y subiendo imágenes…' : 'Enviar solicitud' }}</button>
+    </form>
+    @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
+    @if (success()) { <p class="message success" role="status">{{ success() }}</p> }
+  </section>
+
+  <section class="tickets-panel">
+    <header><div><p class="eyebrow">Seguimiento privado</p><h2>Mis solicitudes</h2></div><button type="button" (click)="load()" [disabled]="loading()">Actualizar</button></header>
+    @if (loading()) { <p class="empty" role="status">Cargando solicitudes…</p> }
+    @else {
+      @for (ticket of tickets(); track ticket.id) {
+        <article class="ticket-card">
+          <header><strong>#{{ ticket.id }} · {{ ticket.deviceType }} {{ ticket.brand }} {{ ticket.model }}</strong><span>{{ ticket.status }}</span></header>
+          <p>{{ ticket.reportedProblem }}</p><small>{{ ticket.createdAt | date:'medium' }}</small>
+          @if (ticket.attachments.length) {
+            <button type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
+            @if (imagesExpanded(ticket.id)) { <app-ticket-attachment-gallery [attachments]="ticket.attachments" /> }
+          }
+          <section class="ticket-upload">
+            <div><strong>Agregar imágenes</strong><small>Opcional, hasta completar 10 adjuntos.</small></div>
+            <label>Elegir<input type="file" accept="image/jpeg,image/png" multiple (change)="selectTicketImages(ticket, $event)"></label>
+            @if (pendingFor(ticket.id).length) {
+              <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
+              <button mat-stroked-button type="button" [disabled]="uploadingTicket() !== null" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
+            }
+          </section>
+        </article>
+      } @empty { <p class="empty">Aún no registraste solicitudes.</p> }
+    }
+  </section>
+</main>

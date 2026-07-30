@@ -6,6 +6,7 @@
 # Java and Maven
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
+backend/uploads/
 *.class
 
 # Node and Angular

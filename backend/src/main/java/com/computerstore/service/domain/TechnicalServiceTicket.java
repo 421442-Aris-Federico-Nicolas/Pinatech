@@ -15,7 +15,6 @@ public class TechnicalServiceTicket {
     @Column(name = "device_type", nullable = false) private String deviceType;
     @Column(nullable = false) private String brand;
     @Column(nullable = false) private String model;
-    @Column(name = "serial_number") private String serialNumber;
     @Column(name = "reported_problem", nullable = false) private String reportedProblem;
     @Column(length = 3000) private String diagnosis;
     @Column(name = "estimated_price", precision = 19, scale = 2) private BigDecimal estimatedPrice;
@@ -25,7 +24,7 @@ public class TechnicalServiceTicket {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     protected TechnicalServiceTicket() {}
-    public TechnicalServiceTicket(UserAccount customer, String deviceType, String brand, String model, String serialNumber, String reportedProblem) { this.customer = customer; this.deviceType = deviceType; this.brand = brand; this.model = model; this.serialNumber = serialNumber; this.reportedProblem = reportedProblem; this.status = TicketStatus.RECEIVED; this.priority = TicketPriority.NORMAL; }
+    public TechnicalServiceTicket(UserAccount customer, String deviceType, String brand, String model, String reportedProblem) { this.customer = customer; this.deviceType = deviceType; this.brand = brand; this.model = model; this.reportedProblem = reportedProblem; this.status = TicketStatus.RECEIVED; this.priority = TicketPriority.NORMAL; }
     public void updateStatus(TicketStatus target) {
         if (target == status) return;
         boolean valid = switch (status) {
@@ -52,7 +51,7 @@ public class TechnicalServiceTicket {
     @PrePersist void created() { createdAt = Instant.now(); updatedAt = createdAt; }
     @PreUpdate void updated() { updatedAt = Instant.now(); }
     public Long getId() { return id; } public UserAccount getCustomer() { return customer; } public UserAccount getTechnician() { return technician; }
-    public String getDeviceType() { return deviceType; } public String getBrand() { return brand; } public String getModel() { return model; } public String getSerialNumber() { return serialNumber; } public String getReportedProblem() { return reportedProblem; }
+    public String getDeviceType() { return deviceType; } public String getBrand() { return brand; } public String getModel() { return model; } public String getReportedProblem() { return reportedProblem; }
     public String getDiagnosis() { return diagnosis; } public BigDecimal getEstimatedPrice() { return estimatedPrice; } public BigDecimal getFinalPrice() { return finalPrice; }
     public TicketStatus getStatus() { return status; } public TicketPriority getPriority() { return priority; } public Instant getCreatedAt() { return createdAt; } public Instant getUpdatedAt() { return updatedAt; }
 }

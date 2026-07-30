@@ -37,7 +37,10 @@
         <section class="grid" aria-label="Resultados del catálogo">
           @for (product of page()?.content ?? []; track product.id) {
             <mat-card>
-              <a class="product-visual" [routerLink]="['/products', product.id]" [attr.aria-label]="'Ver ' + product.name"><span>{{ product.brandName }}</span><b aria-hidden="true">PIN</b></a>
+              <a class="product-visual" [routerLink]="['/products', product.id]" [attr.aria-label]="'Ver ' + product.name">
+                @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name"> }
+                @else { <span>{{ product.brandName }}</span><b aria-hidden="true">PIN</b> }
+              </a>
               <mat-card-header><mat-card-subtitle>{{ product.brandName }} · {{ product.categoryName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]">{{ product.name }}</a></mat-card-title></mat-card-header>
               <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <small>ARS</small></strong></mat-card-content>
               <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>

@@ -71,7 +71,7 @@ nav { align-items:center; display:flex; flex:1; gap:.15rem; }
 .nav-link:hover, .admin-link:hover { background: rgba(0, 151, 189, .22); color: var(--pin-cream); }
 .nav-link.active { background:rgba(0,151,189,.25); color:#fff; }
 .cart-count { align-items:center; background:var(--pin-orange); border-radius:99px; color:#101820; display:inline-flex; font-size:.7rem; height:1.35rem; justify-content:center; margin-left:.25rem; min-width:1.35rem; padding:0 .3rem; }
-.user-name { color: #7dd3e8; font-size: .82rem; margin: 0 .35rem; }
+.user-name { color: #7dd3e8; font-size: .82rem; margin: 0 .35rem; text-decoration: none; }
 .menu-toggle { background:transparent; border:1px solid #315268; border-radius:.5rem; color:#fff; display:none; font-size:1.6rem; padding:.4rem; }
 @media (max-width: 760px) {
   .utility-bar span:first-child { display:none; }

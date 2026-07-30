@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { Page, Product } from '../catalog/catalog.service';
+import { Page, Product, ProductImage } from '../catalog/catalog.service';
 import { Order } from '../../core/orders/order.service';
 
 export interface Category { id: number; name: string; slug: string; }
@@ -25,6 +25,13 @@ export class AdminService {
   createProduct(payload: ProductPayload) { return this.http.post<Product>(`${this.baseUrl}/products`, payload); }
   updateProduct(id: number, payload: ProductPayload) { return this.http.put<Product>(`${this.baseUrl}/products/${id}`, payload); }
   deleteProduct(id: number) { return this.http.delete<void>(`${this.baseUrl}/products/${id}`); }
+  uploadProductImage(productId: number, file: File, altText?: string) {
+    const body = new FormData();
+    body.append('file', file);
+    if (altText?.trim()) body.append('altText', altText.trim());
+    return this.http.post<ProductImage>(`${this.baseUrl}/products/${productId}/images`, body);
+  }
+  deleteProductImage(productId: number, imageId: number) { return this.http.delete<void>(`${this.baseUrl}/products/${productId}/images/${imageId}`); }
   createCategory(payload: Omit<Category, 'id'>) { return this.http.post<Category>(`${this.baseUrl}/categories`, payload); }
   deleteCategory(id: number) { return this.http.delete<void>(`${this.baseUrl}/categories/${id}`); }
   createBrand(name: string) { return this.http.post<Brand>(`${this.baseUrl}/brands`, { name }); }

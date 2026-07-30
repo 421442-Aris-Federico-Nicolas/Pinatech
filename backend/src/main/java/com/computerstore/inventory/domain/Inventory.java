@@ -19,6 +19,7 @@ public class Inventory {
     public void reserve(int quantity) { if (availableQuantity < quantity) throw new com.computerstore.common.exception.InsufficientStockException("Insufficient stock for product " + productId + "."); availableQuantity -= quantity; reservedQuantity += quantity; updatedAt = Instant.now(); }
     public void release(int quantity) { if (reservedQuantity < quantity) throw new BusinessRuleException("Reserved stock cannot be negative."); reservedQuantity -= quantity; availableQuantity += quantity; updatedAt = Instant.now(); }
     public void consumeReserved(int quantity) { if (reservedQuantity < quantity) throw new BusinessRuleException("Reserved stock cannot be negative."); reservedQuantity -= quantity; updatedAt = Instant.now(); }
+    public void restore(int quantity) { availableQuantity += quantity; updatedAt = Instant.now(); }
     public Long getProductId() { return productId; } public int getAvailableQuantity() { return availableQuantity; } public int getReservedQuantity() { return reservedQuantity; }
     public Product getProduct() { return product; }
 }

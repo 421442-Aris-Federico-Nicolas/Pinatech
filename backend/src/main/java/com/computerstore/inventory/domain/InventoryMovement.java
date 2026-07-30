@@ -22,4 +22,5 @@ public class InventoryMovement {
     public static InventoryMovement reservation(Product product, int quantity, CustomerOrder order) { return new InventoryMovement(product,"RESERVATION",quantity,"Stock reserved for order",order); }
     public static InventoryMovement release(Product product, int quantity, CustomerOrder order) { return new InventoryMovement(product,"RELEASE",quantity,"Order reservation released",order); }
     public static InventoryMovement consumption(Product product, int quantity, CustomerOrder order) { return new InventoryMovement(product,"CONSUMPTION",quantity,"Order reservation consumed",order); }
+    public static InventoryMovement returnedFromCancelledOrder(Product product, int quantity, CustomerOrder order) { return new InventoryMovement(product,"RETURN",quantity,"Stock restored after order cancellation",order); }
 }

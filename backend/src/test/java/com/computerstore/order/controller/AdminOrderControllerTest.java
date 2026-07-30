@@ -10,8 +10,10 @@ import java.util.Optional;
 
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.order.domain.CustomerOrder;
+import com.computerstore.order.domain.FulfillmentStatus;
 import com.computerstore.order.domain.OrderItem;
 import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentStatus;
 import com.computerstore.order.dto.OrderStatusRequest;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
@@ -33,6 +35,8 @@ class AdminOrderControllerTest {
 
         verify(stock).release(order);
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
     }
 
     @Test
@@ -47,6 +51,25 @@ class AdminOrderControllerTest {
 
         verify(stock).consume(order);
         assertEquals(OrderStatus.PREPARING, order.getStatus());
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.PREPARING, order.getFulfillmentStatus());
+    }
+
+    @Test
+    void cancellingAPreparingOrderRestoresConsumedStock() {
+        CustomerOrderRepository orders = Mockito.mock(CustomerOrderRepository.class);
+        OrderStockService stock = Mockito.mock(OrderStockService.class);
+        AdminOrderController controller = new AdminOrderController(orders, stock);
+        CustomerOrder order = paidOrder();
+        order.transitionTo(OrderStatus.PREPARING);
+        when(orders.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
+
+        controller.status(1L, new OrderStatusRequest(OrderStatus.CANCELLED));
+
+        verify(stock).restore(order);
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
     }
 
     private CustomerOrder paidOrder() {

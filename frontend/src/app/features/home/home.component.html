@@ -26,7 +26,10 @@
       <div class="products">
         @for (product of featured(); track product.id) {
           <mat-card>
-            <div class="product-visual"><span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b></div>
+            <div class="product-visual">
+              @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name"> }
+              @else { <span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b> }
+            </div>
             <mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title>{{ product.name }}</mat-card-title></mat-card-header>
             <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | number:'1.2-2' }} <em>ARS</em></strong></mat-card-content>
             <mat-card-actions><a mat-button [routerLink]="['/products', product.id]">Ver detalle</a><button mat-flat-button type="button" (click)="add(product)">Agregar</button></mat-card-actions>

@@ -3,10 +3,12 @@ package com.computerstore.auth.service;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Set;
+import java.util.UUID;
 
 import com.computerstore.auth.domain.RefreshToken;
 import com.computerstore.auth.dto.AuthResponse;
@@ -80,7 +82,7 @@ public class AuthService {
         user.addRole(customerRole);
         UserAccount savedUser = userAccountRepository.save(user);
         LOGGER.info("Registered user with id={}", savedUser.getId());
-        return createSession(savedUser);
+        return createSession(savedUser, UUID.randomUUID());
     }
 
     @Transactional
@@ -91,24 +93,32 @@ public class AuthService {
         if (!user.isActive() || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials(email);
         }
-        return createSession(user);
+        return createSession(user, UUID.randomUUID());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AuthenticationFailureException.class)
     public AuthSession refresh(String rawRefreshToken) {
-        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
+        String tokenHash = hash(rawRefreshToken);
+        UUID familyId = refreshTokenRepository.findFamilyIdByTokenHash(tokenHash)
                 .orElseThrow(() -> new AuthenticationFailureException("Refresh token is invalid or expired."));
-        if (!storedToken.isUsable(Instant.now())) {
-            storedToken.revoke();
+        lockFamily(familyId);
+        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new AuthenticationFailureException("Refresh token is invalid or expired."));
+        Instant now = Instant.now();
+        if (!storedToken.isUsable(now)) {
+            refreshTokenRepository.revokeFamily(familyId, now);
             throw new AuthenticationFailureException("Refresh token is invalid or expired.");
         }
-        storedToken.revoke();
-        return createSession(storedToken.getUser());
+        storedToken.revoke(now);
+        return createSession(storedToken.getUser(), familyId);
     }
 
     @Transactional
     public void logout(String rawRefreshToken) {
-        refreshTokenRepository.findByTokenHash(hash(rawRefreshToken)).ifPresent(RefreshToken::revoke);
+        refreshTokenRepository.findFamilyIdByTokenHash(hash(rawRefreshToken)).ifPresent(familyId -> {
+            lockFamily(familyId);
+            refreshTokenRepository.revokeFamily(familyId, Instant.now());
+        });
     }
 
     @Transactional(readOnly = true)
@@ -118,12 +128,13 @@ public class AuthService {
         return toResponse(user);
     }
 
-    private AuthSession createSession(UserAccount user) {
+    private AuthSession createSession(UserAccount user, UUID familyId) {
         AuthenticatedUser principal = AuthenticatedUser.from(user);
         String rawRefreshToken = generateRefreshToken();
         refreshTokenRepository.save(new RefreshToken(
                 user,
                 hash(rawRefreshToken),
+                familyId,
                 Instant.now().plusMillis(refreshExpirationMs)
         ));
         AuthResponse response = new AuthResponse(
@@ -133,6 +144,11 @@ public class AuthService {
                 toResponse(user)
         );
         return new AuthSession(response, rawRefreshToken);
+    }
+
+    private void lockFamily(UUID familyId) {
+        refreshTokenRepository.lockFamily(familyId)
+                .orElseThrow(() -> new IllegalStateException("Refresh token family is missing."));
     }
 
     private AuthenticationFailureException invalidCredentials(String email) {
@@ -148,7 +164,8 @@ public class AuthService {
 
     private String hash(String value) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes()));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable.", exception);
         }

@@ -1,0 +1,123 @@
+<main>
+  @if (created(); as order) {
+    <section class="result" aria-labelledby="request-title" role="status">
+      <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
+      <p class="eyebrow">Solicitud registrada</p>
+      <h1 id="request-title">Recibimos tu solicitud #{{ order.id }}</h1>
+      <p class="result-lead">Esto no confirma un pago ni una entrega. Mis pedidos es la fuente autoritativa para consultar el estado actual de la solicitud.</p>
+      @if (isReservationExpired(order)) {
+        <p class="expiration-warning" role="alert">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</p>
+      } @else {
+        <p class="reservation-status">La reserva fue informada con vigencia hasta la fecha indicada.</p>
+      }
+      <dl>
+        <div><dt>Total de productos</dt><dd>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
+        <div><dt>Vigencia informada de la reserva</dt><dd>@if (reservationExpiration(order); as expiration) { Hasta {{ expiration | date:'medium' }} } @else { Fecha no disponible }</dd></div>
+      </dl>
+      <div class="result-actions">
+        <a mat-flat-button routerLink="/orders">Ir a Mis pedidos</a>
+        <a mat-button routerLink="/catalog">Volver al catálogo</a>
+        <button mat-button type="button" (click)="dismissConfirmation()">Cerrar confirmación</button>
+      </div>
+    </section>
+  } @else if (!cart.items().length) {
+    <section class="empty" aria-labelledby="empty-title">
+      <p class="eyebrow">Revisión de solicitud</p>
+      <h1 id="empty-title">Tu carrito está vacío</h1>
+      <p>Agregá productos desde el catálogo para comenzar una solicitud.</p>
+      <a mat-flat-button routerLink="/catalog">Ver catálogo</a>
+    </section>
+  } @else {
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Paso final</p>
+        <h1>Revisá tu solicitud</h1>
+        <p>Verificá los productos y las condiciones disponibles antes de registrarla.</p>
+      </div>
+      <a routerLink="/cart">Editar carrito</a>
+    </header>
+
+    <div class="checkout-layout" [attr.aria-busy]="loadingCapabilities() || submitting()">
+      <div class="details">
+        <section class="panel products" aria-labelledby="products-title">
+          <div class="section-heading">
+            <span>01</span>
+            <div><p>Tu selección</p><h2 id="products-title">Productos</h2></div>
+          </div>
+          @for (item of cart.items(); track item.product.id) {
+            <article>
+              @if (item.product.images[0]; as image) {
+                <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name">
+              } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
+              <div><strong>{{ item.product.name }}</strong><small>{{ item.product.brandName }} · Cantidad: {{ item.quantity }}</small></div>
+              <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
+            </article>
+          }
+        </section>
+
+        <section class="panel capability" aria-labelledby="delivery-title">
+          <div class="section-heading">
+            <span>02</span>
+            <div><p>Logística</p><h2 id="delivery-title">Entrega</h2></div>
+          </div>
+          @if (loadingCapabilities()) {
+            <p class="loading" role="status">Consultando opciones de entrega…</p>
+          } @else if (capabilities(); as options) {
+            @if (options.deliveryQuotesEnabled) {
+              <p class="notice available">El servicio informa que las cotizaciones de entrega están habilitadas.</p>
+            } @else {
+              <p class="notice">Las cotizaciones y los proveedores de entrega todavía no están configurados.</p>
+            }
+            @if (options.deliveryMethods.length) {
+              <p class="methods"><strong>Modalidades informadas:</strong> {{ options.deliveryMethods.map(methodLabel).join(', ') }}.</p>
+            }
+            <p class="fine-print">Esta solicitud no incluye un costo ni una modalidad de entrega. No te pediremos una dirección en este paso.</p>
+          }
+        </section>
+
+        <section class="panel capability" aria-labelledby="payment-title">
+          <div class="section-heading">
+            <span>03</span>
+            <div><p>Condiciones comerciales</p><h2 id="payment-title">Pago</h2></div>
+          </div>
+          @if (loadingCapabilities()) {
+            <p class="loading" role="status">Consultando opciones de pago…</p>
+          } @else if (capabilities(); as options) {
+            @if (options.onlinePaymentsEnabled) {
+              <p class="notice available">El servicio informa que los pagos online están habilitados.</p>
+            } @else {
+              <p class="notice">Los proveedores de pago online todavía no están configurados.</p>
+            }
+            @if (options.paymentMethods.length) {
+              <p class="methods"><strong>Métodos informados:</strong> {{ options.paymentMethods.map(methodLabel).join(', ') }}.</p>
+            }
+            <p class="fine-print">No ingreses datos de tarjeta ni realices transferencias. Registrar esta solicitud no procesa ningún pago.</p>
+          }
+        </section>
+      </div>
+
+      <aside class="summary" aria-labelledby="summary-title">
+        <p class="eyebrow">Resumen</p>
+        <h2 id="summary-title">Tu solicitud</h2>
+        <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <p class="summary-note">Entrega y pago no están incluidos. El registro genera una reserva temporal de stock.</p>
+
+        @if (capabilitiesError()) {
+          <div class="error" role="alert">
+            <p>{{ capabilitiesError() }}</p>
+            <button mat-button type="button" (click)="loadCapabilities()">Reintentar consulta</button>
+          </div>
+        } @else if (capabilities() && !capabilities()?.orderRequestsEnabled) {
+          <p class="error" role="alert">El registro de solicitudes no está disponible en este momento.</p>
+        }
+
+        <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting() || !capabilities()?.orderRequestsEnabled">
+          {{ submitting() ? 'Registrando…' : 'Registrar solicitud' }}
+        </button>
+        <small>Al continuar no se realizará ningún cobro.</small>
+        @if (submitError()) { <p class="submit-error" role="alert">{{ submitError() }}</p> }
+      </aside>
+    </div>
+  }
+</main>

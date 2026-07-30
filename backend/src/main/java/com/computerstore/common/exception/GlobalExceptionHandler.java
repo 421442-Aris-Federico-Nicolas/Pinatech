@@ -12,7 +12,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -57,6 +61,25 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request", exception.getMessage(), request);
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "upload-too-large", "Upload too large",
+                "Image files must not exceed 5 MiB.", request);
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+    ProblemDetail handleInvalidMultipart(Exception exception, HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "invalid-multipart", "Invalid multipart request",
+                "The multipart request is missing a required part or is malformed.", request);
+    }
+
+    @ExceptionHandler(FileStorageException.class)
+    ProblemDetail handleStorage(FileStorageException exception, HttpServletRequest request) {
+        LOGGER.error("File storage error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "file-storage-error", "File storage error",
+                "The image file could not be processed.", request);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     ProblemDetail handleNotFound(ResourceNotFoundException exception, HttpServletRequest request) {
         return problem(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found", exception.getMessage(), request);
@@ -74,6 +97,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UnauthorizedResourceAccessException.class)
     ProblemDetail handleForbidden(UnauthorizedResourceAccessException exception, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);
     }
 

@@ -45,6 +45,28 @@ class OrderStockServiceTest {
         Mockito.verify(movements, Mockito.times(2)).save(Mockito.any());
     }
 
+    @Test
+    void restoresConsumedStockWhenAnOrderIsCancelled() {
+        InventoryRepository inventories = Mockito.mock(InventoryRepository.class);
+        InventoryMovementRepository movements = Mockito.mock(InventoryMovementRepository.class);
+        Product product = product(1L);
+        Inventory inventory = inventory(product);
+        when(inventories.findByProductIdForUpdate(1L)).thenReturn(Optional.of(inventory));
+        CustomerOrder order = new CustomerOrder(
+                new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
+                List.of(new OrderItem(product, 2)),
+                new BigDecimal("20.00"));
+        OrderStockService service = new OrderStockService(inventories, movements);
+        service.reserve(order);
+        service.consume(order);
+
+        service.restore(order);
+
+        assertEquals(10, inventory.getAvailableQuantity());
+        assertEquals(0, inventory.getReservedQuantity());
+        Mockito.verify(movements, Mockito.times(3)).save(Mockito.any());
+    }
+
     private Product product(Long id) {
         Product product = Mockito.mock(Product.class);
         when(product.getId()).thenReturn(id);

@@ -91,12 +91,24 @@
               <i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i>
             </header>
             <div class="progress"><i [style.width.%]="progress(ticket)"></i></div>
-            <div class="detail-meta"><span><small>Estado</small><strong>{{ statusLabel(ticket.status) }}</strong></span><span><small>Responsable</small><strong>{{ ticket.technicianName }}</strong></span><span><small>Ingreso</small><strong>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span>@if(ticket.serialNumber){<span><small>Número de serie</small><strong>{{ ticket.serialNumber }}</strong></span>}</div>
+            <div class="detail-meta"><span><small>Estado</small><strong>{{ statusLabel(ticket.status) }}</strong></span><span><small>Responsable</small><strong>{{ ticket.technicianName }}</strong></span><span><small>Ingreso</small><strong>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span></div>
 
             @if(!isAdmin() && ticket.technicianId === null){<button class="claim" mat-flat-button type="button" [disabled]="saving()" (click)="claim(ticket)">Tomar este ticket</button>}
             @if(isAdmin() && technicians().length){<mat-form-field class="technician-select"><mat-label>Técnico responsable</mat-label><mat-select [ngModel]="ticket.technicianId" (ngModelChange)="assign($event)" [disabled]="saving()">@for(technician of technicians();track technician.id){<mat-option [value]="technician.id">{{ technician.name }}</mat-option>}</mat-select></mat-form-field>}
 
             <section class="problem"><h3>Problema informado</h3><p>{{ ticket.reportedProblem }}</p></section>
+            <section class="attachments-section">
+              <div class="section-title"><div><h3>Imágenes adjuntas</h3><p>Evidencia privada compartida por cliente y equipo técnico.</p></div></div>
+              @if (ticket.attachments.length) { <app-ticket-attachment-gallery [attachments]="ticket.attachments" /> }
+              @else { <p class="no-attachments">Este ticket todavía no tiene imágenes.</p> }
+              @if (canEdit(ticket)) {
+                <div class="attachment-upload">
+                  <label>Elegir imagen<input type="file" accept="image/jpeg,image/png" (change)="selectAttachment($event, ticket)"></label>
+                  <span>{{ attachmentFile()?.name || 'JPEG o PNG, hasta 5 MiB (opcional)' }}</span>
+                  <button mat-stroked-button type="button" [disabled]="!attachmentFile() || uploadingAttachment()" (click)="uploadAttachment()">{{ uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
+                </div>
+              }
+            </section>
             <section class="technical-form">
               <div class="section-title"><div><h3>Ficha técnica</h3><p>Diagnóstico, prioridad y presupuesto.</p></div>@if(!canEdit(ticket)){<span class="locked">Asignado a otro técnico</span>}</div>
               <mat-form-field><mat-label>Prioridad</mat-label><mat-select [(ngModel)]="priority" [disabled]="!canEdit(ticket)">@for(item of priorities;track item){<mat-option [value]="item">{{ priorityLabel(item) }}</mat-option>}</mat-select></mat-form-field>

@@ -1,14 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { TicketAttachment } from '../../core/tickets/ticket-attachment.model';
 
 export type TicketStatus = 'RECEIVED' | 'UNDER_DIAGNOSIS' | 'WAITING_FOR_APPROVAL' | 'APPROVED' | 'IN_REPAIR' | 'WAITING_FOR_PARTS' | 'READY_FOR_PICKUP' | 'DELIVERED' | 'CANCELLED';
 export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 export interface TechnicalTicket {
   id: number; customerName: string; customerEmail: string; technicianId: number | null; technicianName: string;
-  deviceType: string; brand: string; model: string; serialNumber: string | null; reportedProblem: string;
+  deviceType: string; brand: string; model: string; reportedProblem: string;
   diagnosis: string | null; estimatedPrice: number | null; finalPrice: number | null; status: TicketStatus;
-  priority: TicketPriority; createdAt: string; updatedAt: string;
+  priority: TicketPriority; createdAt: string; updatedAt: string; attachments: TicketAttachment[];
 }
 export interface Technician { id: number; name: string; }
 export interface TicketHistory { id: number; previousStatus: TicketStatus | null; newStatus: TicketStatus; comment: string | null; changedBy: string; changedAt: string; }

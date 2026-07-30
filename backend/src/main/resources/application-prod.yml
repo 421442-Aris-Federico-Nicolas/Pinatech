@@ -7,9 +7,12 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 server:
   forward-headers-strategy: framework
+  shutdown: graceful
 
 springdoc:
   api-docs:

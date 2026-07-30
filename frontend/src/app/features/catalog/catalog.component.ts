@@ -7,6 +7,7 @@ import { MatCardModule } from '@angular/material/card';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
+import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
@@ -19,6 +20,7 @@ const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CatalogComponent {
+  readonly imageUrl = resolveApiContentUrl;
   private readonly service = inject(CatalogService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

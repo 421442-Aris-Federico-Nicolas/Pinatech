@@ -6,7 +6,18 @@ import { Product } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
 
 export interface CartItem { product: Product; quantity: number; }
-export interface OrderConfirmation { id: number; total: number; createdAt: string; }
+export interface OrderConfirmation {
+  id: number;
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  currency: string;
+  paymentMethod: string | null;
+  deliveryMethod: string | null;
+  total: number;
+  createdAt: string;
+  reservationExpiresAt: string;
+}
 
 const GUEST_CART_KEY = 'pinatech-cart-guest';
 const MAX_QUANTITY = 99;
@@ -142,21 +153,51 @@ export class CartService {
       const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
       if (!Array.isArray(parsed)) return [];
       return parsed.filter((item): item is CartItem => this.isCartItem(item))
-        .map((item) => ({ ...item, quantity: this.safeQuantity(item.quantity) }));
+        .map((item) => ({
+          ...item,
+          product: { ...item.product, images: Array.isArray(item.product.images) ? item.product.images : [] },
+          quantity: this.safeQuantity(item.quantity),
+        }));
     } catch {
       return [];
     }
   }
 
   private restoreConfirmation(userId: number | null): OrderConfirmation | null {
+    const storageKey = this.confirmationKey(userId);
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem(this.confirmationKey(userId)) ?? 'null');
+      const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
       if (!parsed || typeof parsed !== 'object') return null;
       const value = parsed as Record<string, unknown>;
+      const reservationExpiresAt = typeof value['reservationExpiresAt'] === 'string'
+        ? Date.parse(value['reservationExpiresAt'])
+        : Number.NaN;
+      if (!Number.isFinite(reservationExpiresAt) || reservationExpiresAt <= Date.now()) {
+        this.remove(storageKey);
+        return null;
+      }
+
       return typeof value['id'] === 'number' && Number.isFinite(value['id'])
         && typeof value['total'] === 'number' && Number.isFinite(value['total'])
         && typeof value['createdAt'] === 'string'
-        ? { id: value['id'], total: value['total'], createdAt: value['createdAt'] }
+        && typeof value['status'] === 'string'
+        && typeof value['paymentStatus'] === 'string'
+        && typeof value['fulfillmentStatus'] === 'string'
+        && typeof value['currency'] === 'string'
+        && (typeof value['paymentMethod'] === 'string' || value['paymentMethod'] === null)
+        && (typeof value['deliveryMethod'] === 'string' || value['deliveryMethod'] === null)
+        ? {
+          id: value['id'],
+          status: value['status'],
+          paymentStatus: value['paymentStatus'],
+          fulfillmentStatus: value['fulfillmentStatus'],
+          currency: value['currency'],
+          paymentMethod: value['paymentMethod'] as string | null,
+          deliveryMethod: value['deliveryMethod'] as string | null,
+          total: value['total'],
+          createdAt: value['createdAt'],
+          reservationExpiresAt: value['reservationExpiresAt'] as string,
+        }
         : null;
     } catch {
       return null;

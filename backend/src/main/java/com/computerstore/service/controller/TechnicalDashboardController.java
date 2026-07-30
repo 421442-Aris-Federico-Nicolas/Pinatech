@@ -9,6 +9,7 @@ import com.computerstore.service.domain.TicketStatusHistory;
 import com.computerstore.service.dto.*;
 import com.computerstore.service.repository.TechnicalServiceTicketRepository;
 import com.computerstore.service.repository.TicketStatusHistoryRepository;
+import com.computerstore.service.service.TicketAttachmentService;
 import com.computerstore.user.domain.RoleName;
 import com.computerstore.user.domain.UserAccount;
 import com.computerstore.user.repository.UserAccountRepository;
@@ -24,17 +25,23 @@ public class TechnicalDashboardController {
     private final TechnicalServiceTicketRepository tickets;
     private final TicketStatusHistoryRepository history;
     private final UserAccountRepository users;
+    private final TicketAttachmentService attachments;
 
-    public TechnicalDashboardController(TechnicalServiceTicketRepository tickets, TicketStatusHistoryRepository history, UserAccountRepository users) {
+    public TechnicalDashboardController(TechnicalServiceTicketRepository tickets, TicketStatusHistoryRepository history, UserAccountRepository users, TicketAttachmentService attachments) {
         this.tickets = tickets;
         this.history = history;
         this.users = users;
+        this.attachments = attachments;
     }
 
     @GetMapping
     @Transactional(readOnly = true)
     public List<TechnicalTicketResponse> list() {
-        return tickets.findAllByOrderByCreatedAtDesc().stream().map(this::response).toList();
+        List<TechnicalServiceTicket> allTickets = tickets.findAllByOrderByCreatedAtDesc();
+        var attachmentMap = attachments.responsesByTicketIds(allTickets.stream().map(TechnicalServiceTicket::getId).toList());
+        return allTickets.stream()
+                .map(ticket -> response(ticket, attachmentMap.getOrDefault(ticket.getId(), List.of())))
+                .toList();
     }
 
     @GetMapping("/{id}/history")
@@ -141,6 +148,10 @@ public class TechnicalDashboardController {
     }
 
     private TechnicalTicketResponse response(TechnicalServiceTicket ticket) {
+        return response(ticket, attachments.responsesForTicket(ticket.getId()));
+    }
+
+    private TechnicalTicketResponse response(TechnicalServiceTicket ticket, List<TicketAttachmentResponse> ticketAttachments) {
         var customer = ticket.getCustomer();
         var technician = ticket.getTechnician();
         return new TechnicalTicketResponse(
@@ -152,7 +163,6 @@ public class TechnicalDashboardController {
                 ticket.getDeviceType(),
                 ticket.getBrand(),
                 ticket.getModel(),
-                ticket.getSerialNumber(),
                 ticket.getReportedProblem(),
                 ticket.getDiagnosis(),
                 ticket.getEstimatedPrice(),
@@ -160,6 +170,7 @@ public class TechnicalDashboardController {
                 ticket.getStatus().name(),
                 ticket.getPriority().name(),
                 ticket.getCreatedAt(),
-                ticket.getUpdatedAt());
+                ticket.getUpdatedAt(),
+                ticketAttachments);
     }
 }
