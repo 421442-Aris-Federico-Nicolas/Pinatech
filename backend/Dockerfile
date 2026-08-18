@@ -13,14 +13,16 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 RUN apk upgrade --no-cache \
+    && apk add --no-cache su-exec \
     && addgroup --system spring \
     && adduser --system --ingroup spring spring \
     && mkdir -p /app/uploads \
     && chown spring:spring /app/uploads
 
 COPY --from=build /app/target/computer-store-api-*.jar application.jar
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-USER spring:spring
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/application.jar"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["java", "-jar", "/app/application.jar"]

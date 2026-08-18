@@ -92,7 +92,6 @@ services:
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE registry repository is required}@sha256:${BACKEND_IMAGE_DIGEST:?BACKEND_IMAGE_DIGEST is required}
     restart: unless-stopped
-    user: "spring:spring"
     read_only: true
     init: true
     security_opt:

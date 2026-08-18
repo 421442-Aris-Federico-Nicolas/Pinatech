@@ -6,7 +6,7 @@ MVP local de una tienda de productos informaticos y servicio tecnico. El proyect
 
 El MVP funcional incluye autenticacion con roles, catalogo, inventario, reservas de stock, solicitudes de pedido y tickets de servicio tecnico. Mercado Pago Checkout Pro esta implementado pero deshabilitado por defecto; la cotizacion de envios aun no esta implementada.
 
-See [payment and shipping integration](docs/payment-and-shipping-integration.md) for the payment flow, [production checklist](docs/production-checklist.md) for release gates and [production deployment](docs/production-deployment.md) for the VPS runbook.
+See [payment and shipping integration](docs/payment-and-shipping-integration.md) for the payment flow, [production checklist](docs/production-checklist.md) for release gates, [Railway and Vercel deployment](docs/railway-vercel-deployment.md) for the cloud runbook and [production deployment](docs/production-deployment.md) for the VPS runbook.
 
 ## Stack
 
@@ -14,7 +14,7 @@ See [payment and shipping integration](docs/payment-and-shipping-integration.md)
 |---|---:|
 | Java | 21 LTS |
 | Spring Boot | 3.5.16 |
-| Angular | 21.2.18 |
+| Angular | 21.2.20 |
 | Node.js | 24.15.0 |
 | PostgreSQL | 17.10 |
 
@@ -64,7 +64,7 @@ java -version
 
 ## Local Docker stack
 
-The default Docker Compose file builds the Angular storefront, starts PostgreSQL and runs the backend with the `prod` profile for local evaluation. Copy `.env.example` to `.env`, set local credentials and configure the intended origin. Startup fails if any required value is absent. This stack is not the public VPS deployment.
+The default Docker Compose file builds the Angular storefront and runs the backend with the `prod` profile against the configured external PostgreSQL datasource. Copy `.env.example` to `.env`, set private datasource credentials and configure the intended origin. Startup fails if any required value is absent. This stack is not the public deployment.
 
 ```bash
 docker compose up -d --build
@@ -77,6 +77,10 @@ docker compose ps
 ```
 
 The storefront is available at `http://localhost:${FRONTEND_PORT:-80}` and proxies `/api` to the backend container. The API is also bound to `127.0.0.1:${BACKEND_PORT:-8080}` so the Angular development server can use it without exposing it to the network. Seeder accounts, OpenAPI documents and Swagger UI are disabled in `prod`.
+
+## Railway and Vercel deployment
+
+The supported cloud layout deploys the Spring Boot API to Railway, the Angular storefront to Vercel, PostgreSQL to Supabase and uploaded images to a Railway Volume. Follow the two-stage [Railway and Vercel runbook](docs/railway-vercel-deployment.md).
 
 ## Production VPS deployment
 
@@ -92,18 +96,8 @@ procedures but do not certify the application as production-ready.
 
 ## Manual startup
 
-1. Export the datasource variables shown below, or run PostgreSQL with local credentials of your choice.
-2. Start PostgreSQL only:
-
-```bash
-docker compose up -d postgres
-```
-
-```powershell
-docker compose up -d postgres
-```
-
-3. Start the backend with the development profile and local datasource variables:
+1. Provision PostgreSQL locally or externally and export its datasource variables.
+2. Start the backend with the development profile:
 
 ```bash
 cd backend
@@ -115,7 +109,7 @@ cd backend
 $env:SPRING_PROFILES_ACTIVE="dev"; $env:SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/computer_store"; $env:SPRING_DATASOURCE_USERNAME="computer_store"; $env:SPRING_DATASOURCE_PASSWORD="computer_store"; .\mvnw.cmd spring-boot:run
 ```
 
-4. Start Angular in a second terminal:
+3. Start Angular in a second terminal:
 
 ```bash
 cd frontend
