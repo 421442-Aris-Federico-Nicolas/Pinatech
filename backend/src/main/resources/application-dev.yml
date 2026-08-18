@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/computer_store}
-    username: ${SPRING_DATASOURCE_USERNAME:computer_store}
-    password: ${SPRING_DATASOURCE_PASSWORD:computer_store}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     show-sql: false
   flyway:

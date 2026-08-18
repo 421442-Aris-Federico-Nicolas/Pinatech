@@ -104,15 +104,12 @@ services:
       - /tmp:mode=1777
     volumes:
       - media_uploads:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      CORS_ALLOWED_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:?SPRING_DATASOURCE_URL is required}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?SPRING_DATASOURCE_USERNAME is required}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required}
+      CORS_ALLOWED_ORIGIN: https://${APP_DOMAIN:pinatech.com.ar?}
       CORS_ALLOWED_ORIGIN_PATTERNS: ""
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       REFRESH_COOKIE_SECURE: "true"
@@ -154,50 +151,11 @@ services:
     logging: *default-logging
     networks:
       - app
-      - data
       - egress
-
-  postgres:
-    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE registry repository is required}@sha256:${POSTGRES_IMAGE_DIGEST:?POSTGRES_IMAGE_DIGEST is required}
-    restart: unless-stopped
-    user: "70:70"
-    read_only: true
-    init: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    stop_grace_period: 60s
-    shm_size: 256m
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    tmpfs:
-      - /var/run/postgresql:uid=70,gid=70,mode=0770
-      - /tmp:uid=70,gid=70,mode=1777
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    deploy:
-      resources:
-        limits:
-          cpus: "1.50"
-          memory: 1G
-          pids: 200
-    logging: *default-logging
-    networks:
-      - data
 
 volumes:
   caddy_data:
   caddy_config:
-  postgres_data:
   media_uploads:
 
 networks:
@@ -207,9 +165,6 @@ networks:
       config:
         - subnet: 172.31.250.0/28
   app:
-    driver: bridge
-    internal: true
-  data:
     driver: bridge
     internal: true
   egress:
