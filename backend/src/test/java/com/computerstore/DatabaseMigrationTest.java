@@ -1,11 +1,15 @@
 package com.computerstore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
@@ -85,11 +89,11 @@ class DatabaseMigrationTest {
                 WHERE variant.id IS NULL OR stock.variant_id IS NULL
                 """, Integer.class));
         assertEquals(10, jdbc.queryForObject("SELECT MIN(available_quantity) FROM inventory", Integer.class));
-        assertEquals(2, jdbc.queryForObject("""
+        assertEquals(3, jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                  AND table_name IN ('payment_attempts', 'payment_events')
+                  AND table_name IN ('payment_attempts', 'payment_events', 'provider_payments')
                 """, Integer.class));
         assertEquals(1, jdbc.queryForObject("""
                 SELECT COUNT(*)
@@ -105,8 +109,70 @@ class DatabaseMigrationTest {
                   AND table_name = 'payment_events'
                   AND column_name IN ('notification_payload_hash', 'provider_payload_hash')
                 """, Integer.class));
-        assertEquals("14", jdbc.queryForObject(
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'payment_attempts'
+                  AND indexname = 'uq_payment_attempts_one_active_per_order'
+                """, Integer.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'provider_payments'
+                  AND indexname = 'uq_provider_payments_provider_payment_id'
+                """, Integer.class));
+        assertEquals("15", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
+    }
+
+    @Test
+    void databaseSerializesActivePreferencesAndProviderPaymentIds() {
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash)
+                VALUES ('Constraint', 'Test', ?, 'hash') RETURNING id
+                """, Long.class, "constraint-" + UUID.randomUUID() + "@example.com");
+        Long orderId = jdbc.queryForObject("""
+                INSERT INTO customer_orders (
+                    user_id, status, subtotal, total, reservation_expires_at,
+                    currency, payment_status, fulfillment_status
+                ) VALUES (?, 'PENDING_PAYMENT', 100, 100, CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+                          'ARS', 'PENDING', 'PENDING') RETURNING id
+                """, Long.class, userId);
+        try {
+            Long attemptId = insertAttempt(orderId, "constraint-a");
+            assertThrows(DataIntegrityViolationException.class,
+                    () -> insertAttempt(orderId, "constraint-b"));
+
+            jdbc.update("""
+                    INSERT INTO provider_payments (
+                        attempt_id, provider_payment_id, provider_status, amount, currency,
+                        live_mode, operation_type, amount_refunded
+                    ) VALUES (?, 'provider-constraint-id', 'approved', 100, 'ARS', FALSE,
+                              'regular_payment', 0)
+                    """, attemptId);
+            assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                    INSERT INTO provider_payments (
+                        attempt_id, provider_payment_id, provider_status, amount, currency,
+                        live_mode, operation_type, amount_refunded
+                    ) VALUES (?, 'provider-constraint-id', 'approved', 100, 'ARS', FALSE,
+                              'regular_payment', 0)
+                    """, attemptId));
+        } finally {
+            jdbc.update("DELETE FROM provider_payments WHERE attempt_id IN (SELECT id FROM payment_attempts WHERE order_id = ?)", orderId);
+            jdbc.update("DELETE FROM payment_attempts WHERE order_id = ?", orderId);
+            jdbc.update("DELETE FROM customer_orders WHERE id = ?", orderId);
+            jdbc.update("DELETE FROM users WHERE id = ?", userId);
+        }
+    }
+
+    private Long insertAttempt(Long orderId, String key) {
+        return jdbc.queryForObject("""
+                INSERT INTO payment_attempts (
+                    public_id, order_id, provider, status, idempotency_key,
+                    amount, currency, expires_at
+                ) VALUES (?, ?, 'MERCADO_PAGO', 'CREATED', ?, 100, 'ARS',
+                          CURRENT_TIMESTAMP + INTERVAL '10 minutes') RETURNING id
+                """, Long.class, UUID.randomUUID(), orderId, key);
     }
 }

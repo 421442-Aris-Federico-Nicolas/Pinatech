@@ -1,5 +1,6 @@
 package com.computerstore.config;
 
+import java.util.Arrays;
 import java.util.List;
 
 import com.computerstore.security.JwtAuthenticationFilter;
@@ -8,6 +9,8 @@ import com.computerstore.security.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -72,12 +75,20 @@ public class SecurityConfiguration {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origin}") String allowedOrigin) {
+            @Value("${app.cors.allowed-origin}") String allowedOrigin,
+            @Value("${app.cors.allowed-origin-patterns:}") String allowedOriginPatterns,
+            Environment environment) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-        "https://*.devtunnels.ms",
-        "http://localhost:*"
-));
+        configuration.setAllowedOrigins(List.of(allowedOrigin));
+        if (!environment.acceptsProfiles(Profiles.of("prod"))) {
+            List<String> patterns = Arrays.stream(allowedOriginPatterns.split(","))
+                    .map(String::trim)
+                    .filter(pattern -> !pattern.isEmpty())
+                    .toList();
+            if (!patterns.isEmpty()) {
+                configuration.setAllowedOriginPatterns(patterns);
+            }
+        }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Idempotency-Key"));
         configuration.setAllowCredentials(true);

@@ -3,10 +3,11 @@ package com.computerstore.payment.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,40 +17,53 @@ import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.payment.domain.PaymentAttempt;
 import com.computerstore.payment.domain.PaymentAttemptStatus;
 import com.computerstore.payment.domain.PaymentEvent;
+import com.computerstore.payment.domain.ProviderPaymentRecord;
 import com.computerstore.payment.dto.PaymentCheckoutResponse;
 import com.computerstore.payment.gateway.PaymentPreference;
 import com.computerstore.payment.gateway.PaymentPreferenceRequest;
 import com.computerstore.payment.gateway.ProviderPayment;
+import com.computerstore.payment.gateway.RefundResult;
 import com.computerstore.payment.repository.PaymentAttemptRepository;
 import com.computerstore.payment.repository.PaymentEventRepository;
+import com.computerstore.payment.repository.ProviderPaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaymentAttemptTransactionalService {
 
+    private static final List<PaymentAttemptStatus> ACTIVE = List.of(
+            PaymentAttemptStatus.CREATED, PaymentAttemptStatus.PREFERENCE_CREATED, PaymentAttemptStatus.PENDING);
+
     private final PaymentAttemptRepository attempts;
+    private final ProviderPaymentRepository providerPayments;
     private final PaymentEventRepository events;
     private final CustomerOrderRepository orders;
     private final OrderStockService stock;
     private final MercadoPagoProperties properties;
+    private final Clock clock;
 
     public PaymentAttemptTransactionalService(
             PaymentAttemptRepository attempts,
+            ProviderPaymentRepository providerPayments,
             PaymentEventRepository events,
             CustomerOrderRepository orders,
             OrderStockService stock,
-            MercadoPagoProperties properties
+            MercadoPagoProperties properties,
+            Clock clock
     ) {
         this.attempts = attempts;
+        this.providerPayments = providerPayments;
         this.events = events;
         this.orders = orders;
         this.stock = stock;
         this.properties = properties;
+        this.clock = clock;
     }
 
     @Transactional(noRollbackFor = ReservationExpiredException.class)
@@ -58,18 +72,20 @@ public class PaymentAttemptTransactionalService {
         String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
         var order = orders.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
-        Optional<PaymentAttempt> existing = attempts.findByOrderIdAndIdempotencyKey(orderId, idempotencyKey);
-        if (existing.isPresent()) {
-            PaymentAttempt attempt = existing.get();
-            if (attempt.getCheckoutUrl() != null) {
-                return new PaymentPreparation(false, response(attempt), null);
-            }
-            return new PaymentPreparation(false, null, preferenceRequest(attempt));
-        }
+        Instant now = Instant.now(clock);
+
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new InvalidRequestException("Only a pending payment order can start a payment.");
         }
-        if (order.isReservationExpired(Instant.now())) {
+        for (PaymentAttempt active : attempts.findActiveByOrderId(orderId, ACTIVE)) {
+            if (active.isActiveAt(now)) {
+                return active.getCheckoutUrl() == null
+                        ? new PaymentPreparation(false, null, preferenceRequest(active))
+                        : new PaymentPreparation(false, response(active), null);
+            }
+            active.retire("Payment preference expired.");
+        }
+        if (order.isReservationExpired(now)) {
             stock.release(order);
             order.expire();
             throw new ReservationExpiredException("The order reservation has expired.");
@@ -84,6 +100,9 @@ public class PaymentAttemptTransactionalService {
     @Transactional
     public PaymentCheckoutResponse completePreference(UUID attemptId, PaymentPreference preference) {
         PaymentAttempt attempt = attemptForUpdate(attemptId);
+        if (!attempt.isActiveAt(Instant.now(clock))) {
+            throw new InvalidRequestException("The payment preference is no longer active.");
+        }
         attempt.preferenceCreated(preference.preferenceId(), preference.checkoutUrl());
         return response(attempt);
     }
@@ -95,179 +114,230 @@ public class PaymentAttemptTransactionalService {
 
     @Transactional
     public Optional<RefundInstruction> processWebhook(
-            ProviderPayment payment,
-            String requestedPaymentId,
-            String requestId,
-            String notificationPayload
-    ) {
+            ProviderPayment payment, String requestedPaymentId, String requestId, String notificationPayload) {
         if (!payment.id().equals(requestedPaymentId)) {
             throw new InvalidRequestException("Mercado Pago returned a different payment ID.");
         }
+        return processPayment(payment, requestId, notificationPayload);
+    }
+
+    @Transactional
+    public Optional<RefundInstruction> processReconciledPayment(ProviderPayment payment) {
+        return processPayment(payment, "reconciliation-" + payment.id(), "reconciliation");
+    }
+
+    private Optional<RefundInstruction> processPayment(
+            ProviderPayment payment, String requestId, String notificationPayload) {
         UUID publicId = parsePublicId(payment.externalReference());
         PaymentAttempt attempt = attemptForUpdate(publicId);
         var order = orders.findByIdForUpdate(attempt.getOrder().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         validateAuthoritativePayment(attempt, payment);
 
+        Optional<ProviderPaymentRecord> existingPayment = providerPayments
+                .findByProviderPaymentIdForUpdate(payment.id());
+        ProviderPaymentRecord providerPayment = existingPayment
+                .orElseGet(() -> providerPayments.save(new ProviderPaymentRecord(attempt, payment)));
+        if (!providerPayment.getAttempt().getPublicId().equals(attempt.getPublicId())) {
+            throw new InvalidRequestException("Mercado Pago payment is already linked to another preference.");
+        }
+
         String eventKey = eventKey(payment);
         if (events.findByEventKey(eventKey).isPresent()) {
-            return pendingRefund(attempt, null);
+            return pendingRefund(providerPayment, null);
         }
         PaymentEvent event = events.save(new PaymentEvent(
-                attempt,
-                payment.id(),
-                requestId,
-                eventKey,
-                payment.status(),
-                payment.statusDetail(),
-                sha256(notificationPayload),
-                payment.payloadHash()));
+                attempt, payment.id(), requestId, eventKey, payment.status(), payment.statusDetail(),
+                sha256(notificationPayload), payment.payloadHash()));
+        if (existingPayment.isPresent() && providerPayment.isStale(payment)) {
+            event.processed("STALE_EVENT");
+            return pendingRefund(providerPayment, null);
+        }
+        providerPayment.update(payment);
 
-        String providerStatus = payment.status().toLowerCase(Locale.ROOT);
-        switch (providerStatus) {
-            case "pending", "in_process", "in_mediation", "authorized" -> {
-                attempt.providerStatus(payment.id(), providerStatus, PaymentAttemptStatus.PENDING);
+        String status = payment.status().toLowerCase(Locale.ROOT);
+        switch (status) {
+            case "pending", "in_process", "authorized" -> {
+                attempt.summaryStatus(status, PaymentAttemptStatus.PENDING);
                 event.processed("PENDING");
             }
+            case "in_mediation" -> {
+                providerPayment.mediation();
+                if (providerPayment.isFundsOrder()) order.markPaymentInMediation();
+                event.processed("MEDIATION");
+            }
             case "rejected", "cancelled" -> {
-                attempt.providerStatus(payment.id(), providerStatus, PaymentAttemptStatus.REJECTED);
+                if (!providerPayment.isFundsOrder()) {
+                    // A preference can produce another payment after one rejection.
+                    attempt.summaryStatus(status, PaymentAttemptStatus.PENDING);
+                }
                 event.processed("REJECTED");
             }
             case "approved" -> {
-                Optional<RefundInstruction> refund = processApproval(attempt, event, payment, order);
-                if (refund.isPresent()) {
-                    return refund;
-                }
+                return processApproval(attempt, providerPayment, event, payment, order);
             }
-            case "refunded", "charged_back" -> {
-                attempt.providerStatus(payment.id(), providerStatus, PaymentAttemptStatus.REFUNDED);
-                order.markPaymentRefunded();
+            case "refunded" -> {
+                providerPayment.externallyRefunded();
+                if (providerPayment.isFundsOrder()
+                        || !providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
+                    order.markPaymentRefunded();
+                    attempt.summaryStatus(status, PaymentAttemptStatus.REFUNDED);
+                }
                 event.processed("REFUNDED_BY_PROVIDER");
+            }
+            case "charged_back" -> {
+                providerPayment.chargeback();
+                if (providerPayment.isFundsOrder()) order.markPaymentChargedBack();
+                event.processed("CHARGEBACK");
             }
             default -> event.processed("IGNORED_STATUS");
         }
         return Optional.empty();
     }
 
-    @Transactional
-    public void refundCompleted(RefundInstruction instruction, String refundId) {
-        PaymentAttempt attempt = attemptForUpdate(instruction.attemptId());
-        if (attempt.getStatus() == PaymentAttemptStatus.REFUNDED) {
-            return;
-        }
-        if (attempt.getStatus() != PaymentAttemptStatus.REFUND_PENDING
-                || !instruction.idempotencyKey().equals(attempt.getRefundIdempotencyKey())
-                || !instruction.paymentId().equals(attempt.getProviderPaymentId())) {
-            throw new IllegalStateException("Refund completion does not match the pending refund.");
-        }
-        var order = orders.findByIdForUpdate(attempt.getOrder().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
-        attempt.refundCompleted(refundId);
-        order.markPaymentRefunded();
-        event(instruction.eventId()).ifPresent(value -> value.processed("REFUNDED"));
-    }
-
-    @Transactional
-    public void refundFailed(RefundInstruction instruction, String error) {
-        PaymentAttempt attempt = attemptForUpdate(instruction.attemptId());
-        if (attempt.getStatus() == PaymentAttemptStatus.REFUND_PENDING) {
-            attempt.refundFailed(error);
-            event(instruction.eventId()).ifPresent(value -> value.processed("REFUND_FAILED"));
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public List<RefundInstruction> pendingRefunds() {
-        return attempts.findTop50ByStatusOrderByUpdatedAtAsc(PaymentAttemptStatus.REFUND_PENDING).stream()
-                .filter(attempt -> attempt.getProviderPaymentId() != null
-                        && attempt.getRefundIdempotencyKey() != null)
-                .map(attempt -> new RefundInstruction(
-                        attempt.getPublicId(),
-                        attempt.getProviderPaymentId(),
-                        attempt.getRefundIdempotencyKey(),
-                        null))
-                .toList();
-    }
-
     private Optional<RefundInstruction> processApproval(
             PaymentAttempt attempt,
+            ProviderPaymentRecord providerPayment,
             PaymentEvent event,
             ProviderPayment payment,
             com.computerstore.order.domain.CustomerOrder order
     ) {
-        if (attempt.getStatus() == PaymentAttemptStatus.REFUND_PENDING) {
-            event.processed("REFUND_PENDING");
-            return pendingRefund(attempt, event.getId());
-        }
-        if (attempt.getStatus() == PaymentAttemptStatus.APPROVED) {
-            event.processed("ALREADY_APPROVED");
+        if (providerPayment.isFundsOrder()) {
+            order.confirmPaymentApproved();
+            event.processed("ALREADY_FUNDED");
             return Optional.empty();
         }
+        if (providerPayment.getRefundIdempotencyKey() != null) {
+            event.processed("REFUND_PENDING");
+            return pendingRefund(providerPayment, event.getId());
+        }
+        boolean alreadyFunded = providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId());
         boolean approvedBeforeExpiry = payment.approvedAt() != null
-                && payment.approvedAt().isBefore(attempt.getExpiresAt());
-        if (order.getStatus() == OrderStatus.PENDING_PAYMENT && approvedBeforeExpiry) {
+                && !payment.approvedAt().isAfter(attempt.getExpiresAt());
+        if (!alreadyFunded && order.getStatus() == OrderStatus.PENDING_PAYMENT && approvedBeforeExpiry) {
+            providerPayment.fundsOrder();
             order.approveMercadoPagoPayment();
-            attempt.providerStatus(payment.id(), payment.status(), PaymentAttemptStatus.APPROVED);
+            attempt.summaryStatus(payment.status(), PaymentAttemptStatus.APPROVED);
             event.processed("ORDER_PAID");
             return Optional.empty();
         }
-
-        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+        if (!alreadyFunded && order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             stock.release(order);
             order.expire();
         }
-        UUID refundKey = attempt.requestRefund(payment.id(), payment.status());
-        order.markPaymentRefundPending();
+        UUID refundKey = providerPayment.requestRefund(Instant.now(clock));
+        if (!alreadyFunded) {
+            order.markPaymentRefundPending();
+            attempt.summaryStatus(payment.status(), PaymentAttemptStatus.REFUND_PENDING);
+        }
         event.processed("REFUND_PENDING");
-        return Optional.of(new RefundInstruction(attempt.getPublicId(), payment.id(), refundKey, event.getId()));
+        return Optional.of(new RefundInstruction(
+                attempt.getPublicId(), payment.id(), refundKey, providerPayment.getRefundId(), event.getId()));
     }
 
-    private Optional<RefundInstruction> pendingRefund(PaymentAttempt attempt, Long eventId) {
-        if (attempt.getStatus() != PaymentAttemptStatus.REFUND_PENDING) {
+    @Transactional
+    public void applyRefundResult(RefundInstruction instruction, RefundResult result) {
+        ProviderPaymentRecord payment = providerPayments
+                .findByProviderPaymentIdForUpdate(instruction.paymentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Provider payment not found."));
+        if (!instruction.idempotencyKey().equals(payment.getRefundIdempotencyKey())) {
+            throw new IllegalStateException("Refund result does not match the pending refund.");
+        }
+        var order = orders.findByIdForUpdate(payment.getAttempt().getOrder().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
+        payment.refundResult(result, Instant.now(clock));
+        if (payment.refundTerminalAndComplete()) {
+            if (!providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
+                order.markPaymentRefunded();
+                payment.getAttempt().summaryStatus("refunded", PaymentAttemptStatus.REFUNDED);
+            }
+            event(instruction.eventId()).ifPresent(value -> value.processed("REFUNDED"));
+        } else {
+            event(instruction.eventId()).ifPresent(value -> value.processed(
+                    "REJECTED".equals(payment.getRefundStatus()) ? "REFUND_REJECTED" : "REFUND_PENDING"));
+        }
+    }
+
+    @Transactional
+    public void refundFailed(RefundInstruction instruction, String error) {
+        providerPayments.findByProviderPaymentIdForUpdate(instruction.paymentId())
+                .filter(payment -> instruction.idempotencyKey().equals(payment.getRefundIdempotencyKey()))
+                .ifPresent(payment -> payment.refundFailed(error, Instant.now(clock)));
+        event(instruction.eventId()).ifPresent(value -> value.processed("REFUND_FAILED"));
+    }
+
+    @Transactional
+    public List<RefundInstruction> claimPendingRefunds() {
+        Instant now = Instant.now(clock);
+        return providerPayments.lockRefundsDue(now).stream().map(payment -> {
+            payment.lease(now.plusSeconds(60));
+            return new RefundInstruction(
+                    payment.getAttempt().getPublicId(), payment.getProviderPaymentId(),
+                    payment.getRefundIdempotencyKey(), payment.getRefundId(), null);
+        }).toList();
+    }
+
+    @Transactional
+    public List<ReconciliationInstruction> claimReconciliations() {
+        Instant now = Instant.now(clock);
+        Instant cutoff = now.minus(properties.reconciliationLookback());
+        return attempts.lockReconciliationsDue(now, cutoff).stream().map(attempt -> {
+            attempt.reconciliationLease(now.plusSeconds(60));
+            return new ReconciliationInstruction(attempt.getPublicId(), attempt.getPreferenceId());
+        }).toList();
+    }
+
+    @Transactional
+    public void reconciliationSucceeded(UUID attemptId) {
+        attemptForUpdate(attemptId).reconciliationSucceeded(Instant.now(clock));
+    }
+
+    @Transactional
+    public void reconciliationFailed(UUID attemptId, String error) {
+        attemptForUpdate(attemptId).reconciliationFailed(Instant.now(clock), error);
+    }
+
+    private Optional<RefundInstruction> pendingRefund(ProviderPaymentRecord payment, Long eventId) {
+        if (payment.getRefundIdempotencyKey() == null || payment.refundTerminalAndComplete()) {
             return Optional.empty();
         }
         return Optional.of(new RefundInstruction(
-                attempt.getPublicId(),
-                attempt.getProviderPaymentId(),
-                attempt.getRefundIdempotencyKey(),
-                eventId));
+                payment.getAttempt().getPublicId(), payment.getProviderPaymentId(),
+                payment.getRefundIdempotencyKey(), payment.getRefundId(), eventId));
     }
 
     private void validateAuthoritativePayment(PaymentAttempt attempt, ProviderPayment payment) {
+        boolean expectedLiveMode = properties.environment() == MercadoPagoEnvironment.PRODUCTION;
         if (!attempt.getPublicId().toString().equals(payment.externalReference())
                 || attempt.getPreferenceId() == null
                 || !attempt.getPreferenceId().equals(payment.preferenceId())
                 || !properties.collectorId().equals(payment.collectorId())
                 || attempt.getAmount().compareTo(payment.amount()) != 0
                 || !"ARS".equals(payment.currency())
-                || !attempt.getCurrency().equals(payment.currency())) {
+                || !attempt.getCurrency().equals(payment.currency())
+                || payment.liveMode() != expectedLiveMode
+                || !"regular_payment".equals(payment.operationType())
+                || payment.amountRefunded() == null
+                || payment.amountRefunded().signum() < 0
+                || payment.amountRefunded().compareTo(payment.amount()) > 0) {
             throw new InvalidRequestException("Mercado Pago payment data does not match the payment attempt.");
         }
     }
 
     private PaymentPreferenceRequest preferenceRequest(PaymentAttempt attempt) {
         return new PaymentPreferenceRequest(
-                attempt.getPublicId(),
-                attempt.getOrder().getId(),
-                attempt.getAmount(),
-                attempt.getCurrency(),
-                attempt.getExpiresAt(),
-                attempt.getOrder().getItems().stream()
+                attempt.getPublicId(), attempt.getOrder().getId(), attempt.getAmount(), attempt.getCurrency(),
+                attempt.getExpiresAt(), attempt.getOrder().getItems().stream()
                         .map(item -> new PaymentPreferenceRequest.Item(
                                 item.getVariant().getId().toString(),
                                 item.getProductName() + " - " + item.getVariantColorName(),
-                                item.getQuantity(),
-                                item.getUnitPrice()))
+                                item.getQuantity(), item.getUnitPrice()))
                         .toList());
     }
 
     private PaymentCheckoutResponse response(PaymentAttempt attempt) {
-        return new PaymentCheckoutResponse(
-                attempt.getPublicId(),
-                attempt.getOrder().getId(),
-                attempt.getStatus().name(),
-                attempt.getCheckoutUrl(),
-                attempt.getExpiresAt());
+        return new PaymentCheckoutResponse(attempt.getPublicId(), attempt.getOrder().getId(),
+                attempt.getStatus().name(), attempt.getCheckoutUrl(), attempt.getExpiresAt());
     }
 
     private PaymentAttempt attemptForUpdate(UUID publicId) {
@@ -288,12 +358,8 @@ public class PaymentAttemptTransactionalService {
     }
 
     private String eventKey(ProviderPayment payment) {
-        String canonical = String.join("|",
-                payment.id(),
-                payment.status(),
-                nullToEmpty(payment.statusDetail()),
-                payment.lastUpdatedAt() == null ? "" : payment.lastUpdatedAt().toString());
-        return sha256(canonical);
+        return sha256(String.join("|", payment.id(), payment.status(), nullToEmpty(payment.statusDetail()),
+                payment.lastUpdatedAt() == null ? "" : payment.lastUpdatedAt().toString()));
     }
 
     private String sha256(String value) {

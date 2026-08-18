@@ -149,6 +149,10 @@ public class CustomerOrder {
         if (!valid) {
             throw new InvalidStateTransitionException("The requested order status transition is not allowed.");
         }
+        if ((target == OrderStatus.PREPARING || target == OrderStatus.READY || target == OrderStatus.DELIVERED)
+                && paymentStatus != PaymentStatus.APPROVED) {
+            throw new InvalidStateTransitionException("Fulfillment requires an approved payment without disputes.");
+        }
 
         status = target;
         switch (target) {
@@ -181,6 +185,12 @@ public class CustomerOrder {
         paymentMethod = "MERCADO_PAGO";
     }
 
+    public void confirmPaymentApproved() {
+        if (status == OrderStatus.PAID && paymentMethod != null && paymentMethod.equals("MERCADO_PAGO")) {
+            paymentStatus = PaymentStatus.APPROVED;
+        }
+    }
+
     public void markPaymentRefundPending() {
         paymentStatus = PaymentStatus.REFUND_PENDING;
         paymentMethod = "MERCADO_PAGO";
@@ -188,6 +198,16 @@ public class CustomerOrder {
 
     public void markPaymentRefunded() {
         paymentStatus = PaymentStatus.REFUNDED;
+        paymentMethod = "MERCADO_PAGO";
+    }
+
+    public void markPaymentInMediation() {
+        paymentStatus = PaymentStatus.IN_MEDIATION;
+        paymentMethod = "MERCADO_PAGO";
+    }
+
+    public void markPaymentChargedBack() {
+        paymentStatus = PaymentStatus.CHARGEBACK;
         paymentMethod = "MERCADO_PAGO";
     }
 

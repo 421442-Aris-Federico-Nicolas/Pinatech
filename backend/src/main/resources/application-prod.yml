@@ -23,6 +23,7 @@ springdoc:
 app:
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN}
+    allowed-origin-patterns: ""
   jwt:
     secret: ${JWT_SECRET}
   cookies:

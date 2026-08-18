@@ -45,7 +45,7 @@ app:
     root: ${FILE_STORAGE_ROOT:./uploads}
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:4200}
-    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
+    allowed-origin-patterns: "${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,https://*.devtunnels.ms}"
   jwt:
     secret: ${JWT_SECRET:local-development-secret-change-before-production}
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
@@ -71,4 +71,7 @@ app:
       public-base-url: ${PUBLIC_BASE_URL:}
       connect-timeout: ${MP_CONNECT_TIMEOUT:PT3S}
       read-timeout: ${MP_READ_TIMEOUT:PT10S}
+      production-confirmation: ${MP_PRODUCTION_CONFIRMATION:false}
+      webhook-timestamp-tolerance: ${MP_WEBHOOK_TIMESTAMP_TOLERANCE:PT5M}
+      reconciliation-lookback: ${MP_RECONCILIATION_LOOKBACK:PT720H}
       refund-reconciliation-interval-ms: ${MP_REFUND_RECONCILIATION_INTERVAL_MS:60000}

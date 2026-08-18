@@ -1,0 +1,216 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: ${CADDY_IMAGE:?CADDY_IMAGE registry repository is required}@sha256:${CADDY_IMAGE_DIGEST:?CADDY_IMAGE_DIGEST is required}
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    stop_grace_period: 30s
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=0700
+    depends_on:
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 192M
+          pids: 100
+    logging: *default-logging
+    networks:
+      edge:
+        ipv4_address: 172.31.250.2
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE registry repository is required}@sha256:${FRONTEND_IMAGE_DIGEST:?FRONTEND_IMAGE_DIGEST is required}
+    restart: unless-stopped
+    user: "101:101"
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    stop_grace_period: 20s
+    tmpfs:
+      - /var/cache/nginx:uid=101,gid=101,mode=0750
+      - /var/run:uid=101,gid=101,mode=0750
+      - /tmp:uid=101,gid=101,mode=0700
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 192M
+          pids: 100
+    logging: *default-logging
+    networks:
+      edge:
+        ipv4_address: 172.31.250.3
+      app:
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE registry repository is required}@sha256:${BACKEND_IMAGE_DIGEST:?BACKEND_IMAGE_DIGEST is required}
+    restart: unless-stopped
+    user: "spring:spring"
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 45s
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - media_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      CORS_ALLOWED_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      CORS_ALLOWED_ORIGIN_PATTERNS: ""
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      REFRESH_COOKIE_SECURE: "true"
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      AUTH_MAX_LOGIN_ATTEMPTS: ${AUTH_MAX_LOGIN_ATTEMPTS:-5}
+      AUTH_MAX_REGISTRATION_ATTEMPTS: ${AUTH_MAX_REGISTRATION_ATTEMPTS:-3}
+      AUTH_MAX_REFRESH_ATTEMPTS: ${AUTH_MAX_REFRESH_ATTEMPTS:-20}
+      AUTH_RATE_LIMIT_WINDOW_MS: ${AUTH_RATE_LIMIT_WINDOW_MS:-60000}
+      ORDER_RESERVATION_TTL: ${ORDER_RESERVATION_TTL:-PT15M}
+      ORDER_EXPIRATION_BATCH_SIZE: ${ORDER_EXPIRATION_BATCH_SIZE:-100}
+      ORDER_EXPIRATION_CHECK_INTERVAL_MS: ${ORDER_EXPIRATION_CHECK_INTERVAL_MS:-60000}
+      MP_ENABLED: ${MP_ENABLED:-false}
+      MP_ENVIRONMENT: ${MP_ENVIRONMENT:-sandbox}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      MP_COLLECTOR_ID: ${MP_COLLECTOR_ID:-}
+      PUBLIC_BASE_URL: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      MP_CONNECT_TIMEOUT: ${MP_CONNECT_TIMEOUT:-PT3S}
+      MP_READ_TIMEOUT: ${MP_READ_TIMEOUT:-PT10S}
+      MP_PRODUCTION_CONFIRMATION: ${MP_PRODUCTION_CONFIRMATION:-false}
+      MP_WEBHOOK_TIMESTAMP_TOLERANCE: ${MP_WEBHOOK_TIMESTAMP_TOLERANCE:-PT5M}
+      MP_RECONCILIATION_LOOKBACK: ${MP_RECONCILIATION_LOOKBACK:-PT720H}
+      MP_REFUND_RECONCILIATION_INTERVAL_MS: ${MP_REFUND_RECONCILIATION_INTERVAL_MS:-60000}
+      FILE_STORAGE_ROOT: /app/uploads
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1G
+          pids: 300
+    logging: *default-logging
+    networks:
+      - app
+      - data
+      - egress
+
+  postgres:
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE registry repository is required}@sha256:${POSTGRES_IMAGE_DIGEST:?POSTGRES_IMAGE_DIGEST is required}
+    restart: unless-stopped
+    user: "70:70"
+    read_only: true
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 60s
+    shm_size: 256m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    tmpfs:
+      - /var/run/postgresql:uid=70,gid=70,mode=0770
+      - /tmp:uid=70,gid=70,mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1G
+          pids: 200
+    logging: *default-logging
+    networks:
+      - data
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  media_uploads:
+
+networks:
+  edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.250.0/28
+  app:
+    driver: bridge
+    internal: true
+  data:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge

@@ -9,6 +9,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.LinkedHashSet;
 
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
@@ -112,6 +113,9 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
                     text(response, "status_detail"),
                     instant(response, "date_approved"),
                     instant(response, "date_last_updated"),
+                    requiredBoolean(response, "live_mode"),
+                    requiredText(response, "operation_type"),
+                    requiredDecimal(response, "amount_refunded"),
                     sha256(response.toString()));
         } catch (RestClientResponseException | ResourceAccessException exception) {
             throw new PaymentProviderException("Mercado Pago payment lookup failed.", exception);
@@ -119,7 +123,30 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
     }
 
     @Override
-    public String refund(String paymentId, UUID idempotencyKey) {
+    public List<String> findPaymentIdsByPreference(String preferenceId) {
+        properties.requireEnabled();
+        try {
+            JsonNode response = client.get()
+                    .uri(uri -> uri.path("/merchant_orders/search")
+                            .queryParam("preference_id", preferenceId).build())
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (response == null) {
+                throw new PaymentProviderException("Mercado Pago returned an empty merchant order search response.");
+            }
+            LinkedHashSet<String> ids = new LinkedHashSet<>();
+            response.path("elements").forEach(order -> order.path("payments").forEach(payment -> {
+                String id = text(payment, "id");
+                if (id != null && id.matches("[0-9]{1,100}")) ids.add(id);
+            }));
+            return List.copyOf(ids);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new PaymentProviderException("Mercado Pago merchant order search failed.", exception);
+        }
+    }
+
+    @Override
+    public RefundResult refund(String paymentId, UUID idempotencyKey) {
         properties.requireEnabled();
         try {
             JsonNode response = client.post()
@@ -132,10 +159,51 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
             if (response == null) {
                 throw new PaymentProviderException("Mercado Pago returned an empty refund response.");
             }
-            return requiredText(response, "id");
+            return refundResult(response);
         } catch (RestClientResponseException | ResourceAccessException exception) {
             throw new PaymentProviderException("Mercado Pago refund request failed.", exception);
         }
+    }
+
+    @Override
+    public RefundResult getRefund(String paymentId, String refundId) {
+        properties.requireEnabled();
+        try {
+            JsonNode response = client.get()
+                    .uri("/v1/payments/{paymentId}/refunds/{refundId}", paymentId, refundId)
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (response == null) {
+                throw new PaymentProviderException("Mercado Pago returned an empty refund lookup response.");
+            }
+            return refundResult(response);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new PaymentProviderException("Mercado Pago refund lookup failed.", exception);
+        }
+    }
+
+    private RefundResult refundResult(JsonNode response) {
+        String status = requiredText(response, "status");
+        if (!List.of("pending", "approved", "rejected").contains(status.toLowerCase())) {
+            throw new PaymentProviderException("Mercado Pago returned an unsupported refund status.");
+        }
+        return new RefundResult(requiredText(response, "id"), status, requiredDecimal(response, "amount"));
+    }
+
+    private boolean requiredBoolean(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isBoolean()) {
+            throw new PaymentProviderException("Mercado Pago response is missing " + field + ".");
+        }
+        return value.booleanValue();
+    }
+
+    private java.math.BigDecimal requiredDecimal(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isNumber()) {
+            throw new PaymentProviderException("Mercado Pago response is missing " + field + ".");
+        }
+        return value.decimalValue();
     }
 
     private String requiredText(JsonNode node, String field) {

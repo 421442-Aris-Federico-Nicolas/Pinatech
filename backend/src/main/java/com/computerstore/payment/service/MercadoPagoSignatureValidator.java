@@ -2,6 +2,8 @@ package com.computerstore.payment.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,9 +19,11 @@ import org.springframework.stereotype.Component;
 public class MercadoPagoSignatureValidator {
 
     private final MercadoPagoProperties properties;
+    private final Clock clock;
 
-    public MercadoPagoSignatureValidator(MercadoPagoProperties properties) {
+    public MercadoPagoSignatureValidator(MercadoPagoProperties properties, Clock clock) {
         this.properties = properties;
+        this.clock = clock;
     }
 
     public void validate(String dataId, String requestId, String signature) {
@@ -35,6 +39,16 @@ public class MercadoPagoSignatureValidator {
         String timestamp = parts.get("ts");
         String suppliedHash = parts.get("v1");
         if (blank(timestamp) || blank(suppliedHash)) {
+            throw invalid();
+        }
+        long timestampSeconds;
+        try {
+            timestampSeconds = Long.parseLong(timestamp);
+        } catch (NumberFormatException exception) {
+            throw invalid();
+        }
+        long age = Math.abs(Instant.now(clock).getEpochSecond() - timestampSeconds);
+        if (age > properties.webhookTimestampTolerance().toSeconds()) {
             throw invalid();
         }
         String manifest = "id:" + dataId.toLowerCase() + ";request-id:" + requestId + ";ts:" + timestamp + ";";

@@ -2,6 +2,7 @@ package com.computerstore.payment.service;
 
 import com.computerstore.payment.exception.PaymentProviderException;
 import com.computerstore.payment.gateway.MercadoPagoGateway;
+import com.computerstore.payment.gateway.RefundResult;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,8 +24,10 @@ public class PaymentWebhookService {
         }
         RefundInstruction instruction = refund.get();
         try {
-            String refundId = gateway.refund(instruction.paymentId(), instruction.idempotencyKey());
-            transactions.refundCompleted(instruction, refundId);
+            RefundResult result = instruction.refundId() == null
+                    ? gateway.refund(instruction.paymentId(), instruction.idempotencyKey())
+                    : gateway.getRefund(instruction.paymentId(), instruction.refundId());
+            transactions.applyRefundResult(instruction, result);
         } catch (PaymentProviderException exception) {
             transactions.refundFailed(instruction, exception.getMessage());
             throw exception;

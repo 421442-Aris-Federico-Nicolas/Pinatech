@@ -12,7 +12,8 @@ RUN ./mvnw --batch-mode -DskipTests package
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
-RUN addgroup --system spring \
+RUN apk upgrade --no-cache \
+    && addgroup --system spring \
     && adduser --system --ingroup spring spring \
     && mkdir -p /app/uploads \
     && chown spring:spring /app/uploads

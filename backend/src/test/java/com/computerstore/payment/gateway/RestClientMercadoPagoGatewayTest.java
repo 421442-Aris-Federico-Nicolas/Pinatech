@@ -79,6 +79,9 @@ class RestClientMercadoPagoGatewayTest {
                           "currency_id": "ARS",
                           "status": "approved",
                           "status_detail": "accredited",
+                          "live_mode": false,
+                          "operation_type": "regular_payment",
+                          "amount_refunded": 0,
                           "date_approved": "2026-08-17T20:00:00Z",
                           "date_last_updated": "2026-08-17T20:00:01Z",
                           "order": {"id": "merchant-order-1", "type": "mercadopago"}
@@ -99,11 +102,14 @@ class RestClientMercadoPagoGatewayTest {
         return new MercadoPagoProperties(
                 true,
                 MercadoPagoEnvironment.SANDBOX,
-                "access-token",
+                "TEST-access-token",
                 "webhook-secret",
                 "99",
                 URI.create("https://store.example/"),
                 Duration.ofSeconds(1),
-                Duration.ofSeconds(2));
+                Duration.ofSeconds(2),
+                false,
+                Duration.ofMinutes(5),
+                Duration.ofDays(30));
     }
 }

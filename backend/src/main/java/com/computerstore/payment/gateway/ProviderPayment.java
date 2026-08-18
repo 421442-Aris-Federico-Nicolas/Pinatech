@@ -14,6 +14,9 @@ public record ProviderPayment(
         String statusDetail,
         Instant approvedAt,
         Instant lastUpdatedAt,
+        boolean liveMode,
+        String operationType,
+        BigDecimal amountRefunded,
         String payloadHash
 ) {
 }

@@ -4,9 +4,9 @@ MVP local de una tienda de productos informaticos y servicio tecnico. El proyect
 
 ## Estado
 
-El MVP funcional incluye autenticacion con roles, catalogo, inventario, reservas de stock, solicitudes de pedido y tickets de servicio tecnico. El checkout ya separa estado de pago y estado de entrega, pero no procesa pagos ni cotiza envios hasta seleccionar proveedores.
+El MVP funcional incluye autenticacion con roles, catalogo, inventario, reservas de stock, solicitudes de pedido y tickets de servicio tecnico. Mercado Pago Checkout Pro esta implementado pero deshabilitado por defecto; la cotizacion de envios aun no esta implementada.
 
-See [payment and shipping integration](docs/payment-and-shipping-integration.md) for the provider-neutral design and [production checklist](docs/production-checklist.md) for the release gates.
+See [payment and shipping integration](docs/payment-and-shipping-integration.md) for the payment flow, [production checklist](docs/production-checklist.md) for release gates and [production deployment](docs/production-deployment.md) for the VPS runbook.
 
 ## Stack
 
@@ -62,9 +62,9 @@ sudo apt install openjdk-21-jdk
 java -version
 ```
 
-## Production startup with Docker
+## Local Docker stack
 
-Docker Compose builds the Angular storefront, starts PostgreSQL and runs the backend with the `prod` profile. Copy `.env.example` to `.env`, set a strong database password and JWT secret, and set the real HTTPS storefront origin. Startup fails if any required value is absent. PostgreSQL is bound only to loopback and the API is exposed through the frontend reverse proxy.
+The default Docker Compose file builds the Angular storefront, starts PostgreSQL and runs the backend with the `prod` profile for local evaluation. Copy `.env.example` to `.env`, set local credentials and configure the intended origin. Startup fails if any required value is absent. This stack is not the public VPS deployment.
 
 ```bash
 docker compose up -d --build
@@ -76,7 +76,19 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The storefront is available at `http://localhost:${FRONTEND_PORT:-80}` and proxies `/api` to the backend container. The API is also bound to `127.0.0.1:${BACKEND_PORT:-8080}` so the Angular development server can use it without exposing it to the network. Seeder accounts, OpenAPI documents and Swagger UI are disabled in `prod`. Terminate TLS in front of the storefront for a public deployment.
+The storefront is available at `http://localhost:${FRONTEND_PORT:-80}` and proxies `/api` to the backend container. The API is also bound to `127.0.0.1:${BACKEND_PORT:-8080}` so the Angular development server can use it without exposing it to the network. Seeder accounts, OpenAPI documents and Swagger UI are disabled in `prod`.
+
+## Production VPS deployment
+
+`docker-compose.prod.yml` never builds on the server. It requires registry images pinned by
+digest, exposes only Caddy on 80/443, obtains HTTPS automatically and isolates application
+and data networks. Use `.env.production.example` only as a template for a root-owned
+`0600` file outside the repository.
+
+Do not run the production stack by copying example values or using floating tags. Follow
+the full [VPS deployment runbook](docs/production-deployment.md) and complete the
+[production checklist](docs/production-checklist.md); these files provide controls and
+procedures but do not certify the application as production-ready.
 
 ## Manual startup
 

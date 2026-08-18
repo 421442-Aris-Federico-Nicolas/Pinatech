@@ -7,5 +7,7 @@ public enum PaymentStatus {
     EXPIRED,
     CANCELLED,
     REFUND_PENDING,
-    REFUNDED
+    REFUNDED,
+    IN_MEDIATION,
+    CHARGEBACK
 }

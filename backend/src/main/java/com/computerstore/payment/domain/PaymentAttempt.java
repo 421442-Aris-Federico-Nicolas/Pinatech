@@ -47,9 +47,6 @@ public class PaymentAttempt {
     @Column(name = "preference_id", length = 100)
     private String preferenceId;
 
-    @Column(name = "provider_payment_id", length = 100)
-    private String providerPaymentId;
-
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
@@ -62,12 +59,6 @@ public class PaymentAttempt {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(name = "refund_idempotency_key")
-    private UUID refundIdempotencyKey;
-
-    @Column(name = "refund_id", length = 100)
-    private String refundId;
-
     @Column(name = "last_provider_status", length = 50)
     private String lastProviderStatus;
 
@@ -79,6 +70,15 @@ public class PaymentAttempt {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "reconciliation_next_retry_at")
+    private Instant reconciliationNextRetryAt;
+
+    @Column(name = "reconciliation_attempt_count", nullable = false)
+    private int reconciliationAttemptCount;
+
+    @Column(name = "reconciliation_lease_until")
+    private Instant reconciliationLeaseUntil;
 
     protected PaymentAttempt() {
     }
@@ -113,42 +113,55 @@ public class PaymentAttempt {
         this.checkoutUrl = checkoutUrl;
         this.status = PaymentAttemptStatus.PREFERENCE_CREATED;
         this.lastError = null;
+        this.reconciliationNextRetryAt = Instant.now();
     }
 
     public void preferenceFailed(String error) {
         this.lastError = truncate(error);
     }
 
-    public void providerStatus(String paymentId, String providerStatus, PaymentAttemptStatus target) {
-        if (providerPaymentId != null && !providerPaymentId.equals(paymentId) && rank(target) <= rank(status)) {
-            lastProviderStatus = providerStatus;
-            return;
+    public boolean isActiveAt(Instant now) {
+        return (status == PaymentAttemptStatus.CREATED
+                || status == PaymentAttemptStatus.PREFERENCE_CREATED
+                || status == PaymentAttemptStatus.PENDING)
+                && expiresAt.isAfter(now);
+    }
+
+    public void retire(String error) {
+        if (status == PaymentAttemptStatus.CREATED
+                || status == PaymentAttemptStatus.PREFERENCE_CREATED
+                || status == PaymentAttemptStatus.PENDING) {
+            status = PaymentAttemptStatus.REJECTED;
+            lastError = truncate(error);
+            reconciliationNextRetryAt = null;
+            reconciliationLeaseUntil = null;
         }
-        providerPaymentId = paymentId;
+    }
+
+    public void reconciliationLease(Instant until) {
+        reconciliationLeaseUntil = until;
+    }
+
+    public void reconciliationSucceeded(Instant now) {
+        reconciliationAttemptCount = 0;
+        reconciliationLeaseUntil = null;
+        reconciliationNextRetryAt = now.plusSeconds(300);
+    }
+
+    public void reconciliationFailed(Instant now, String error) {
+        reconciliationAttemptCount++;
+        reconciliationLeaseUntil = null;
+        reconciliationNextRetryAt = now.plusSeconds(Math.min(
+                3600, 30L << Math.min(reconciliationAttemptCount - 1, 7)));
+        lastError = truncate(error);
+    }
+
+    public void summaryStatus(String providerStatus, PaymentAttemptStatus target) {
         lastProviderStatus = providerStatus;
         if (rank(target) >= rank(status)) {
             status = target;
         }
         lastError = null;
-    }
-
-    public UUID requestRefund(String paymentId, String providerStatus) {
-        providerStatus(paymentId, providerStatus, PaymentAttemptStatus.REFUND_PENDING);
-        if (refundIdempotencyKey == null) {
-            refundIdempotencyKey = UUID.randomUUID();
-        }
-        return refundIdempotencyKey;
-    }
-
-    public void refundCompleted(String refundId) {
-        this.refundId = refundId;
-        this.status = PaymentAttemptStatus.REFUNDED;
-        this.lastError = null;
-    }
-
-    public void refundFailed(String error) {
-        status = PaymentAttemptStatus.REFUND_PENDING;
-        lastError = truncate(error);
     }
 
     private int rank(PaymentAttemptStatus value) {
@@ -175,10 +188,8 @@ public class PaymentAttempt {
     public CustomerOrder getOrder() { return order; }
     public PaymentAttemptStatus getStatus() { return status; }
     public String getPreferenceId() { return preferenceId; }
-    public String getProviderPaymentId() { return providerPaymentId; }
     public BigDecimal getAmount() { return amount; }
     public String getCurrency() { return currency; }
     public String getCheckoutUrl() { return checkoutUrl; }
     public Instant getExpiresAt() { return expiresAt; }
-    public UUID getRefundIdempotencyKey() { return refundIdempotencyKey; }
 }

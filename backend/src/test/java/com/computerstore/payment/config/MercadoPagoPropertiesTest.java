@@ -19,7 +19,10 @@ class MercadoPagoPropertiesTest {
                 "",
                 URI.create(""),
                 Duration.ofSeconds(1),
-                Duration.ofSeconds(2)));
+                Duration.ofSeconds(2),
+                false,
+                Duration.ofMinutes(5),
+                Duration.ofDays(30)));
     }
 
     @Test
@@ -27,11 +30,22 @@ class MercadoPagoPropertiesTest {
         assertThrows(IllegalArgumentException.class, () -> new MercadoPagoProperties(
                 true,
                 MercadoPagoEnvironment.PRODUCTION,
-                "token",
+                "APP_USR-token",
                 "secret",
                 "99",
                 URI.create("checkout"),
                 Duration.ofSeconds(1),
-                Duration.ofSeconds(2)));
+                Duration.ofSeconds(2),
+                true,
+                Duration.ofMinutes(5),
+                Duration.ofDays(30)));
+    }
+
+    @Test
+    void productionRequiresExplicitConfirmationAndProductionCredentials() {
+        assertThrows(IllegalArgumentException.class, () -> new MercadoPagoProperties(
+                true, MercadoPagoEnvironment.PRODUCTION, "TEST-token", "secret", "99",
+                URI.create("https://store.example"), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                false, Duration.ofMinutes(5), Duration.ofDays(30)));
     }
 }
