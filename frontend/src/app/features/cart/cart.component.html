@@ -33,7 +33,7 @@
         <h2>Resumen</h2>
         <div><span>Productos ({{ cart.count() }})</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
         <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <p>En el próximo paso vas a revisar disponibilidad de entrega y pago antes de registrar la solicitud.</p>
+        <p>En el próximo paso vas a revisar el pedido y, si está disponible, continuar el pago en Mercado Pago.</p>
         @if (auth.isAuthenticated()) {
           <a mat-flat-button routerLink="/checkout">Continuar</a>
         } @else {
@@ -46,7 +46,7 @@
     <section class="empty">
       <div class="placeholder large" aria-hidden="true"><span>PIN</span></div>
       <h2>Tu carrito está vacío</h2>
-      <p>Explorá el catálogo y agregá los productos que quieras solicitar.</p>
+      <p>Explorá el catálogo y agregá los productos que quieras comprar.</p>
       <a mat-flat-button routerLink="/catalog">Ver catálogo</a>
     </section>
   }

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 import { OrdersComponent } from './orders.component';
 
 describe('OrdersComponent', () => {
@@ -24,7 +25,11 @@ describe('OrdersComponent', () => {
   it('renders Spanish statuses and the expiration for pending payment', async () => {
     await TestBed.configureTestingModule({
       imports: [OrdersComponent],
-      providers: [provideRouter([]), { provide: OrderService, useValue: { mine: () => of([order]) } }],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([order]) } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
     }).compileComponents();
 
     const fixture = TestBed.createComponent(OrdersComponent);
@@ -39,7 +44,11 @@ describe('OrdersComponent', () => {
   it('shows a recoverable error when loading fails', async () => {
     await TestBed.configureTestingModule({
       imports: [OrdersComponent],
-      providers: [provideRouter([]), { provide: OrderService, useValue: { mine: () => throwError(() => new Error('network')) } }],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => throwError(() => new Error('network')) } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
     }).compileComponents();
 
     const fixture = TestBed.createComponent(OrdersComponent);
@@ -47,5 +56,35 @@ describe('OrdersComponent', () => {
 
     expect(fixture.nativeElement.textContent).toContain('No pudimos mostrar tus pedidos');
     expect(fixture.nativeElement.querySelector('button')?.textContent).toContain('Reintentar');
+  });
+
+  it('continues a payable order through the backend-provided checkout URL', async () => {
+    const payable = { ...order, reservationExpiresAt: '2099-07-29T20:00:00Z' };
+    const assign = vi.fn();
+    const mercadoPago = vi.fn(() => of({
+      attemptId: 'attempt-1', orderId: 42, status: 'PENDING',
+      checkoutUrl: 'https://www.mercadopago.com.ar/checkout', expiresAt: '2099-07-29T20:00:00Z',
+    }));
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([payable]) } },
+        { provide: CheckoutService, useValue: {
+          capabilities: () => of({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] }),
+          mercadoPago,
+        } },
+        { provide: CHECKOUT_WINDOW, useValue: { location: { assign } } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+    const button = [...fixture.nativeElement.querySelectorAll('button')]
+      .find((candidate: HTMLButtonElement) => candidate.textContent?.includes('Continuar pago')) as HTMLButtonElement;
+    button.click();
+
+    expect(mercadoPago).toHaveBeenCalledWith(42, 'PENDING');
+    expect(assign).toHaveBeenCalledWith('https://www.mercadopago.com.ar/checkout');
   });
 });

@@ -1,6 +1,6 @@
 # Production checklist
 
-This repository is prepared for provider integration but is not ready to accept real payments until every release gate below is complete.
+Mercado Pago Checkout Pro is implemented but must remain on sandbox credentials until every release gate below is complete.
 
 ## Commerce
 

@@ -28,7 +28,7 @@
 
     @if (!loading() && section() === 'overview') {
       <section class="kpis" aria-label="Indicadores principales">
-        <article><div class="kpi-icon cyan"><iconify-icon icon="line-md:account"></iconify-icon></div><p>Ventas registradas</p><strong>{{ revenue() | number:'1.0-0' }} <small>ARS</small></strong><span>{{ soldOrders().length }} operaciones no canceladas</span></article>
+        <article><div class="kpi-icon cyan"><iconify-icon icon="line-md:account"></iconify-icon></div><p>Ventas acreditadas</p><strong>{{ revenue() | number:'1.0-0' }} <small>ARS</small></strong><span>{{ soldOrders().length }} pagos aprobados y no reintegrados</span></article>
         <article><div class="kpi-icon orange"><iconify-icon icon="line-md:clipboard-list"></iconify-icon></div><p>Pedidos activos</p><strong>{{ activeOrders() }}</strong><span>{{ statusCount('PENDING_PAYMENT') }} pendientes de pago</span></article>
         <article><div class="kpi-icon violet"><iconify-icon icon="line-md:coffee-half-empty-twotone-loop"></iconify-icon></div><p>Ticket promedio</p><strong>{{ averageTicket() | number:'1.0-0' }} <small>ARS</small></strong><span>Sobre pedidos pagados</span></article>
         <article><div class="kpi-icon green"><iconify-icon icon="line-md:confirm-circle"></iconify-icon></div><p>Unidades disponibles</p><strong>{{ availableUnits() }}</strong><span [class.alert-text]="lowStock()">{{ lowStock() }} variantes con stock bajo</span></article>

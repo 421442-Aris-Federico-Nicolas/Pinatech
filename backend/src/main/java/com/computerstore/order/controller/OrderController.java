@@ -32,6 +32,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -119,6 +120,16 @@ public class OrderController {
         return orders.findByUserIdOrderByCreatedAtDesc(auth.id()).stream()
                 .map(OrderResponseMapper::toResponse)
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Transactional(readOnly = true)
+    public OrderResponse own(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser auth) {
+        return orders.findById(id)
+                .filter(order -> order.getUser().getId().equals(auth.id()))
+                .map(OrderResponseMapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
     }
 
     private String normalizeIdempotencyKey(String suppliedKey) {

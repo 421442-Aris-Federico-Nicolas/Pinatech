@@ -20,6 +20,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.computerstore.payment.exception.PaymentProviderException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -108,6 +109,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailureException.class)
     ProblemDetail handleAuthenticationFailure(AuthenticationFailureException exception, HttpServletRequest request) {
         return problem(HttpStatus.UNAUTHORIZED, "authentication-failed", "Authentication failed", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(PaymentProviderException.class)
+    ProblemDetail handlePaymentProvider(PaymentProviderException exception, HttpServletRequest request) {
+        LOGGER.error("Payment provider error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
+        return problem(HttpStatus.BAD_GATEWAY, "payment-provider-error", "Payment provider error",
+                "The payment provider could not complete the request.", request);
     }
 
     @ExceptionHandler(RateLimitExceededException.class)

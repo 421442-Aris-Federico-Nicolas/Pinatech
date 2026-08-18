@@ -141,7 +141,7 @@ public class CustomerOrder {
         }
         boolean valid = switch (status) {
             case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;
-            case PAID -> target == OrderStatus.PREPARING || target == OrderStatus.CANCELLED;
+            case PAID -> target == OrderStatus.PREPARING;
             case PREPARING -> target == OrderStatus.READY || target == OrderStatus.CANCELLED;
             case READY -> target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
             default -> false;
@@ -174,6 +174,21 @@ public class CustomerOrder {
         status = OrderStatus.CANCELLED;
         paymentStatus = PaymentStatus.EXPIRED;
         fulfillmentStatus = FulfillmentStatus.CANCELLED;
+    }
+
+    public void approveMercadoPagoPayment() {
+        transitionTo(OrderStatus.PAID);
+        paymentMethod = "MERCADO_PAGO";
+    }
+
+    public void markPaymentRefundPending() {
+        paymentStatus = PaymentStatus.REFUND_PENDING;
+        paymentMethod = "MERCADO_PAGO";
+    }
+
+    public void markPaymentRefunded() {
+        paymentStatus = PaymentStatus.REFUNDED;
+        paymentMethod = "MERCADO_PAGO";
     }
 
     public Long getId() { return id; }

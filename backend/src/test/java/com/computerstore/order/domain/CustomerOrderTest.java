@@ -42,14 +42,12 @@ class CustomerOrderTest {
     }
 
     @Test
-    void cancellingAnApprovedOrderKeepsTheApprovedPayment() {
+    void rejectsCancellingAPaidOrder() {
         CustomerOrder order = order();
         order.transitionTo(OrderStatus.PAID);
 
-        order.transitionTo(OrderStatus.CANCELLED);
-
-        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
-        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
+        assertThrows(InvalidStateTransitionException.class, () -> order.transitionTo(OrderStatus.CANCELLED));
+        assertEquals(OrderStatus.PAID, order.getStatus());
     }
 
     @Test

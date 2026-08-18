@@ -136,10 +136,11 @@ describe('CartService', () => {
     expect(cart.total()).toBe(99000);
   });
 
-  it('clears the cart and persists the order confirmation after checkout', () => {
+  it('keeps the cart after creating an order and clears it only when checkout is completed', () => {
     const cart = TestBed.inject(CartService);
     cart.add(product, variant, 2);
-    cart.checkout().subscribe();
+    let createdOrder: Parameters<typeof cart.completeCheckout>[0] | undefined;
+    cart.checkout().subscribe((order) => createdOrder = order);
 
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
     expect(request.request.body).toEqual({ items: [{ variantId: 11, quantity: 2 }] });
@@ -156,6 +157,12 @@ describe('CartService', () => {
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: '2026-07-29T20:00:00Z',
     });
+
+    expect(cart.items()).toEqual([{ product, variant, quantity: 2 }]);
+    expect(cart.confirmation()).toBeNull();
+    expect(localStorage.getItem('pinatech-order-guest')).toBeNull();
+
+    cart.completeCheckout(createdOrder!);
 
     expect(cart.items()).toEqual([]);
     expect(cart.confirmation()?.id).toBe(42);

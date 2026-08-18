@@ -19,8 +19,6 @@ interface ProductForm extends ProductPayload {}
 interface PendingProductImage { file: File; previewUrl: string; altText: string; }
 interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
-const REVENUE_STATUSES = new Set<OrderStatus>(['PAID', 'PREPARING', 'READY', 'DELIVERED']);
-
 @Component({
   selector: 'app-admin',
   imports: [DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule],
@@ -63,7 +61,7 @@ export class AdminComponent {
   adjustment = 0;
   adjustmentReason = '';
 
-  readonly soldOrders = computed(() => this.orders().filter((order) => REVENUE_STATUSES.has(order.status as OrderStatus)));
+  readonly soldOrders = computed(() => this.orders().filter((order) => order.paymentStatus === 'APPROVED'));
   readonly revenue = computed(() => this.soldOrders().reduce((total, order) => total + order.total, 0));
   readonly averageTicket = computed(() => this.soldOrders().length ? this.revenue() / this.soldOrders().length : 0);
   readonly activeOrders = computed(() => this.orders().filter((order) => !['DELIVERED', 'CANCELLED'].includes(order.status)).length);
@@ -395,10 +393,10 @@ export class AdminComponent {
 
   orderActions(status: string): OrderAction[] {
     switch (status as OrderStatus) {
-      case 'PENDING_PAYMENT': return [{ label: 'Marcar pagado', status: 'PAID' }, { label: 'Cancelar', status: 'CANCELLED', danger: true }];
-      case 'PAID': return [{ label: 'Preparar pedido', status: 'PREPARING' }, { label: 'Cancelar', status: 'CANCELLED', danger: true }];
-      case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }, { label: 'Cancelar venta', status: 'CANCELLED', danger: true }];
-      case 'READY': return [{ label: 'Marcar entregado', status: 'DELIVERED' }, { label: 'Cancelar venta', status: 'CANCELLED', danger: true }];
+      case 'PENDING_PAYMENT': return [{ label: 'Cancelar', status: 'CANCELLED', danger: true }];
+      case 'PAID': return [{ label: 'Preparar pedido', status: 'PREPARING' }];
+      case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }];
+      case 'READY': return [{ label: 'Marcar entregado', status: 'DELIVERED' }];
       default: return [];
     }
   }

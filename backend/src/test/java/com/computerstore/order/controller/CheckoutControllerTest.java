@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.computerstore.security.CustomUserDetailsService;
 import com.computerstore.security.JwtService;
+import com.computerstore.payment.config.MercadoPagoProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,9 @@ class CheckoutControllerTest {
 
     @MockBean
     private CustomUserDetailsService userDetailsService;
+
+    @MockBean
+    private MercadoPagoProperties mercadoPagoProperties;
 
     @Autowired
     private MockMvc mockMvc;

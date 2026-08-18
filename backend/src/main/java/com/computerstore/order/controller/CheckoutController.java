@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.dto.CheckoutCapabilitiesResponse;
+import com.computerstore.payment.config.MercadoPagoProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,17 +13,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/checkout")
 public class CheckoutController {
 
-    private static final CheckoutCapabilitiesResponse NO_PROVIDER_CAPABILITIES =
-            new CheckoutCapabilitiesResponse(
-                    CustomerOrder.DEFAULT_CURRENCY,
-                    true,
-                    false,
-                    false,
-                    List.of(),
-                    List.of());
+    private final MercadoPagoProperties mercadoPago;
+
+    public CheckoutController(MercadoPagoProperties mercadoPago) {
+        this.mercadoPago = mercadoPago;
+    }
 
     @GetMapping("/capabilities")
     public CheckoutCapabilitiesResponse capabilities() {
-        return NO_PROVIDER_CAPABILITIES;
+        return new CheckoutCapabilitiesResponse(
+                CustomerOrder.DEFAULT_CURRENCY,
+                true,
+                mercadoPago.enabled(),
+                false,
+                mercadoPago.enabled() ? List.of("MERCADO_PAGO") : List.of(),
+                List.of());
     }
 }

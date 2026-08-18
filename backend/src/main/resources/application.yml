@@ -45,6 +45,7 @@ app:
     root: ${FILE_STORAGE_ROOT:./uploads}
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:4200}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
   jwt:
     secret: ${JWT_SECRET:local-development-secret-change-before-production}
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
@@ -60,3 +61,14 @@ app:
     reservation-ttl: ${ORDER_RESERVATION_TTL:PT15M}
     expiration-batch-size: ${ORDER_EXPIRATION_BATCH_SIZE:100}
     expiration-check-interval-ms: ${ORDER_EXPIRATION_CHECK_INTERVAL_MS:60000}
+  payments:
+    mercado-pago:
+      enabled: ${MP_ENABLED:false}
+      environment: ${MP_ENVIRONMENT:sandbox}
+      access-token: ${MP_ACCESS_TOKEN:}
+      webhook-secret: ${MP_WEBHOOK_SECRET:}
+      collector-id: ${MP_COLLECTOR_ID:}
+      public-base-url: ${PUBLIC_BASE_URL:}
+      connect-timeout: ${MP_CONNECT_TIMEOUT:PT3S}
+      read-timeout: ${MP_READ_TIMEOUT:PT10S}
+      refund-reconciliation-interval-ms: ${MP_REFUND_RECONCILIATION_INTERVAL_MS:60000}

@@ -15,6 +15,10 @@ article { background: #fff; border: 1px solid #d9e4eb; border-left: 4px solid va
 .badges span[data-status="PAID"], .badges span[data-status="READY"], .badges span[data-status="DELIVERED"] { background: #def6ed; color: #096344; }
 .badges span[data-status="CANCELLED"], .badges span[data-status="FAILED"], .badges span[data-status="REJECTED"], .badges span[data-status="EXPIRED"] { background: #fde7e7; color: #912828; }
 .reservation { background: #fff7e9; border-left: 3px solid var(--pin-orange); line-height: 1.5; margin: 1rem 1.35rem 0; padding: .75rem 1rem; }
+.payment-error { background: #fff0f0; border: 1px solid #e4b8b8; color: #8f2424; margin: 0 0 1rem; padding: .8rem 1rem; }
+.payment-action { align-items: center; background: #eaf6f8; display: flex; gap: 1rem; justify-content: space-between; margin: 1rem 1.35rem 0; padding: .85rem 1rem; }
+.payment-action p { color: #244757; font-size: .84rem; line-height: 1.45; margin: 0; }
+.payment-action button { flex: 0 0 auto; }
 .items { padding: .5rem 1.35rem; }
 .items > div { align-items: baseline; border-bottom: 1px solid #edf1f3; display: flex; gap: 1rem; justify-content: space-between; padding: .85rem 0; }
 .items span { color: #344c5d; }
@@ -37,6 +41,7 @@ dd { font-size: .82rem; margin: 0; }
 
 @media (max-width: 650px) {
   .order-header, footer { align-items: stretch; flex-direction: column; }
+  .payment-action { align-items: stretch; flex-direction: column; }
   .badges { align-items: flex-start; justify-content: flex-start; }
   dl { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; }
   .total { border-top: 1px solid #d9e4eb; padding-top: 1rem; text-align: left; }

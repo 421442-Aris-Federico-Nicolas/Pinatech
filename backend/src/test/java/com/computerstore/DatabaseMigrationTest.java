@@ -85,7 +85,27 @@ class DatabaseMigrationTest {
                 WHERE variant.id IS NULL OR stock.variant_id IS NULL
                 """, Integer.class));
         assertEquals(10, jdbc.queryForObject("SELECT MIN(available_quantity) FROM inventory", Integer.class));
-        assertEquals("13", jdbc.queryForObject(
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('payment_attempts', 'payment_events')
+                """, Integer.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'payment_events'
+                  AND indexname = 'uq_payment_events_event_key'
+                """, Integer.class));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'payment_events'
+                  AND column_name IN ('notification_payload_hash', 'provider_payload_hash')
+                """, Integer.class));
+        assertEquals("14", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

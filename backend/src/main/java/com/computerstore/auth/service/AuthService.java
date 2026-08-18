@@ -16,7 +16,7 @@ import com.computerstore.auth.dto.AuthenticatedUserResponse;
 import com.computerstore.auth.dto.LoginRequest;
 import com.computerstore.auth.dto.RegisterRequest;
 import com.computerstore.auth.repository.RefreshTokenRepository;
-import com.computerstore.common.exception.BusinessRuleException;
+
 import com.computerstore.common.exception.AuthenticationFailureException;
 import com.computerstore.common.exception.DuplicateResourceException;
 import com.computerstore.common.exception.ResourceNotFoundException;

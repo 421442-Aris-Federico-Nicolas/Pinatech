@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { catchError, forkJoin, map, of, tap } from 'rxjs';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Product, ProductVariant } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
@@ -118,11 +118,13 @@ export class CartService {
     const idempotencyKey = this.checkoutAttempt();
     return this.http.post<OrderConfirmation>(`${environment.apiBaseUrl}/orders`, {
       items: this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity })),
-    }, { headers: { 'Idempotency-Key': idempotencyKey } }).pipe(tap((confirmation) => {
-      this.update([]);
-      this.confirmationState.set(confirmation);
-      this.persistConfirmation(this.auth.user()?.id ?? null, confirmation);
-    }));
+    }, { headers: { 'Idempotency-Key': idempotencyKey } });
+  }
+
+  completeCheckout(confirmation: OrderConfirmation): void {
+    this.update([]);
+    this.confirmationState.set(confirmation);
+    this.persistConfirmation(this.auth.user()?.id ?? null, confirmation);
   }
 
   dismissConfirmation(): void {

@@ -36,4 +36,8 @@ export class OrderService {
   mine() {
     return this.http.get<Order[]>(`${environment.apiBaseUrl}/orders/me`);
   }
+
+  get(id: number) {
+    return this.http.get<Order>(`${environment.apiBaseUrl}/orders/${id}`);
+  }
 }

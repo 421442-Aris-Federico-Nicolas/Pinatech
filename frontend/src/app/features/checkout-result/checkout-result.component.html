@@ -1,0 +1,67 @@
+<main>
+  <section class="result-card" [attr.aria-busy]="polling()">
+    <p class="eyebrow">Estado del pedido</p>
+
+    @if (error()) {
+      <div class="state rejected" role="alert">
+        <span aria-hidden="true">!</span>
+        <h1>No pudimos verificar el pago</h1>
+        <p>{{ error() }}</p>
+        @if (orderId !== null) { <button mat-stroked-button type="button" (click)="load()">Reintentar verificación</button> }
+      </div>
+    } @else if (order(); as currentOrder) {
+      @switch (result(currentOrder)) {
+        @case ('approved') {
+          <div class="state approved" role="status">
+            <span aria-hidden="true">OK</span>
+            <h1>Pago aprobado</h1>
+            <p>Nuestro servidor confirmó la acreditación del pedido #{{ currentOrder.id }}.</p>
+          </div>
+        }
+        @case ('refunded') {
+          <div class="state refunded" role="status">
+            <span aria-hidden="true">↩</span>
+            <h1>Pago reintegrado</h1>
+            <p>Nuestro servidor informa que el pago del pedido #{{ currentOrder.id }} fue reintegrado.</p>
+          </div>
+        }
+        @case ('refund-pending') {
+          <div class="state pending" role="status">
+            <span class="loader" aria-hidden="true"></span>
+            <h1>Reintegro en proceso</h1>
+            <p>El pago llegó después del vencimiento del pedido. Iniciamos la devolución automáticamente.</p>
+          </div>
+        }
+        @case ('rejected') {
+          <div class="state rejected" role="status">
+            <span aria-hidden="true">!</span>
+            <h1>Pago rechazado</h1>
+            <p>El estado confirmado por nuestro servidor es rechazado, cancelado o vencido. Podés revisar si el pedido admite un nuevo intento.</p>
+          </div>
+        }
+        @default {
+          <div class="state pending" role="status">
+            <span class="loader" aria-hidden="true"></span>
+            <h1>Pago pendiente</h1>
+            <p>{{ polling() ? 'Estamos consultando la confirmación del pedido con nuestro servidor.' : 'Todavía no recibimos una confirmación definitiva del pago.' }}</p>
+            @if (!polling()) { <button mat-stroked-button type="button" (click)="load()">Volver a verificar</button> }
+          </div>
+        }
+      }
+
+      <dl>
+        <div><dt>Pedido</dt><dd>#{{ currentOrder.id }}</dd></div>
+        <div><dt>Total</dt><dd>{{ currentOrder.total | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
+      </dl>
+    } @else {
+      <div class="state pending" role="status">
+        <span class="loader" aria-hidden="true"></span>
+        <h1>Verificando el pago</h1>
+        <p>Estamos consultando el estado real del pedido con nuestro servidor.</p>
+      </div>
+    }
+
+    <p class="authority">La vuelta desde Mercado Pago no confirma el pago. Solo mostramos el estado informado por nuestro backend.</p>
+    <div class="actions"><a mat-flat-button routerLink="/orders">Ir a Mis pedidos</a><a mat-button routerLink="/catalog">Volver al catálogo</a></div>
+  </section>
+</main>

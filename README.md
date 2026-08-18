@@ -127,7 +127,28 @@ Flyway executes `backend/src/main/resources/db/migration/V1__create_initial_sche
 
 `POST /api/orders` accepts an optional `Idempotency-Key` header (1-100 characters). The storefront creates and persists this key while a checkout attempt is pending. Repeating the same key for the same user and payload returns the original order; reusing it with another payload returns `409`. Omitting the header preserves compatibility for other API clients.
 
-Stock is reserved for `ORDER_RESERVATION_TTL` (15 minutes by default) while an order is pending. Expired reservations are cancelled and released automatically. Orders store provider-neutral payment and fulfillment states while the legacy status keeps the existing administration flow compatible. Registering a request does not process a payment or include delivery.
+Stock is reserved for `ORDER_RESERVATION_TTL` (15 minutes by default) while an order is pending. Expired reservations are cancelled and released automatically. Mercado Pago Checkout Pro creates an expiring hosted checkout for that reservation. Only a signed webhook followed by an authoritative provider lookup can approve the order; browser return parameters are never trusted. A payment received after stock was released is refunded idempotently.
+
+## Mercado Pago Checkout Pro
+
+The integration is disabled by default. Copy `.env.example` to `.env` and configure the sandbox values before enabling it:
+
+```env
+MP_ENABLED=true
+MP_ENVIRONMENT=sandbox
+MP_ACCESS_TOKEN=TEST-your-sandbox-access-token
+MP_WEBHOOK_SECRET=your-webhook-signature-secret
+MP_COLLECTOR_ID=your-test-seller-user-id
+PUBLIC_BASE_URL=https://your-public-tunnel.example
+```
+
+`PUBLIC_BASE_URL` must be an HTTPS URL that exposes the storefront and `/api`. Configure this notification URL in the Mercado Pago application:
+
+```text
+https://your-public-tunnel.example/api/payments/webhooks/mercado-pago
+```
+
+Docker Compose reads `.env` automatically. To use `.env.local` explicitly, start it with `docker compose --env-file .env.local up -d --build`. Neither private file is versioned. Checkout Pro does not require a Mercado Pago public key or JavaScript SDK in Angular.
 
 ## Product and technical-service images
 

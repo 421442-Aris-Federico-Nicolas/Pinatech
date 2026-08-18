@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 
 @Component({
   selector: 'app-orders',
@@ -14,12 +15,49 @@ import { Order, OrderService } from '../../core/orders/order.service';
 })
 export class OrdersComponent {
   private readonly service = inject(OrderService);
+  private readonly checkoutService = inject(CheckoutService);
+  private readonly browserWindow = inject(CHECKOUT_WINDOW);
   readonly orders = signal<Order[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
+  readonly onlinePaymentAvailable = signal(false);
+  readonly payingOrder = signal<number | null>(null);
+  readonly paymentError = signal('');
 
   constructor() {
     this.load();
+    this.checkoutService.capabilities().subscribe({
+      next: (capabilities) => this.onlinePaymentAvailable.set(
+        capabilities.onlinePaymentsEnabled && capabilities.paymentMethods.includes('MERCADO_PAGO'),
+      ),
+      error: () => this.onlinePaymentAvailable.set(false),
+    });
+  }
+
+  pay(order: Order): void {
+    if (!this.canPay(order) || this.payingOrder() !== null) return;
+    this.payingOrder.set(order.id);
+    this.paymentError.set('');
+    this.checkoutService.mercadoPago(order.id, order.paymentStatus).pipe(
+      finalize(() => this.payingOrder.set(null)),
+    ).subscribe({
+      next: (payment) => {
+        if (!payment.checkoutUrl.trim()) {
+          this.paymentError.set('Mercado Pago no devolvió un enlace válido. Intentá nuevamente.');
+          return;
+        }
+        this.browserWindow.location.assign(payment.checkoutUrl);
+      },
+      error: () => this.paymentError.set('No pudimos iniciar el pago. Podés reintentarlo sin duplicar el intento.'),
+    });
+  }
+
+  canPay(order: Order): boolean {
+    return this.onlinePaymentAvailable()
+      && order.status === 'PENDING_PAYMENT'
+      && ['PENDING', 'REJECTED'].includes(order.paymentStatus)
+      && Number.isFinite(Date.parse(order.reservationExpiresAt))
+      && Date.parse(order.reservationExpiresAt) > Date.now();
   }
 
   load(): void {
@@ -55,6 +93,7 @@ export class OrdersComponent {
       FAILED: 'Pago rechazado',
       REJECTED: 'Pago rechazado',
       EXPIRED: 'Pago vencido',
+      REFUND_PENDING: 'Reintegro en proceso',
       REFUNDED: 'Pago reintegrado',
       CANCELLED: 'Pago cancelado',
       NOT_REQUIRED: 'Pago no requerido',
@@ -80,6 +119,7 @@ export class OrdersComponent {
       CASH: 'Efectivo',
       BANK_TRANSFER: 'Transferencia bancaria',
       CARD: 'Tarjeta',
+      MERCADO_PAGO: 'Mercado Pago',
       PICKUP: 'Retiro',
       DELIVERY: 'Entrega',
       SHIPPING: 'Envío',

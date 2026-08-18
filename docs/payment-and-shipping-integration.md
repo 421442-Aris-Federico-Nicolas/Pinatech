@@ -1,102 +1,72 @@
 # Payment and shipping integration
 
-The application deliberately does not process payments or quote deliveries yet. The current checkout registers a stock reservation and clearly reports that no payment or delivery was selected.
+Mercado Pago Checkout Pro is implemented as a hosted checkout. Delivery quoting is not implemented yet.
 
-## Current contract
+## Runtime switch
 
-`GET /api/checkout/capabilities` is the feature switch consumed by Angular. It currently returns:
+`GET /api/checkout/capabilities` reports Mercado Pago only when `MP_ENABLED=true` and the backend starts only if all required payment settings are present.
 
 ```json
 {
   "currency": "ARS",
   "orderRequestsEnabled": true,
-  "onlinePaymentsEnabled": false,
+  "onlinePaymentsEnabled": true,
   "deliveryQuotesEnabled": false,
-  "paymentMethods": [],
+  "paymentMethods": ["MERCADO_PAGO"],
   "deliveryMethods": []
 }
 ```
 
-Each order already stores these provider-neutral fields:
+## Configuration
 
-- `currency`: monetary currency, currently `ARS`.
-- `payment_status`: `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`, `CANCELLED` or `REFUNDED`.
-- `fulfillment_status`: `PENDING`, `PREPARING`, `READY`, `SHIPPED`, `DELIVERED` or `CANCELLED`.
-- `payment_method`: future business method such as bank transfer or an online gateway.
-- `delivery_method`: future method such as pickup or carrier delivery.
+Required when enabled:
 
-The legacy `status` remains temporarily for compatibility with the existing administration flow. New payment code must use `payment_status` as the financial source of truth and `fulfillment_status` for preparation and delivery.
+- `MP_ENVIRONMENT`: `sandbox` or `production`.
+- `MP_ACCESS_TOKEN`: private server credential.
+- `MP_WEBHOOK_SECRET`: Webhooks signature secret.
+- `MP_COLLECTOR_ID`: expected seller user ID.
+- `PUBLIC_BASE_URL`: public HTTPS storefront URL; `/api` must reach the backend.
 
-## How an online payment works
+Optional timeout and reconciliation settings are listed in `.env.example`. Credentials belong only in `.env`, deployment secrets, or an explicit `.env.local`. They must never be placed in Angular or committed.
 
-The browser must never decide that an order is paid and must never send trusted totals. A normal hosted-checkout integration works as follows:
+Docker Compose reads `.env` automatically. An alternative file requires `docker compose --env-file .env.local ...`.
 
-1. The backend recalculates prices and reserves stock.
-2. The backend creates a payment attempt with the provider using the order ID as the external reference.
-3. The provider returns a hosted checkout URL or public preference identifier.
-4. Angular redirects the customer to that provider-owned checkout.
-5. The provider calls a backend webhook when payment changes state.
-6. The backend verifies the webhook signature and queries the provider when required.
-7. A database transaction records the provider event exactly once and changes `payment_status`.
-8. Only an authenticated provider event may set `payment_status = APPROVED`.
+## Checkout flow
 
-The redirect back to Angular is only a user experience signal. It is not proof of payment because users can forge or revisit redirect URLs.
+1. Angular creates an idempotent order with `POST /api/orders`.
+2. The backend recalculates prices and reserves stock.
+3. Angular calls `POST /api/orders/{orderId}/payments/mercado-pago` with a separate idempotency key.
+4. The backend creates an expiring preference using the saved ARS total and a non-sequential external reference.
+5. Angular redirects to the provider-owned `sandbox_init_point` or `init_point`.
+6. Mercado Pago calls `POST /api/payments/webhooks/mercado-pago`.
+7. The endpoint acknowledges non-payment topics such as `merchant_order` without treating their IDs as payments.
+8. For `type=payment`, the backend verifies `x-signature`, queries the payment and validates seller, preference, reference, amount and currency.
+9. A database transaction records the event once and updates the order.
+10. `/checkout/result` polls `GET /api/orders/{orderId}` and ignores payment statuses from browser query parameters.
 
-## Provider-neutral backend boundary
+Only a verified provider payment can set an order to paid. The administration UI cannot mark it paid manually.
 
-When a provider is selected, add a payment module with these responsibilities:
+## Persistence and privacy
 
-```text
-PaymentApplicationService
-  -> PaymentGateway (interface)
-       -> MercadoPagoPaymentGateway / chosen provider adapter
-  -> PaymentAttemptRepository
-  -> PaymentWebhookController
-```
+Migration V14 adds `payment_attempts` and `payment_events`. Attempts contain the IDs and state needed for idempotency and reconciliation. Events retain hashes of notification/provider payloads rather than complete payloads, avoiding unnecessary personal data storage. Card data is never handled or stored by this application.
 
-Persist a `payment_attempts` table instead of placing provider payloads in `customer_orders`. At minimum it should contain order ID, provider, external ID, status, amount, currency, idempotency key, timestamps and the last verified event ID. Store only the fields needed for reconciliation; never store card numbers or security codes.
+## Expiration and refunds
 
-Required controls:
+The preference expires with the stock reservation. Cash, ATM and bank-transfer payment types are excluded and binary mode is enabled for immediate outcomes.
 
-- Provider credentials loaded from a secret manager, never Angular or Git.
-- Idempotency when creating attempts and processing webhook events.
-- Signature validation and replay protection on webhooks.
-- Amount, currency and order ownership verified server-side.
-- Structured audit trail for approval, rejection and refunds.
-- Retry-safe processing because providers deliver webhooks more than once.
-- Separate sandbox and production accounts, credentials and webhook URLs.
+The webhook and reservation worker lock the same order. If stock was already released when an approval arrives, the order is not reopened: it becomes `REFUND_PENDING`, a full refund is requested with a persisted idempotency key, and the reconciliation worker retries until it becomes `REFUNDED`.
 
-## Bank transfer
+Administrative cancellation of paid orders is blocked until a separate audited return/refund workflow is implemented.
 
-Bank transfer is not the same as an online gateway. A first implementation normally needs:
+## Sandbox setup
 
-- A payment method selected before creating the order.
-- Configurable account instructions displayed after reservation.
-- A longer, explicit transfer expiration policy.
-- Optional receipt upload to private object storage with size and MIME validation.
-- An audited administrator action or bank reconciliation integration to approve it.
+1. Create a Mercado Pago application and select test credentials.
+2. Expose the Docker storefront through one HTTPS tunnel to local port 80.
+3. Put the test access token, Webhooks secret, test seller user ID and tunnel URL in `.env`.
+4. Register `${PUBLIC_BASE_URL}/api/payments/webhooks/mercado-pago` as the payment notification URL.
+5. Set `CORS_ALLOWED_ORIGIN` to the same public origin and `MP_ENABLED=true`.
+6. Rebuild the stack and verify `/api/checkout/capabilities` reports Mercado Pago.
+7. Complete a purchase with a test buyer and test payment method.
+8. Verify approval, rejection, duplicate notification, expiration and late-refund scenarios before changing to production credentials.
 
-Do not mark a transfer as approved merely because the customer uploaded an image.
-
-## Shipping decision
-
-Before implementing delivery, define:
-
-- Store pickup availability and business hours.
-- Carriers and covered postal codes.
-- Whether price depends on postal code, weight, dimensions or order total.
-- Who creates labels and tracking numbers.
-- Delivery promises and what happens when quoting fails.
-
-After that decision, add immutable order snapshots for recipient, address, postal code, quoted cost, carrier/service and tracking. Product weight and dimensions are required for most carrier quotations.
-
-## Implementation order
-
-1. Choose payment methods and delivery modes.
-2. Define sandbox accounts and business rules.
-3. Add payment attempts and delivery quotes as separate tables.
-4. Implement backend adapters and webhook verification.
-5. Enable methods through checkout capabilities.
-6. Add Angular selection and redirect screens.
-7. Cover approval, rejection, expiration, duplicate webhook and refund with integration tests.
-8. Run a complete sandbox purchase before enabling production credentials.
+Return URLs improve the user experience but are not proof of payment. A valid webhook plus an authoritative API lookup remains the financial source of truth.

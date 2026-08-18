@@ -4,12 +4,14 @@
     <a mat-button routerLink="/catalog">Seguir explorando</a>
   </header>
 
+  @if (paymentError()) { <p class="payment-error" role="alert">{{ paymentError() }}</p> }
+
   @if (loading()) {
     <section class="state" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></section>
   } @else if (error()) {
     <section class="state error" role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p><button mat-stroked-button type="button" (click)="load()">Reintentar</button></section>
   } @else if (!orders().length) {
-    <section class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés solicitudes</h2><p>Cuando registres una desde el checkout, vas a poder seguirla desde acá.</p><a mat-flat-button routerLink="/catalog">Ver catálogo</a></section>
+    <section class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés pedidos</h2><p>Cuando inicies uno desde el checkout, vas a poder seguirlo desde acá.</p><a mat-flat-button routerLink="/catalog">Ver catálogo</a></section>
   } @else {
     <section class="orders" aria-label="Historial de pedidos">
       @for (order of orders(); track order.id) {
@@ -23,8 +25,17 @@
             </div>
           </header>
 
-          @if (order.paymentStatus === 'PENDING') {
+          @if (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED') {
             <p class="reservation"><strong>Reserva vigente hasta:</strong> {{ order.reservationExpiresAt | date:'medium' }}. El registro no implica que el pago esté confirmado.</p>
+          }
+
+          @if (canPay(order)) {
+            <div class="payment-action">
+              <p>{{ order.paymentStatus === 'REJECTED' ? 'El pago anterior no fue aprobado. Podés iniciar un nuevo intento mientras la reserva siga vigente.' : 'El pago todavía está pendiente. Podés continuar en Mercado Pago.' }}</p>
+              <button mat-flat-button type="button" [disabled]="payingOrder() !== null" (click)="pay(order)">
+                {{ payingOrder() === order.id ? 'Preparando Mercado Pago…' : order.paymentStatus === 'REJECTED' ? 'Reintentar pago' : 'Continuar pago' }}
+              </button>
+            </div>
           }
 
           <div class="items">

@@ -22,6 +22,10 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id")
     Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id and customerOrder.user.id = :userId")
+    Optional<CustomerOrder> findByIdAndUserIdForUpdate(@Param("id") Long id, @Param("userId") Long userId);
+
     @Query(value = """
             SELECT id
             FROM customer_orders

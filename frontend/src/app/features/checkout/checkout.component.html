@@ -3,9 +3,9 @@
   @if (created(); as order) {
     <section class="result" aria-labelledby="request-title" role="status">
       <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
-      <p class="eyebrow">Solicitud registrada</p>
-      <h1 id="request-title">Recibimos tu solicitud #{{ order.id }}</h1>
-      <p class="result-lead">Esto no confirma un pago ni una entrega. Mis pedidos es la fuente autoritativa para consultar el estado actual de la solicitud.</p>
+      <p class="eyebrow">Pedido registrado</p>
+      <h1 id="request-title">Tu pedido #{{ order.id }} está registrado</h1>
+      <p class="result-lead">El pedido se registró y se inició el checkout de Mercado Pago. Esta pantalla no confirma un pago: consultá el estado informado por nuestro backend.</p>
       @if (isReservationExpired(order)) {
         <p class="expiration-warning" role="alert">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</p>
       } @else {
@@ -23,17 +23,17 @@
     </section>
   } @else if (!cart.items().length) {
     <section class="empty" aria-labelledby="empty-title">
-      <p class="eyebrow">Revisión de solicitud</p>
+        <p class="eyebrow">Revisión del pedido</p>
       <h1 id="empty-title">Tu carrito está vacío</h1>
-      <p>Agregá productos desde el catálogo para comenzar una solicitud.</p>
+      <p>Agregá productos desde el catálogo para comenzar un pedido.</p>
       <a mat-flat-button routerLink="/catalog">Ver catálogo</a>
     </section>
   } @else {
     <header class="page-header">
       <div>
         <p class="eyebrow">Paso final</p>
-        <h1>Revisá tu solicitud</h1>
-        <p>Verificá los productos y las condiciones disponibles antes de registrarla.</p>
+        <h1>Revisá tu pedido</h1>
+        <p>Verificá los productos antes de continuar a Mercado Pago.</p>
       </div>
       <a routerLink="/cart">Editar carrito</a>
     </header>
@@ -72,7 +72,7 @@
             @if (options.deliveryMethods.length) {
               <p class="methods"><strong>Modalidades informadas:</strong> {{ options.deliveryMethods.map(methodLabel).join(', ') }}.</p>
             }
-            <p class="fine-print">Esta solicitud no incluye un costo ni una modalidad de entrega. No te pediremos una dirección en este paso.</p>
+            <p class="fine-print">Este pedido no incluye un costo ni una modalidad de entrega. No te pediremos una dirección en este paso.</p>
           }
         </section>
 
@@ -85,38 +85,44 @@
             <p class="loading" role="status">Consultando opciones de pago…</p>
           } @else if (capabilities(); as options) {
             @if (options.onlinePaymentsEnabled) {
-              <p class="notice available">El servicio informa que los pagos online están habilitados.</p>
+              @if (options.paymentMethods.includes('MERCADO_PAGO')) {
+                <p class="notice available">Podés pagar online de forma segura en Mercado Pago.</p>
+              } @else {
+                <p class="notice">Mercado Pago no está disponible en este momento.</p>
+              }
             } @else {
-              <p class="notice">Los proveedores de pago online todavía no están configurados.</p>
+              <p class="notice">Los pagos online no están disponibles en este momento.</p>
             }
             @if (options.paymentMethods.length) {
               <p class="methods"><strong>Métodos informados:</strong> {{ options.paymentMethods.map(methodLabel).join(', ') }}.</p>
             }
-            <p class="fine-print">No ingreses datos de tarjeta ni realices transferencias. Registrar esta solicitud no procesa ningún pago.</p>
+            <p class="fine-print">Ingresarás los datos de pago únicamente en Mercado Pago. La redirección no acredita el pago por sí sola.</p>
           }
         </section>
       </div>
 
       <aside class="summary" aria-labelledby="summary-title">
         <p class="eyebrow">Resumen</p>
-        <h2 id="summary-title">Tu solicitud</h2>
+        <h2 id="summary-title">Tu pedido</h2>
         <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
         <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <p class="summary-note">Entrega y pago no están incluidos. El registro genera una reserva temporal de stock.</p>
+        <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a Mercado Pago.</p>
 
         @if (capabilitiesError()) {
           <div class="error" role="alert">
             <p>{{ capabilitiesError() }}</p>
             <button mat-button type="button" (click)="loadCapabilities()">Reintentar consulta</button>
           </div>
-        } @else if (capabilities() && !capabilities()?.orderRequestsEnabled) {
-          <p class="error" role="alert">El registro de solicitudes no está disponible en este momento.</p>
+        } @else if (capabilities() && !mercadoPagoEnabled()) {
+          <p class="error" role="alert">Mercado Pago no está disponible en este momento.</p>
         }
 
-        <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting() || !capabilities()?.orderRequestsEnabled">
-          {{ submitting() ? 'Registrando…' : 'Registrar solicitud' }}
-        </button>
-        <small>Al continuar no se realizará ningún cobro.</small>
+        @if (mercadoPagoEnabled()) {
+          <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()">
+            {{ submitting() ? 'Preparando Mercado Pago…' : 'Pagar con Mercado Pago' }}
+          </button>
+          <small>El pago se confirma únicamente después de que nuestro backend lo verifique.</small>
+        }
         @if (submitError()) { <p class="submit-error" role="alert">{{ submitError() }}</p> }
       </aside>
     </div>
