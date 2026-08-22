@@ -25,18 +25,35 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
+  it('shows the global footer with a safe Instagram link and copyright', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const footer = fixture.nativeElement.querySelector('.site-footer') as HTMLElement;
+    const instagram = footer.querySelector('a[href="https://www.instagram.com/pinatech.cba/"]') as HTMLAnchorElement;
+
+    expect(footer.textContent).toContain('@pinatech.cba');
+    expect(footer.textContent).toContain(`© ${new Date().getFullYear()} Pinatech`);
+    expect(instagram.target).toBe('_blank');
+    expect(instagram.rel).toContain('noopener');
+    expect(instagram.querySelector('iconify-icon')?.getAttribute('icon')).toBe('mdi:instagram');
+  });
+
   it('protects customer order and checkout result routes', () => {
     expect(routes.find((route) => route.path === 'orders')?.canActivate).toContain(customerGuard);
     expect(routes.find((route) => route.path === 'checkout/result')?.canActivate).toContain(customerGuard);
   });
 
-  it('keeps focus in place for query-only navigation and groups product routes with catalog', async () => {
+  it('skips focus on initial load, preserves it for query changes and focuses new pages', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
     fixture.detectChanges();
     await router.navigateByUrl('/catalog');
     fixture.detectChanges();
     await fixture.whenStable();
+
+    const heading = fixture.nativeElement.querySelector('h1') as HTMLHeadingElement;
+    expect(document.activeElement).not.toBe(heading);
 
     const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
     input.focus();
@@ -46,6 +63,10 @@ describe('App', () => {
 
     expect(document.activeElement).toBe(input);
     await router.navigateByUrl('/products/1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
     expect(fixture.componentInstance.catalogActive()).toBe(true);
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('h1'));
   });
 });

@@ -75,7 +75,7 @@ describe('TicketsComponent attachment gallery', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect((fixture.nativeElement.querySelector('[name="reportedProblem"]') as HTMLTextAreaElement).disabled).toBe(true);
+    expect((fixture.nativeElement.querySelector('app-textarea[name="reportedProblem"] textarea') as HTMLTextAreaElement).disabled).toBe(true);
     expect((fixture.nativeElement.querySelector('[name="newTicketImages"]') as HTMLInputElement).disabled).toBe(true);
     expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.local-previews button'))[0].disabled).toBe(true);
 

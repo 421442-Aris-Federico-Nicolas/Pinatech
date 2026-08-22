@@ -1,14 +1,17 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
+import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 
 @Component({
   selector: 'app-orders',
-  imports: [CurrencyPipe, DatePipe, MatButtonModule, RouterLink],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './orders.component.html',
   styleUrl: './orders.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,6 +28,7 @@ export class OrdersComponent {
   readonly capabilitiesError = signal('');
   readonly payingOrder = signal<number | null>(null);
   readonly paymentError = signal('');
+  readonly estadoTono = estadoTono;
 
   constructor() {
     this.load();
@@ -87,62 +91,18 @@ export class OrdersComponent {
   }
 
   statusLabel(status: string): string {
-    return this.label(status, {
-      PENDING_PAYMENT: 'Pendiente de pago',
-      PENDING: 'Pendiente',
-      REQUESTED: 'Solicitud registrada',
-      PAID: 'Pagado',
-      PREPARING: 'En preparación',
-      READY: 'Listo',
-      SHIPPED: 'Enviado',
-      DELIVERED: 'Entregado',
-      CANCELLED: 'Cancelado',
-    });
+    return estadoLabel(status, 'pedido');
   }
 
   paymentLabel(status: string): string {
-    return this.label(status, {
-      PENDING: 'Pago pendiente',
-      UNPAID: 'Sin pagar',
-      PAID: 'Pago acreditado',
-      APPROVED: 'Pago aprobado',
-      FAILED: 'Pago rechazado',
-      REJECTED: 'Pago rechazado',
-      EXPIRED: 'Pago vencido',
-      REFUND_PENDING: 'Reintegro en proceso',
-      REFUNDED: 'Pago reintegrado',
-      CANCELLED: 'Pago cancelado',
-      NOT_REQUIRED: 'Pago no requerido',
-    });
+    return estadoLabel(status, 'pago');
   }
 
   fulfillmentLabel(status: string): string {
-    return this.label(status, {
-      PENDING: 'Preparación pendiente',
-      UNFULFILLED: 'Sin preparar',
-      RESERVED: 'Stock reservado',
-      PREPARING: 'En preparación',
-      READY: 'Listo para entregar',
-      SHIPPED: 'Enviado',
-      DELIVERED: 'Entregado',
-      CANCELLED: 'Entrega cancelada',
-    });
+    return estadoLabel(status, 'entrega');
   }
 
   methodLabel(method: string | null): string {
-    if (!method) return 'A definir';
-    return this.label(method, {
-      CASH: 'Efectivo',
-      BANK_TRANSFER: 'Transferencia bancaria',
-      CARD: 'Tarjeta',
-      MERCADO_PAGO: 'Mercado Pago',
-      PICKUP: 'Retiro',
-      DELIVERY: 'Entrega',
-      SHIPPING: 'Envío',
-    });
-  }
-
-  private label(value: string, labels: Record<string, string>): string {
-    return labels[value] ?? value.toLowerCase().replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
+    return estadoLabel(method, 'metodo');
   }
 }

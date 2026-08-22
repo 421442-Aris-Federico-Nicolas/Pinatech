@@ -42,6 +42,8 @@ describe('CheckoutResultComponent', () => {
     expect(get).toHaveBeenCalledWith(42);
     expect(fixture.nativeElement.textContent).toContain('Pago rechazado');
     expect(fixture.nativeElement.textContent).not.toContain('Pago aprobado');
+    expect(fixture.nativeElement.querySelector('.result-card')?.classList).toContain('app-card');
+    expect(fixture.nativeElement.querySelector('.actions a')?.classList).toContain('app-button');
     expect(fixture.nativeElement.querySelector('.state[role="status"]')?.querySelector('button')).toBeNull();
     expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Mercado Pago');
     fixture.destroy();

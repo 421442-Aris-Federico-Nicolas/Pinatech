@@ -32,3 +32,29 @@
 </mat-toolbar>
 </header>
 <div id="main-content" tabindex="-1"><router-outlet /></div>
+<footer class="site-footer">
+  <div class="footer-content">
+    <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">
+      <img src="/pinatech-favicon.png" alt="" width="48" height="48">
+      <span>
+        <strong translate="no">Pinatech</strong>
+        <small>Tecnología y servicio técnico</small>
+      </span>
+    </a>
+    <div class="footer-contact">
+      <span>Contacto</span>
+      <a
+        href="https://www.instagram.com/pinatech.cba/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Instagram de Pinatech, se abre en una pestaña nueva"
+      >
+        <iconify-icon icon="mdi:instagram" aria-hidden="true"></iconify-icon>
+        <span translate="no">@pinatech.cba</span>
+      </a>
+    </div>
+  </div>
+  <div class="footer-legal">
+    <small>&copy; {{ currentYear }} Pinatech. Todos los derechos reservados.</small>
+  </div>
+</footer>

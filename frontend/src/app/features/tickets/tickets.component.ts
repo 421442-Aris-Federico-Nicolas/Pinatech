@@ -2,24 +2,26 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { catchError, concatMap, finalize, from, map, of, toArray } from 'rxjs';
 import { TicketAttachment } from '../../core/tickets/ticket-attachment.model';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
+import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
+import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
+import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { CreateTicketPayload, Ticket, TicketsService } from './tickets.service';
 
 interface PendingImage { file: File; previewUrl: string; }
 
 @Component({
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
   templateUrl: './tickets.component.html',
   styleUrl: './tickets.component.scss',
-  styles: [`button,.upload-field label,.ticket-upload label{touch-action:manipulation}button:active:not(:disabled){transform:translateY(1px)}.upload-field label:has(input:focus-visible),.ticket-upload label:has(input:focus-visible),button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--pin-orange);outline-offset:3px}.ticket-card h3{font-size:inherit;margin:0;overflow-wrap:anywhere}.ticket-card small,.ticket-card header span{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}`],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TicketsComponent {
@@ -41,6 +43,11 @@ export class TicketsComponent {
   readonly ticketImages = signal<Record<number, PendingImage[]>>({});
   readonly expandedTickets = signal<Set<number>>(new Set());
   readonly deviceTypes = ['PlayStation', 'Notebook', 'PC de escritorio'];
+  readonly deviceTypeOptions: readonly AppSelectOption[] = [
+    { value: '', label: 'Seleccioná un equipo', disabled: true },
+    ...this.deviceTypes.map((deviceType) => ({ value: deviceType, label: deviceType })),
+  ];
+  readonly estadoTono = estadoTono;
   readonly form = this.emptyForm();
 
   constructor() {
@@ -150,9 +157,7 @@ export class TicketsComponent {
 
   createLimitReached(): boolean { return this.createImages().length >= 10; }
   attachmentLimitReached(ticket: Ticket): boolean { return ticket.attachments.length + this.pendingFor(ticket.id).length >= 10; }
-  statusLabel(status: string): string { return {
-    RECEIVED: 'Recibido', UNDER_DIAGNOSIS: 'En diagnóstico', WAITING_FOR_APPROVAL: 'Esperando aprobación', APPROVED: 'Aprobado', IN_REPAIR: 'En reparación', WAITING_FOR_PARTS: 'Esperando repuesto', READY_FOR_PICKUP: 'Listo para retirar', DELIVERED: 'Entregado', CANCELLED: 'Cancelado',
-  }[status] ?? status; }
+  statusLabel(status: string): string { return estadoLabel(status, 'ticket'); }
 
   @HostListener('window:beforeunload', ['$event'])
   protectUnfinishedRequest(event: BeforeUnloadEvent): void {
@@ -215,7 +220,7 @@ export class TicketsComponent {
   private fail(message: string): void { this.success.set(''); this.error.set(message); }
   private invalid(message: string): void {
     this.fail(message);
-    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('form :is(input, textarea, mat-select).ng-invalid')?.focus());
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('form :is(app-input, app-select, app-textarea).ng-invalid')?.focus());
   }
   private syncUrl(ticket: number | null): void {
     if (!this.router || !this.route) return;

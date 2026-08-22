@@ -66,4 +66,37 @@ describe('AdminComponent payments', () => {
     expect(confirmation).toHaveBeenCalledOnce();
     expect(products).toHaveBeenCalledOnce();
   });
+
+  it('uses shared editor controls and rejects a nonpositive product price', async () => {
+    const createProduct = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }),
+          categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]),
+          inventories: () => of([]),
+          orders: () => of([]),
+          createProduct,
+        },
+      }],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('catalog');
+    Object.assign(component.form, {
+      name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 0, categoryId: 3, brandId: 8,
+    });
+    fixture.detectChanges();
+    component.saveProduct();
+
+    expect(fixture.nativeElement.querySelector('.product-form app-input')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.product-form app-select')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('mat-form-field')).toBeNull();
+    expect(createProduct).not.toHaveBeenCalled();
+    expect(component.error()).toContain('precio mayor que cero');
+  });
 });

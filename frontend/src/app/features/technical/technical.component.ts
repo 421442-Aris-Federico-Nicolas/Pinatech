@@ -2,14 +2,17 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef, computed, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
+import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
+import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
+import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { TechnicalDetails, TechnicalService, TechnicalTicket, Technician, TicketHistory, TicketPriority, TicketStatus } from './technical.service';
 
 type TechnicalSection = 'overview' | 'queue' | 'mine';
@@ -22,7 +25,7 @@ const PRIORITY_FILTERS = ['ALL', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
 
 @Component({
   selector: 'app-technical',
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './technical.component.html',
   styleUrl: './technical.component.scss',
@@ -57,6 +60,9 @@ export class TechnicalComponent {
   readonly editingBusy = computed(() => this.saving() || this.uploadingAttachment());
   readonly statuses = WORKFLOW;
   readonly priorities: TicketPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
+  readonly priorityOptions: readonly AppSelectOption[] = this.priorities.map((priority) => ({ value: priority, label: this.priorityLabel(priority) }));
+  readonly technicianOptions = computed<readonly AppSelectOption[]>(() => this.technicians().map((technician) => ({ value: technician.id, label: technician.name })));
+  readonly estadoTono = estadoTono;
   statusComment = '';
   diagnosis = '';
   estimatedPrice: number | null = null;
@@ -167,7 +173,16 @@ export class TechnicalComponent {
     if (!ticket || !this.canEdit(ticket) || this.editingBusy()) return;
     if (detailsForm?.invalid) {
       this.fail('Revisá los importes de la ficha técnica.');
-      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.technical-form input.ng-invalid')?.focus());
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.technical-form :is(app-input, app-select, app-textarea).ng-invalid')?.focus());
+      return;
+    }
+    const invalidPrice = [
+      { value: this.estimatedPrice, name: 'estimatedPrice' },
+      { value: this.finalPrice, name: 'finalPrice' },
+    ].find(({ value }) => value !== null && (!Number.isFinite(Number(value)) || Number(value) < 0));
+    if (invalidPrice) {
+      this.fail('Los importes deben ser números iguales o mayores que cero.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(`[name="${invalidPrice.name}"]`)?.focus());
       return;
     }
     const details: TechnicalDetails = {
@@ -267,10 +282,8 @@ export class TechnicalComponent {
   canEdit(ticket: TechnicalTicket): boolean { return this.isAdmin() || ticket.technicianId === null || ticket.technicianId === this.auth.user()?.id; }
   isAdmin(): boolean { return this.auth.user()?.roles.includes('ADMIN') ?? false; }
   statusCount(status: TicketStatus): number { return this.tickets().filter((ticket) => ticket.status === status).length; }
-  statusLabel(status: TicketStatus | string): string { return {
-    RECEIVED: 'Recibido', UNDER_DIAGNOSIS: 'En diagnóstico', WAITING_FOR_APPROVAL: 'Esperando aprobación', APPROVED: 'Aprobado', IN_REPAIR: 'En reparación', WAITING_FOR_PARTS: 'Esperando repuesto', READY_FOR_PICKUP: 'Listo para retirar', DELIVERED: 'Entregado', CANCELLED: 'Cancelado',
-  }[status] ?? status; }
-  priorityLabel(priority: TicketPriority | string): string { return { LOW: 'Baja', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente' }[priority] ?? priority; }
+  statusLabel(status: TicketStatus | string): string { return estadoLabel(status, 'ticket'); }
+  priorityLabel(priority: TicketPriority | string): string { return estadoLabel(priority, 'prioridad-ticket'); }
   age(ticket: TechnicalTicket): string {
     const hours = Math.max(0, Math.floor((Date.now() - new Date(ticket.createdAt).getTime()) / 3_600_000));
     const formatter = new Intl.RelativeTimeFormat('es-AR', { numeric: 'auto' });

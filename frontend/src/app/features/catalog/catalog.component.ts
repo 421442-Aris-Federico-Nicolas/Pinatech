@@ -1,26 +1,25 @@
-import { CurrencyPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
-import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
 import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product, ProductVariant } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
 @Component({
-  imports: [CurrencyPipe, FormsModule, MatButtonModule, MatCardModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, AppProductCardComponent, FormsModule, RouterLink],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CatalogComponent {
-  readonly imageUrl = resolveApiContentUrl;
   private readonly service = inject(CatalogService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -40,7 +39,6 @@ export class CatalogComponent {
   readonly filtersOpen = signal(false);
   readonly feedback = signal('');
   readonly priceError = signal('');
-  readonly selectedVariants = signal<Record<number, number>>({});
 
   constructor() {
     this.loadOptions();
@@ -77,19 +75,11 @@ export class CatalogComponent {
     this.applyFilters();
   }
 
-  add(product: Product): void {
-    const variant = this.selectedVariant(product);
-    if (!variant?.inStock) { this.announce('El color seleccionado no tiene stock disponible.'); return; }
+  add(product: Product, variant: ProductVariant): void {
+    if (!variant.inStock) { this.announce('El color seleccionado no tiene stock disponible.'); return; }
     this.cart.add(product, variant);
     this.announce(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
   }
-
-  selectedVariant(product: Product): ProductVariant | undefined {
-    const selectedId = this.selectedVariants()[product.id];
-    return product.variants.find((variant) => variant.id === selectedId) ?? product.variants.find((variant) => variant.inStock) ?? product.variants[0];
-  }
-
-  selectVariant(productId: number, variantId: number): void { this.selectedVariants.update((selected) => ({ ...selected, [productId]: variantId })); }
 
   retry(): void { this.loadPage(this.page()?.number ?? 0); }
 
@@ -112,7 +102,7 @@ export class CatalogComponent {
     this.page.set(null);
     this.request = this.service.getProducts(this.filters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
-      .subscribe({ next: (result) => { this.page.set(result); this.selectedVariants.update((selected) => ({ ...Object.fromEntries(result.content.map((product) => [product.id, product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id])), ...selected })); }, error: () => { this.page.set(null); this.error.set(true); } });
+      .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
   }
 
   private readParams(params: ParamMap): void {

@@ -1,7 +1,7 @@
 <main>
   <header class="page-header">
     <div><p class="eyebrow">Tu cuenta</p><h1>Mis pedidos</h1></div>
-    <a mat-button routerLink="/catalog">Seguir explorando</a>
+    <a appButton="text" routerLink="/catalog">Seguir explorando</a>
   </header>
 
   @if (paymentError()) { <p class="payment-error" role="alert">{{ paymentError() }}</p> }
@@ -11,7 +11,7 @@
   @if (capabilitiesError()) {
     <div class="capability-error" [attr.aria-busy]="loadingCapabilities()">
       <p role="alert">{{ capabilitiesError() }}</p>
-      <button mat-stroked-button type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando disponibilidad del pago online' : 'Reintentar consulta de pago online'">
+      <button appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando disponibilidad del pago online' : 'Reintentar consulta de pago online'">
         {{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}
       </button>
       @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar la disponibilidad del pago online.</p> }
@@ -19,21 +19,21 @@
   }
 
   @if (error()) {
-    <section class="state error" [attr.aria-busy]="loading()"><div role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p></div><button mat-stroked-button type="button" (click)="load()" [disabled]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="loading() ? 'Cargando tus pedidos nuevamente' : 'Reintentar carga de pedidos'">{{ loading() ? 'Cargando pedidos…' : 'Reintentar carga de pedidos' }}</button>@if (loading()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a cargar tus pedidos.</p> }</section>
+    <section appCard class="state error" [attr.aria-busy]="loading()"><div role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p></div><button appButton="outlined" type="button" (click)="load()" [disabled]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="loading() ? 'Cargando tus pedidos nuevamente' : 'Reintentar carga de pedidos'">{{ loading() ? 'Cargando pedidos…' : 'Reintentar carga de pedidos' }}</button>@if (loading()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a cargar tus pedidos.</p> }</section>
   } @else if (loading()) {
-    <section class="state"><div role="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></div></section>
+    <section appCard class="state"><div role="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></div></section>
   } @else if (!orders().length) {
-    <section class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés pedidos</h2><p>Cuando inicies uno desde el carrito, vas a poder seguirlo desde acá.</p><a mat-flat-button routerLink="/catalog">Ver catálogo</a></section>
+    <section appCard class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés pedidos</h2><p>Cuando inicies uno desde el carrito, vas a poder seguirlo desde acá.</p><a appButton="filled" routerLink="/catalog">Ver catálogo</a></section>
   } @else {
     <ol class="orders" aria-label="Historial de pedidos">
       @for (order of orders(); track order.id) {
-        <li><article>
+        <li><article appCard>
           <header class="order-header">
             <div><p>Pedido</p><h2>#{{ order.id }}</h2><small>Registrado el {{ order.createdAt | date:'medium' }}</small></div>
             <ul class="badges" aria-label="Estados del pedido">
-              <li [attr.data-status]="order.status">{{ statusLabel(order.status) }}</li>
-              <li [attr.data-status]="order.paymentStatus">{{ paymentLabel(order.paymentStatus) }}</li>
-              <li [attr.data-status]="order.fulfillmentStatus">{{ fulfillmentLabel(order.fulfillmentStatus) }}</li>
+              <li [appBadge]="estadoTono(order.status, 'pedido')">{{ statusLabel(order.status) }}</li>
+              <li [appBadge]="estadoTono(order.paymentStatus, 'pago')">{{ paymentLabel(order.paymentStatus) }}</li>
+              <li [appBadge]="estadoTono(order.fulfillmentStatus, 'entrega')">{{ fulfillmentLabel(order.fulfillmentStatus) }}</li>
             </ul>
           </header>
 
@@ -44,7 +44,7 @@
           @if (canPay(order)) {
             <div class="payment-action" [attr.aria-busy]="payingOrder() === order.id">
               <p>{{ order.paymentStatus === 'REJECTED' ? 'El pago anterior no fue aprobado. Podés iniciar un nuevo intento mientras la reserva siga vigente.' : 'El pago todavía está pendiente. Podés continuar en ' }}@if (order.paymentStatus !== 'REJECTED') { <span translate="no">Mercado Pago</span>. }</p>
-              <button mat-flat-button type="button" [disabled]="payingOrder() !== null" [attr.aria-busy]="payingOrder() === order.id" [attr.aria-label]="payingOrder() === order.id ? 'Preparando el pago del pedido ' + order.id : (order.paymentStatus === 'REJECTED' ? 'Reintentar el pago del pedido ' : 'Continuar el pago del pedido ') + order.id" (click)="pay(order)">
+              <button appButton="filled" type="button" [disabled]="payingOrder() !== null" [attr.aria-busy]="payingOrder() === order.id" [attr.aria-label]="payingOrder() === order.id ? 'Preparando el pago del pedido ' + order.id : (order.paymentStatus === 'REJECTED' ? 'Reintentar el pago del pedido ' : 'Continuar el pago del pedido ') + order.id" (click)="pay(order)">
                 @if (payingOrder() === order.id) { <span class="button-spinner" aria-hidden="true"></span> }
                 <span>{{ payingOrder() === order.id ? 'Preparando pago…' : order.paymentStatus === 'REJECTED' ? 'Reintentar pago' : 'Continuar pago' }}</span>
               </button>

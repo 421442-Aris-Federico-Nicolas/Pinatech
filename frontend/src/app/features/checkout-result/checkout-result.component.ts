@@ -1,10 +1,11 @@
 import { CurrencyPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize, switchMap, take, takeWhile, timer } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
 
 type PaymentResult = 'approved' | 'pending' | 'rejected' | 'refund-pending' | 'refunded';
 
@@ -14,7 +15,7 @@ const POLL_INTERVAL_MS = 2000;
 
 @Component({
   selector: 'app-checkout-result',
-  imports: [CurrencyPipe, MatButtonModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, CurrencyPipe, RouterLink],
   templateUrl: './checkout-result.component.html',
   styleUrl: './checkout-result.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

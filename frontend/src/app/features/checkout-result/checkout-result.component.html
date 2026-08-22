@@ -1,5 +1,5 @@
 <main>
-  <section class="result-card" [attr.aria-busy]="polling()">
+  <section appCard class="result-card" [attr.aria-busy]="polling()">
     <p class="eyebrow">Estado del pedido</p>
 
     @if (error()) {
@@ -9,7 +9,7 @@
         <p>{{ error() }}</p>
       </div>
       @if (orderId !== null) {
-        <button mat-stroked-button type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago nuevamente' : 'Reintentar verificación del pago'">{{ polling() ? 'Verificando pago…' : 'Reintentar verificación del pago' }}</button>
+        <button appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago nuevamente' : 'Reintentar verificación del pago'">{{ polling() ? 'Verificando pago…' : 'Reintentar verificación del pago' }}</button>
         @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a verificar el pago.</p> }
       }
     } @else if (order(); as currentOrder) {
@@ -48,7 +48,7 @@
             <h1>Pago pendiente</h1>
             <p>{{ polling() ? 'Estamos consultando la confirmación del pedido con nuestro servidor.' : 'Todavía no recibimos una confirmación definitiva del pago.' }}</p>
           </div>
-          <button mat-stroked-button type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago' : 'Volver a verificar el pago'">{{ polling() ? 'Verificando pago…' : 'Volver a verificar el pago' }}</button>
+          <button appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago' : 'Volver a verificar el pago'">{{ polling() ? 'Verificando pago…' : 'Volver a verificar el pago' }}</button>
           @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Verificando nuevamente el estado del pago.</p> }
         }
       }
@@ -66,6 +66,6 @@
     }
 
     <p class="authority">La vuelta desde <span translate="no">Mercado Pago</span> no confirma el pago. Solo mostramos el estado informado por nuestro sistema.</p>
-    <div class="actions"><a mat-flat-button routerLink="/orders">Ir a Mis pedidos</a><a mat-button routerLink="/catalog">Volver al catálogo</a></div>
+    <div class="actions"><a appButton="filled" routerLink="/orders">Ir a Mis pedidos</a><a appButton="text" routerLink="/catalog">Volver al catálogo</a></div>
   </section>
 </main>

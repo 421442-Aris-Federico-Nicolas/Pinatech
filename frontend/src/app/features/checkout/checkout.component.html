@@ -1,7 +1,7 @@
 <main>
-  @if (cart.notice()) { <p class="reconciliation-warning"><span role="status">{{ cart.notice() }}</span> <button type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></p> }
+  @if (cart.notice()) { <p class="reconciliation-warning"><span role="status">{{ cart.notice() }}</span> <button appButton="text" type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></p> }
   @if (created(); as order) {
-    <section class="result" aria-labelledby="request-title">
+    <section appCard class="result" aria-labelledby="request-title">
       <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
       <div class="result-status" role="status" aria-live="polite">
         <p class="eyebrow">Pedido registrado</p>
@@ -18,17 +18,17 @@
         <div><dt>Vigencia informada de la reserva</dt><dd>@if (reservationExpiration(order); as expiration) { Hasta {{ expiration | date:'medium' }} } @else { Fecha no disponible }</dd></div>
       </dl>
       <div class="result-actions">
-        <a mat-flat-button routerLink="/orders">Ir a Mis pedidos</a>
-        <a mat-button routerLink="/catalog">Volver al catálogo</a>
-        <button mat-button type="button" (click)="dismissConfirmation()">Cerrar confirmación</button>
+        <a appButton="filled" routerLink="/orders">Ir a Mis pedidos</a>
+        <a appButton="text" routerLink="/catalog">Volver al catálogo</a>
+        <button appButton="text" type="button" (click)="dismissConfirmation()">Cerrar confirmación</button>
       </div>
     </section>
   } @else if (!cart.items().length) {
-    <section class="empty" aria-labelledby="empty-title">
+    <section appCard class="empty" aria-labelledby="empty-title">
         <p class="eyebrow">Revisión del pedido</p>
       <h1 id="empty-title">Tu carrito está vacío</h1>
       <p>Agregá productos desde el catálogo para comenzar un pedido.</p>
-      <a mat-flat-button routerLink="/catalog">Ver catálogo</a>
+      <a appButton="filled" routerLink="/catalog">Ver catálogo</a>
     </section>
   } @else {
     <header class="page-header">
@@ -37,12 +37,12 @@
         <h1>Revisá tu pedido</h1>
         <p>Verificá los productos antes de continuar a <span translate="no">Mercado Pago</span>.</p>
       </div>
-      <a routerLink="/cart">Editar carrito</a>
+      <a appButton="text" routerLink="/cart">Editar carrito</a>
     </header>
 
     <div class="checkout-layout" [attr.aria-busy]="loadingCapabilities() || submitting()">
       <div class="details">
-        <section class="panel products" aria-labelledby="products-title">
+        <section appCard class="panel products" aria-labelledby="products-title">
           <div class="section-heading">
             <span>01</span>
             <div><p>Tu selección</p><h2 id="products-title">Productos</h2></div>
@@ -60,7 +60,7 @@
           </ul>
         </section>
 
-        <section class="panel capability" aria-labelledby="delivery-title">
+        <section appCard class="panel capability" aria-labelledby="delivery-title">
           <div class="section-heading">
             <span>02</span>
             <div><p>Logística</p><h2 id="delivery-title">Entrega</h2></div>
@@ -80,7 +80,7 @@
           }
         </section>
 
-        <section class="panel capability" aria-labelledby="payment-title">
+        <section appCard class="panel capability" aria-labelledby="payment-title">
           <div class="section-heading">
             <span>03</span>
             <div><p>Condiciones comerciales</p><h2 id="payment-title">Pago</h2></div>
@@ -109,7 +109,7 @@
         </section>
       </div>
 
-      <aside class="summary" aria-labelledby="summary-title">
+      <aside appCard class="summary" aria-labelledby="summary-title">
         <p class="eyebrow">Resumen</p>
         <h2 id="summary-title">Tu pedido</h2>
         <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
@@ -119,7 +119,7 @@
         @if (capabilitiesError()) {
           <div class="error" [attr.aria-busy]="loadingCapabilities()">
             <p role="alert">{{ capabilitiesError() }}</p>
-            <button mat-button type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button>
+            <button appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button>
             @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar las opciones disponibles.</p> }
           </div>
         } @else if (capabilities() && !mercadoPagoEnabled()) {
@@ -127,7 +127,7 @@
         }
 
         @if (mercadoPagoEnabled()) {
-          <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
+          <button appButton="filled" type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
             @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
             <span>{{ submitting() ? 'Preparando pago…' : 'Pagar con ' }}@if (!submitting()) { <span translate="no">Mercado Pago</span> }</span>
           </button>

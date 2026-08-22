@@ -2,15 +2,17 @@ import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
+import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
+import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
 import { AdminService, Brand, Category, Inventory, ProductPayload } from './admin.service';
 
@@ -23,7 +25,7 @@ interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
 @Component({
   selector: 'app-admin',
-  imports: [CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, CurrencyPipe, DatePipe, DecimalPipe, FormsModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
@@ -92,6 +94,9 @@ export class AdminComponent {
     const maximum = Math.max(...days.map((day) => day.total), 1);
     return days.map((day) => ({ ...day, height: day.total ? Math.max(12, day.total / maximum * 100) : 4 }));
   });
+  readonly categoryOptions = computed<readonly AppSelectOption[]>(() => this.categories().map((category) => ({ value: category.id, label: category.name })));
+  readonly brandOptions = computed<readonly AppSelectOption[]>(() => this.brands().map((brand) => ({ value: brand.id, label: brand.name })));
+  readonly estadoTono = estadoTono;
 
   constructor() {
     const section = this.route?.snapshot.queryParamMap.get('section');
@@ -195,7 +200,11 @@ export class AdminComponent {
     this.clearMessages();
     if (productForm?.invalid) {
       this.fail('Revisá los campos requeridos del producto.');
-      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.editor :is(input, textarea, mat-select).ng-invalid')?.focus());
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.editor :is(app-input, app-select, app-textarea, input, textarea).ng-invalid')?.focus());
+      return;
+    }
+    if (!Number.isFinite(Number(this.form.price)) || Number(this.form.price) <= 0) {
+      this.failAndFocus('Indicá un precio mayor que cero.', '[name="productPrice"]');
       return;
     }
     if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) {
@@ -505,7 +514,7 @@ export class AdminComponent {
   }
 
   statusLabel(status: string): string {
-    return { PENDING_PAYMENT: 'Pendiente de pago', PAID: 'Pagado', PREPARING: 'En preparación', READY: 'Listo', DELIVERED: 'Entregado', CANCELLED: 'Cancelado' }[status] ?? status;
+    return estadoLabel(status, 'pedido');
   }
 
   statusCount(status: string): number { return this.orders().filter((order) => order.status === status).length; }

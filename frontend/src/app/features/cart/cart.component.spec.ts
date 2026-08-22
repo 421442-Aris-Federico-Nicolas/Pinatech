@@ -43,6 +43,8 @@ describe('CartComponent', () => {
     const link = fixture.nativeElement.querySelector('a[href="/checkout"]') as HTMLAnchorElement;
 
     expect(link?.textContent).toContain('Revisar pedido y pago');
+    expect(link.classList).toContain('app-button');
+    expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
     expect(fixture.nativeElement.textContent).not.toContain('Confirmar pedido');
     expect(cart.checkout).not.toHaveBeenCalled();
   });

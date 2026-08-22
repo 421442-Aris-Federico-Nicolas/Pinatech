@@ -74,6 +74,9 @@ describe('CheckoutComponent', () => {
     const paymentButton = [...fixture.nativeElement.querySelectorAll('button')]
       .find((candidate: HTMLButtonElement) => candidate.textContent?.includes('Pagar con Mercado Pago')) as HTMLButtonElement;
     expect(paymentButton.getAttribute('aria-label')).toBe('Pagar con Mercado Pago');
+    expect(paymentButton.classList).toContain('app-button');
+    expect(fixture.nativeElement.querySelectorAll('.panel.app-card').length).toBe(3);
+    expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
     expect(fixture.nativeElement.querySelector('.product-list')?.tagName).toBe('UL');
 
     fixture.componentInstance.submit();

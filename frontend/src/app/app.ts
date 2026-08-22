@@ -20,6 +20,7 @@ export class App {
   readonly cart = inject(CartService);
   readonly menuOpen = signal(false);
   readonly catalogActive = signal(false);
+  readonly currentYear = new Date().getFullYear();
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
@@ -35,7 +36,7 @@ export class App {
       this.currentPath = path;
       this.catalogActive.set(path === '/catalog' || path.startsWith('/products/'));
       this.menuOpen.set(false);
-      if (previousPath === path) return;
+      if (previousPath === null || previousPath === path) return;
       queueMicrotask(() => {
         const content = this.document.getElementById('main-content');
         const heading = content?.querySelector<HTMLElement>('h1');

@@ -4,13 +4,13 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, i
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
 import { CartService } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
 
 @Component({
-  imports: [CurrencyPipe, MatButtonModule, RouterLink],
+  imports: [AppButtonDirective, CurrencyPipe, RouterLink],
   templateUrl: './product.component.html',
   styleUrl: './product.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

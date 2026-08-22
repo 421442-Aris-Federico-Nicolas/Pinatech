@@ -1,14 +1,15 @@
 import { CurrencyPipe, DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
 
 @Component({
-  imports: [CurrencyPipe, MatButtonModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, CurrencyPipe, RouterLink],
   templateUrl: './cart.component.html',
   styleUrl: './cart.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

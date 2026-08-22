@@ -1,15 +1,17 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { finalize, map, switchMap } from 'rxjs';
 import { CartService, OrderConfirmation } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { estadoLabel } from '../../core/utils/estado-label';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService } from './checkout.service';
 
 @Component({
   selector: 'app-checkout',
-  imports: [CurrencyPipe, DatePipe, MatButtonModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './checkout.component.html',
   styleUrl: './checkout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -97,15 +99,6 @@ export class CheckoutComponent {
   }
 
   methodLabel(method: string): string {
-    const labels: Record<string, string> = {
-      CASH: 'Efectivo',
-      BANK_TRANSFER: 'Transferencia bancaria',
-      CARD: 'Tarjeta',
-      MERCADO_PAGO: 'Mercado Pago',
-      PICKUP: 'Retiro',
-      DELIVERY: 'Entrega',
-      SHIPPING: 'Envío',
-    };
-    return labels[method] ?? method.toLowerCase().replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
+    return estadoLabel(method, 'metodo');
   }
 }

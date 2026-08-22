@@ -5,7 +5,7 @@
       <p class="kicker">HARDWARE PARA TU PRÓXIMO NIVEL</p>
       <h1>Elevá tu setup.<br><span>Elegí con claridad.</span></h1>
       <p class="lead">Explorá el catálogo real de hardware y periféricos disponible en Pinatech.</p>
-      <div class="hero-actions"><a mat-flat-button routerLink="/catalog">Explorar catálogo</a>@if (!auth.isAuthenticated()) { <a mat-stroked-button routerLink="/login">Ingresar</a> }</div>
+      <div class="hero-actions"><a appButton="filled" routerLink="/catalog">Explorar catálogo</a>@if (!auth.isAuthenticated()) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
     </div>
     <div class="hero-visual"><img src="/pinatech-banner.png" alt="Identidad visual de Pinatech" width="2000" height="621" fetchpriority="high"><span class="scan-line" aria-hidden="true"></span></div>
   </section>
@@ -21,23 +21,15 @@
     @if (isLoading()) {
       <div class="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><p>Cargando productos…</p></div>
     } @else if (error()) {
-      <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button mat-button type="button" (click)="loadFeatured()">Reintentar</button></div>
+      <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button appButton="text" type="button" (click)="loadFeatured()">Reintentar</button></div>
     } @else {
       <ul class="products">
         @for (product of featured(); track product.id) {
-          <li><mat-card>
-            <a class="product-visual" [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" [attr.aria-label]="'Ver ' + product.name">
-              @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name" width="640" height="480" loading="lazy"> }
-              @else { <span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b> }
-            </a>
-            <mat-card-header><mat-card-subtitle translate="no">{{ product.brandName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" translate="no">{{ product.name }}</a></mat-card-title></mat-card-header>
-            <mat-card-content><strong>{{ product.price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'symbol-narrow':'1.2-2' }}</small></mat-card-content>
-            <mat-card-actions><label class="variant-select">Color<select [name]="'featured-variant-' + product.id" autocomplete="off" [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [attr.aria-label]="'Agregar ' + product.name + ' al carrito'" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
-          </mat-card></li>
-        } @empty { <li class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></li> }
+          <li><app-product-card [product]="product" mode="featured" (addToCart)="add(product, $event)" /></li>
+        } @empty { <li class="status"><p>Por el momento no hay productos publicados.</p><a appButton="text" routerLink="/catalog">Ir al catálogo</a></li> }
       </ul>
     }
   </section>
 
-  <section class="service"><div><p class="eyebrow">Pinatech service lab</p><h2>Tu equipo también<br>merece respawn.</h2><p>Registrá una solicitud y consultá su seguimiento desde tu cuenta.</p><a mat-stroked-button routerLink="/tickets">Ir a servicio técnico</a></div></section>
+  <section class="service"><div><p class="eyebrow">Pinatech service lab</p><h2>Tu equipo también<br>merece respawn.</h2><p>Registrá una solicitud y consultá su seguimiento desde tu cuenta.</p><a appButton="outlined" routerLink="/tickets">Ir a servicio técnico</a></div></section>
 </main>

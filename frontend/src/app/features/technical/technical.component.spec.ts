@@ -48,4 +48,30 @@ describe('TechnicalComponent filters', () => {
     expect(component.filteredTickets().map((item) => item.id)).toEqual([2]);
     expect(component.selected()?.id).toBe(2);
   });
+
+  it('uses shared technical controls and rejects negative prices', async () => {
+    const updateDetails = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [TechnicalComponent],
+      providers: [
+        { provide: TechnicalService, useValue: { tickets: () => of([ticket(1, 'RECEIVED')]), history: () => of([]), updateDetails } },
+        { provide: TicketAttachmentService, useValue: { upload: vi.fn() } },
+        { provide: AuthService, useValue: { user: () => ({ id: 5, roles: ['TECHNICIAN'] }) } },
+        { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ section: 'queue' }) } } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(TechnicalComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.estimatedPrice = -1;
+    fixture.componentInstance.saveDetails();
+
+    expect(fixture.nativeElement.querySelector('.technical-form app-select')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.technical-form app-textarea')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.technical-form app-input')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('mat-form-field')).toBeNull();
+    expect(updateDetails).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.error()).toContain('iguales o mayores que cero');
+  });
 });

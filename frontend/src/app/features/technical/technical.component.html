@@ -16,7 +16,7 @@
   <main [attr.aria-busy]="loading()">
     <header class="page-heading">
       <div><p class="eyebrow">Operación técnica</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
-      <button class="refresh" type="button" [disabled]="loading() || editingBusy()" (click)="load()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> Actualizar</button>
+      <button class="refresh" appButton="outlined" type="button" [disabled]="loading() || editingBusy()" (click)="load()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> Actualizar</button>
     </header>
 
     @if(error()){<p class="message error" role="alert">{{ error() }}</p>}
@@ -25,18 +25,18 @@
 
     @if(!loading() && section() === 'overview'){
       <section class="kpis" aria-label="Indicadores técnicos">
-        <article><div class="kpi-icon cyan"><iconify-icon aria-hidden="true" icon="line-md:clipboard-list"></iconify-icon></div><p>Tickets activos</p><strong>{{ activeTickets().length }}</strong><span>{{ unassignedTickets() }} todavía sin asignar</span></article>
-        <article><div class="kpi-icon orange"><iconify-icon aria-hidden="true" icon="line-md:alert-circle"></iconify-icon></div><p>Prioridad alta</p><strong>{{ urgentTickets() }}</strong><span>Casos altos y urgentes</span></article>
-        <article><div class="kpi-icon violet"><iconify-icon aria-hidden="true" icon="line-md:cog"></iconify-icon></div><p>Mi carga actual</p><strong>{{ myTickets().length }}</strong><span>Tickets bajo tu responsabilidad</span></article>
-        <article><div class="kpi-icon green"><iconify-icon aria-hidden="true" icon="line-md:confirm-circle"></iconify-icon></div><p>Listos para retirar</p><strong>{{ readyTickets() }}</strong><span>{{ statusCount('DELIVERED') }} reparaciones entregadas</span></article>
+        <article appCard><div class="kpi-icon cyan"><iconify-icon aria-hidden="true" icon="line-md:clipboard-list"></iconify-icon></div><p>Tickets activos</p><strong>{{ activeTickets().length }}</strong><span>{{ unassignedTickets() }} todavía sin asignar</span></article>
+        <article appCard><div class="kpi-icon orange"><iconify-icon aria-hidden="true" icon="line-md:alert-circle"></iconify-icon></div><p>Prioridad alta</p><strong>{{ urgentTickets() }}</strong><span>Casos altos y urgentes</span></article>
+        <article appCard><div class="kpi-icon violet"><iconify-icon aria-hidden="true" icon="line-md:cog"></iconify-icon></div><p>Mi carga actual</p><strong>{{ myTickets().length }}</strong><span>Tickets bajo tu responsabilidad</span></article>
+        <article appCard><div class="kpi-icon green"><iconify-icon aria-hidden="true" icon="line-md:confirm-circle"></iconify-icon></div><p>Listos para retirar</p><strong>{{ readyTickets() }}</strong><span>{{ statusCount('DELIVERED') }} reparaciones entregadas</span></article>
       </section>
 
       <section class="overview-grid">
-        <article class="panel intake-chart">
+        <article appCard class="panel intake-chart">
           <header><div><p class="panel-kicker">Últimos 7 días</p><h2>Ingreso de equipos</h2></div><strong>{{ tickets().length }} históricos</strong></header>
           <div class="chart" aria-label="Tickets ingresados durante los últimos siete días">@for(day of intakeChart();track day.label){<div class="chart-column"><span>{{ day.count || '' }}</span><i [style.height.%]="day.height"></i><small>{{ day.label }}</small></div>}</div>
         </article>
-        <article class="panel flow-panel">
+        <article appCard class="panel flow-panel">
           <header><div><p class="panel-kicker">Flujo del laboratorio</p><h2>Trabajo en curso</h2></div></header>
           <div class="flow-list">
             <button type="button" (click)="setStatusFilter('RECEIVED'); navigate('queue')"><i data-status="RECEIVED"></i><span><strong>Recibidos</strong><small>Esperando diagnóstico</small></span><b>{{ statusCount('RECEIVED') }}</b></button>
@@ -48,17 +48,17 @@
       </section>
 
       <section class="dashboard-bottom">
-        <article class="panel recent-panel">
-          <header><div><p class="panel-kicker">Actividad reciente</p><h2>Últimos tickets</h2></div><button type="button" (click)="setStatusFilter('ACTIVE'); navigate('queue')">Abrir bandeja →</button></header>
-          <div class="recent-list">@for(ticket of recentTickets();track ticket.id){<button type="button" (click)="select(ticket,true)"><span class="ticket-id">#{{ ticket.id }}</span><span class="device"><strong>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</strong><small>{{ ticket.customerName }} · {{ age(ticket) }}</small></span><i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><span class="status-badge" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</span></button>}@empty{<p class="empty-row">No hay tickets registrados.</p>}</div>
+         <article appCard class="panel recent-panel">
+          <header><div><p class="panel-kicker">Actividad reciente</p><h2>Últimos tickets</h2></div><button appButton="text" type="button" (click)="setStatusFilter('ACTIVE'); navigate('queue')">Abrir bandeja →</button></header>
+          <div class="recent-list">@for(ticket of recentTickets();track ticket.id){<button type="button" (click)="select(ticket,true)"><span class="ticket-id">#{{ ticket.id }}</span><span class="device"><strong>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</strong><small>{{ ticket.customerName }} · {{ age(ticket) }}</small></span><i class="priority-badge" [appBadge]="estadoTono(ticket.priority, 'prioridad-ticket')" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><span class="status-badge" [appBadge]="estadoTono(ticket.status, 'ticket')" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</span></button>}@empty{<p class="empty-row">No hay tickets registrados.</p>}</div>
         </article>
-        <article class="panel workload-panel">
+        <article appCard class="panel workload-panel">
           @if(isAdmin()){
             <header><div><p class="panel-kicker">Distribución</p><h2>Carga por técnico</h2></div></header>
             <div class="workload-list">@for(technician of teamWorkload();track technician.id){<div><span class="avatar">{{ technician.name.charAt(0) }}</span><span><strong>{{ technician.name }}</strong><small>{{ technician.count }} tickets activos</small></span><i><b [style.width.%]="activeTickets().length ? technician.count / activeTickets().length * 100 : 0"></b></i></div>}@empty{<p class="empty-row">No hay técnicos activos.</p>}</div>
           }@else{
             <header><div><p class="panel-kicker">Tu operación</p><h2>Mi mesa</h2></div></header>
-            <div class="personal-summary"><strong>{{ myTickets().length }}</strong><p>tickets activos asignados</p><button type="button" (click)="navigate('mine')">Ir a mi trabajo →</button></div>
+            <div class="personal-summary"><strong>{{ myTickets().length }}</strong><p>tickets activos asignados</p><button appButton="text" type="button" (click)="navigate('mine')">Ir a mi trabajo →</button></div>
           }
         </article>
       </section>
@@ -75,11 +75,11 @@
         <div class="ticket-list">
           @for(ticket of filteredTickets();track ticket.id){
             <button type="button" [class.selected]="selected()?.id === ticket.id" [attr.aria-pressed]="selected()?.id === ticket.id" [class.urgent]="ticket.priority === 'URGENT'" (click)="select(ticket)">
-              <span class="ticket-top"><b>#{{ ticket.id }}</b><i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><small>{{ age(ticket) }}</small></span>
+              <span class="ticket-top"><b>#{{ ticket.id }}</b><i class="priority-badge" [appBadge]="estadoTono(ticket.priority, 'prioridad-ticket')" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i><small>{{ age(ticket) }}</small></span>
               <strong>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</strong>
               <span class="customer-line">{{ ticket.customerName }}</span>
               <p>{{ ticket.reportedProblem }}</p>
-              <span class="ticket-foot"><i class="status-badge" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</i><small>{{ ticket.technicianName }}</small></span>
+              <span class="ticket-foot"><i class="status-badge" [appBadge]="estadoTono(ticket.status, 'ticket')" [attr.data-status]="ticket.status">{{ statusLabel(ticket.status) }}</i><small>{{ ticket.technicianName }}</small></span>
             </button>
           }@empty{<section class="empty-state"><iconify-icon aria-hidden="true" icon="line-md:clipboard-list"></iconify-icon><h2>No hay tickets</h2><p>Ajustá los filtros para ampliar la búsqueda.</p></section>}
         </div>
@@ -88,13 +88,13 @@
           @if(selected();as ticket){
             <header>
               <div><p class="panel-kicker">Ticket #{{ ticket.id }}</p><h2>{{ ticket.deviceType }} · {{ ticket.brand }} {{ ticket.model }}</h2><span>{{ ticket.customerName }} · {{ ticket.customerEmail }}</span></div>
-              <i class="priority-badge" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i>
+              <i class="priority-badge" [appBadge]="estadoTono(ticket.priority, 'prioridad-ticket')" [attr.data-priority]="ticket.priority">{{ priorityLabel(ticket.priority) }}</i>
             </header>
             <div class="progress" role="progressbar" aria-label="Avance del ticket" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress(ticket)"><i aria-hidden="true" [style.width.%]="progress(ticket)"></i></div>
             <div class="detail-meta"><span><small>Estado</small><strong>{{ statusLabel(ticket.status) }}</strong></span><span><small>Responsable</small><strong>{{ ticket.technicianName }}</strong></span><span><small>Ingreso</small><strong>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span></div>
 
-            @if(!isAdmin() && ticket.technicianId === null){<button class="claim" mat-flat-button type="button" [disabled]="editingBusy()" (click)="claim(ticket)">Tomar este ticket</button>}
-            @if(isAdmin() && technicians().length){<mat-form-field class="technician-select"><mat-label>Técnico responsable</mat-label><mat-select [ngModel]="ticket.technicianId" (ngModelChange)="assign($event)" [disabled]="editingBusy()">@for(technician of technicians();track technician.id){<mat-option [value]="technician.id">{{ technician.name }}</mat-option>}</mat-select></mat-form-field>}
+            @if(!isAdmin() && ticket.technicianId === null){<button class="claim" appButton="filled" type="button" [disabled]="editingBusy()" (click)="claim(ticket)">Tomar este ticket</button>}
+            @if(isAdmin() && technicians().length){<app-select class="technician-select" label="Técnico responsable" name="ticketTechnician" [options]="technicianOptions()" [ngModel]="ticket.technicianId" (ngModelChange)="assign($event)" [disabled]="editingBusy()" />}
 
             <section class="problem"><h3>Problema informado</h3><p>{{ ticket.reportedProblem }}</p></section>
             <section class="attachments-section">
@@ -105,19 +105,19 @@
                 <div class="attachment-upload" [attr.aria-busy]="uploadingAttachment()">
                   <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Elegir imagen<input type="file" name="ticketAttachment" accept="image/jpeg,image/png" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
                   <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : attachmentFile()?.name || 'JPEG o PNG, hasta 5 MiB (opcional)' }}</span>
-                  <button mat-stroked-button type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
+                  <button appButton="outlined" type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
                 </div>
               }
             </section>
             <form class="technical-form" #detailsForm="ngForm" (ngSubmit)="saveDetails(detailsForm)" novalidate>
-              <div class="section-title"><div><h3>Ficha técnica</h3><p>Diagnóstico, prioridad y presupuesto.</p></div>@if(!canEdit(ticket)){<span class="locked">Asignado a otro técnico</span>}</div>
-              <mat-form-field><mat-label>Prioridad</mat-label><mat-select [(ngModel)]="priority" name="ticketPriority" [disabled]="!canEdit(ticket) || editingBusy()">@for(item of priorities;track item){<mat-option [value]="item">{{ priorityLabel(item) }}</mat-option>}</mat-select></mat-form-field>
-              <mat-form-field class="wide"><mat-label>Diagnóstico técnico</mat-label><textarea matInput rows="4" [(ngModel)]="diagnosis" name="ticketDiagnosis" autocomplete="off" spellcheck="true" [disabled]="!canEdit(ticket) || editingBusy()" placeholder="Ej. Se verificó la fuente y se reemplazó el conector…"></textarea></mat-form-field>
-              <div class="price-fields"><mat-form-field><mat-label>Presupuesto estimado</mat-label><input matInput type="number" min="0" step="0.01" [(ngModel)]="estimatedPrice" name="estimatedPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field><mat-form-field><mat-label>Precio final</mat-label><input matInput type="number" min="0" step="0.01" [(ngModel)]="finalPrice" name="finalPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field></div>
-              <button mat-stroked-button type="submit" [disabled]="!canEdit(ticket) || editingBusy()">Guardar ficha técnica</button>
+              <div class="section-title"><div><h3>Ficha técnica</h3><p>Diagnóstico, prioridad y presupuesto.</p></div>@if(!canEdit(ticket)){<span class="locked" appBadge="danger">Asignado a otro técnico</span>}</div>
+              <app-select label="Prioridad" name="ticketPriority" [options]="priorityOptions" [(ngModel)]="priority" [disabled]="!canEdit(ticket) || editingBusy()" />
+              <app-textarea class="wide" label="Diagnóstico técnico" name="ticketDiagnosis" [rows]="4" [(ngModel)]="diagnosis" autocomplete="off" spellcheck="true" [disabled]="!canEdit(ticket) || editingBusy()" placeholder="Ej. Se verificó la fuente y se reemplazó el conector…" />
+              <div class="price-fields"><app-input label="Presupuesto estimado (ARS)" type="number" name="estimatedPrice" [min]="0" step="0.01" [(ngModel)]="estimatedPrice" inputMode="decimal" [disabled]="!canEdit(ticket) || editingBusy()" /><app-input label="Precio final (ARS)" type="number" name="finalPrice" [min]="0" step="0.01" [(ngModel)]="finalPrice" inputMode="decimal" [disabled]="!canEdit(ticket) || editingBusy()" /></div>
+              <button appButton="outlined" type="submit" [disabled]="!canEdit(ticket) || editingBusy()">Guardar ficha técnica</button>
             </form>
 
-            @if(statusActions(ticket.status).length){<section class="workflow-actions"><h3>Actualizar estado</h3><mat-form-field><mat-label>Nota para el historial (opcional)</mat-label><input matInput [(ngModel)]="statusComment" name="statusComment" autocomplete="off" spellcheck="true" placeholder="Ej. Cliente aprobó el presupuesto…" [disabled]="!canEdit(ticket) || editingBusy()"></mat-form-field><div>@for(action of statusActions(ticket.status);track action.status){<button mat-flat-button type="button" [class.danger-action]="action.danger" [disabled]="!canEdit(ticket) || editingBusy()" (click)="changeStatus(action)">{{ action.label }}</button>}</div></section>}
+            @if(statusActions(ticket.status).length){<section class="workflow-actions"><h3>Actualizar estado</h3><app-input label="Nota para el historial (opcional)" name="statusComment" [(ngModel)]="statusComment" autocomplete="off" spellcheck="true" placeholder="Ej. Cliente aprobó el presupuesto…" [disabled]="!canEdit(ticket) || editingBusy()" /><div>@for(action of statusActions(ticket.status);track action.status){<button appButton="filled" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="!canEdit(ticket) || editingBusy()" (click)="changeStatus(action)">{{ action.label }}</button>}</div></section>}
 
             <section class="timeline"><h3>Historial</h3>@if(historyLoading()){<p role="status">Cargando historial…</p>}@else if(historyError()){<p class="message error" role="alert">{{ historyError() }}</p>}@else if(history().length){@for(item of history();track item.id){<article><i></i><div><strong>{{ statusLabel(item.newStatus) }}</strong><small>{{ item.changedAt | date:'dd/MM/yy, HH:mm' }} · {{ item.changedBy }}</small>@if(item.comment){<p>{{ item.comment }}</p>}</div></article>}}@else{<article><i></i><div><strong>{{ statusLabel(ticket.status) }}</strong><small>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</small><p>Estado actual. Este ticket es anterior al historial detallado.</p></div></article>}</section>
           }@else{

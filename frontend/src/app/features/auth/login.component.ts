@@ -1,34 +1,17 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, RouterLink],
-  template: `
-    <main>
-      <a class="back" routerLink="/">← Volver a <span translate="no">Pinatech</span></a>
-      <mat-card>
-        <p class="eyebrow">Tu cuenta</p><h1>Iniciar sesión</h1>
-        @if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') { <p class="context">Ingresá para continuar con tu carrito. Tus productos se conservarán.</p> }
-        <form [formGroup]="form" (ngSubmit)="submit()">
-          <mat-form-field><mat-label>Email</mat-label><input matInput type="email" name="email" formControlName="email" autocomplete="email" inputmode="email" spellcheck="false">@if(form.controls.email.touched && form.controls.email.invalid){<mat-error>Ingresá un email válido.</mat-error>}</mat-form-field>
-          <mat-form-field><mat-label>Contraseña</mat-label><input matInput type="password" name="password" formControlName="password" autocomplete="current-password" spellcheck="false">@if(form.controls.password.touched && form.controls.password.invalid){<mat-error>Ingresá tu contraseña.</mat-error>}</mat-form-field>
-          @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
-          <button mat-flat-button type="submit" [disabled]="submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Iniciando sesión, esperá' : 'Iniciar sesión'">@if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }<span>{{ submitting() ? 'Ingresando…' : 'Ingresar' }}</span></button>
-          <p class="register-link">¿Todavía no tenés cuenta? <a routerLink="/register" [queryParams]="{ returnUrl: route.snapshot.queryParamMap.get('returnUrl') }">Registrate</a></p>
-        </form>
-      </mat-card>
-    </main>`,
-  styles: [`
-    :host{background:linear-gradient(145deg,#07111d,#062b47);color:#eef7fb;display:block;min-height:calc(100dvh - 110px)}main{display:grid;min-height:calc(100dvh - 110px);padding:2rem;place-items:center;position:relative}.back{color:#71ddf0;left:clamp(1rem,5vw,4rem);position:absolute;text-decoration:none;top:2rem}.back:hover,.register-link a:hover{text-decoration:underline}.back:active,.register-link a:active{opacity:.8}mat-card{background:#fff;border-top:4px solid var(--pin-orange);color:var(--pin-navy);padding:clamp(1.25rem,4vw,2.25rem);width:min(100%,430px)}.eyebrow{color:#00677f;font-size:.7rem;font-weight:900;letter-spacing:.14em;margin:0;text-transform:uppercase}h1{font-size:2.2rem;letter-spacing:-.05em;margin:.35rem 0 1.5rem}.context{background:#e7f7fa;border-left:3px solid var(--pin-teal);font-size:.85rem;line-height:1.5;padding:.75rem}form{display:grid;gap:.65rem}.error{color:#a12b2b;margin:0 0 .5rem;overflow-wrap:anywhere}form>button{margin-top:.5rem;touch-action:manipulation;width:100%}.button-spinner{animation:spin .8s linear infinite;border:2px solid rgb(255 255 255 / .45);border-radius:50%;border-top-color:currentColor;display:inline-block;height:1rem;margin-right:.5rem;vertical-align:-.15rem;width:1rem}.register-link{font-size:.85rem;margin:.75rem 0 0;text-align:center}.register-link a{color:#007c9d;font-weight:800;touch-action:manipulation}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.button-spinner{animation:none}}@media(max-width:500px){main{padding:5rem 1rem 1rem}.back{top:1.25rem}}
-  `],
+  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, ReactiveFormsModule, RouterLink],
+  templateUrl: './login.component.html',
+  styleUrl: './auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent {

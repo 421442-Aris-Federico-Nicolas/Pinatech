@@ -3,12 +3,12 @@
 
   @if (auth.user(); as user) {
     <div class="profile-layout">
-      <section class="identity" aria-labelledby="identity-title">
+      <section appCard class="identity" aria-labelledby="identity-title">
         <span class="monogram" aria-hidden="true">{{ user.firstName.charAt(0) }}{{ user.lastName.charAt(0) }}</span>
-        <div><p>Cuenta <span translate="no">Pinatech</span></p><h2 id="identity-title">{{ user.firstName }} {{ user.lastName }}</h2><ul class="roles" aria-label="Roles de la cuenta">@for (role of user.roles; track role) { <li>{{ roleLabel(role) }}</li> }</ul></div>
+        <div><p>Cuenta <span translate="no">Pinatech</span></p><h2 id="identity-title">{{ user.firstName }} {{ user.lastName }}</h2><ul class="roles" aria-label="Roles de la cuenta">@for (role of user.roles; track role) { <li appBadge="neutral">{{ roleLabel(role) }}</li> }</ul></div>
       </section>
 
-      <section class="data" aria-labelledby="data-title">
+      <section appCard class="data" aria-labelledby="data-title">
         <div class="section-heading"><p>Información personal</p><h2 id="data-title">Datos de contacto</h2></div>
         <dl>
           <div><dt>Nombre</dt><dd>{{ user.firstName }} {{ user.lastName }}</dd></div>
@@ -18,11 +18,11 @@
         <p class="read-only">Estos datos son de solo lectura. La edición todavía no está disponible.</p>
       </section>
 
-      <aside aria-labelledby="preferences-title">
+      <aside appCard aria-labelledby="preferences-title">
         <span class="aside-number">Próximamente</span>
         <h2 id="preferences-title">Direcciones y preferencias</h2>
         <p>Se habilitarán cuando estén definidas las modalidades y condiciones de entrega. Por ahora no necesitás cargar una dirección.</p>
-        @if (user.roles.includes('CUSTOMER')) { <a routerLink="/orders">Ver mis pedidos</a> }
+        @if (user.roles.includes('CUSTOMER')) { <a appButton="text" routerLink="/orders">Ver mis pedidos</a> }
       </aside>
     </div>
   }

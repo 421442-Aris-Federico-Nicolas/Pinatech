@@ -1,0 +1,33 @@
+<main>
+  <a class="back" appButton="text" routerLink="/">← Volver a <span translate="no">Pinatech</span></a>
+  <section appCard class="auth-card wide" aria-labelledby="register-title">
+    <p class="eyebrow">Tu cuenta <span translate="no">Pinatech</span></p>
+    <h1 id="register-title">Crear cuenta</h1>
+    <p class="intro">Registrate para conservar tu carrito y consultar tus pedidos y servicios técnicos.</p>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="name-row">
+        <app-input label="Nombre" name="firstName" formControlName="firstName" autocomplete="given-name" spellcheck="false" [maxLength]="100" required [error]="form.controls.firstName.touched && form.controls.firstName.invalid ? 'Ingresá tu nombre.' : ''" />
+        <app-input label="Apellido" name="lastName" formControlName="lastName" autocomplete="family-name" spellcheck="false" [maxLength]="100" required [error]="form.controls.lastName.touched && form.controls.lastName.invalid ? 'Ingresá tu apellido.' : ''" />
+      </div>
+      <app-input label="Email" type="email" name="email" formControlName="email" autocomplete="email" inputMode="email" spellcheck="false" [maxLength]="254" required [error]="form.controls.email.touched && form.controls.email.invalid ? 'Ingresá un email válido.' : ''" />
+      <app-input label="Teléfono (opcional)" type="tel" name="phone" formControlName="phone" autocomplete="tel" inputMode="tel" spellcheck="false" [maxLength]="30" [error]="form.controls.phone.touched && form.controls.phone.invalid ? 'Revisá el número ingresado.' : ''" />
+      <app-input label="Contraseña" type="password" name="password" formControlName="password" autocomplete="new-password" spellcheck="false" [maxLength]="72" required [error]="form.controls.password.touched && form.controls.password.invalid ? 'Usá 8 caracteres, mayúscula, minúscula y número.' : ''" />
+      <app-input
+        label="Repetir contraseña"
+        type="password"
+        name="confirmPassword"
+        formControlName="confirmPassword"
+        autocomplete="new-password"
+        spellcheck="false"
+        [maxLength]="72"
+        required
+        [error]="form.controls.confirmPassword.touched && form.controls.confirmPassword.hasError('required') ? 'Repetí tu contraseña.' : form.controls.confirmPassword.touched && form.hasError('passwordsMismatch') ? 'Las contraseñas no coinciden.' : ''" />
+      @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
+      <button appButton="filled" type="submit" [disabled]="submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Creando tu cuenta, esperá' : 'Crear cuenta'">
+        @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
+        <span>{{ submitting() ? 'Creando cuenta…' : 'Crear cuenta' }}</span>
+      </button>
+      <p class="account-link">¿Ya tenés cuenta? <a routerLink="/login" [queryParams]="{ returnUrl: route.snapshot.queryParamMap.get('returnUrl') }">Ingresá</a></p>
+    </form>
+  </section>
+</main>

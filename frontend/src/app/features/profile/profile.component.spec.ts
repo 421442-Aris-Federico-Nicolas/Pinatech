@@ -31,6 +31,9 @@ describe('ProfileComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Cliente');
     expect(fixture.nativeElement.textContent).toContain('Ver mis pedidos');
     expect(fixture.nativeElement.querySelector('.roles')?.tagName).toBe('UL');
+    expect(fixture.nativeElement.querySelectorAll('.profile-layout .app-card').length).toBe(3);
+    expect(fixture.nativeElement.querySelector('.roles li')?.classList).toContain('app-badge');
+    expect(fixture.nativeElement.querySelector('aside a')?.classList).toContain('app-button');
     expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Pinatech');
   });
 });
