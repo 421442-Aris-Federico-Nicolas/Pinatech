@@ -12,6 +12,12 @@
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
     "overlapSeconds": 0,
-    "drainingSeconds": 30
+    "drainingSeconds": 30,
+    "multiRegionConfig": {
+      "us-west2": {
+        "numReplicas": 1
+      }
+    }
   }
 }
+
