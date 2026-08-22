@@ -6,6 +6,7 @@ import { Product, ProductVariant } from '../../features/catalog/catalog.service'
 import { AuthService } from '../auth/auth.service';
 
 export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
+export interface CartAddResult { requested: number; added: number; quantity: number; capped: boolean; }
 export interface OrderConfirmation {
   id: number;
   status: string;
@@ -61,15 +62,21 @@ export class CartService {
     });
   }
 
-  add(product: Product, variant: ProductVariant, quantity = 1): void {
-    const amount = this.safeQuantity(quantity);
+  add(product: Product, variant: ProductVariant, quantity = 1): CartAddResult {
+    const requested = this.safeQuantity(quantity);
     const current = this.itemsState();
     const found = current.find((item) => item.variant.id === variant.id);
-    this.update(found
-      ? current.map((item) => item.variant.id === variant.id
-        ? { product, variant, quantity: Math.min(MAX_QUANTITY, item.quantity + amount) }
-        : item)
-      : [...current, { product, variant, quantity: amount }]);
+    const previousQuantity = found?.quantity ?? 0;
+    const nextQuantity = Math.min(MAX_QUANTITY, previousQuantity + requested);
+    const added = nextQuantity - previousQuantity;
+    if (added > 0) {
+      this.update(found
+        ? current.map((item) => item.variant.id === variant.id
+          ? { product, variant, quantity: nextQuantity }
+          : item)
+        : [...current, { product, variant, quantity: nextQuantity }]);
+    }
+    return { requested, added, quantity: nextQuantity, capped: added < requested };
   }
 
   setQuantity(variantId: number, quantity: number): void {

@@ -4,6 +4,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
@@ -37,6 +38,7 @@ export class AdminComponent {
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly router = inject(Router, { optional: true });
+  private readonly notifications = inject(NotificationService);
   private productSnapshot = '';
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
@@ -54,7 +56,6 @@ export class AdminComponent {
   readonly orderFilter = signal<string>('ALL');
   readonly orderUpdating = signal<number | null>(null);
   readonly error = signal('');
-  readonly success = signal('');
   readonly saving = signal(false);
   readonly taxonomySaving = signal(false);
   readonly deletingTaxonomy = signal('');
@@ -346,7 +347,7 @@ export class AdminComponent {
         const updated = { ...product, images: product.images.filter((current) => current.id !== image.id) };
         this.products.update((products) => products.map((current) => current.id === product.id ? updated : current));
         this.selected.set(updated);
-        this.success.set('Imagen eliminada.');
+        this.succeed('Imagen eliminada.');
       },
       error: () => this.fail('No se pudo eliminar la imagen.'),
     });
@@ -357,7 +358,7 @@ export class AdminComponent {
     if (!product || this.saving() || this.deactivatingProduct() || !confirm(`¿Dar de baja "${product.name}"?`)) return;
     this.deactivatingProduct.set(true);
     this.service.deleteProduct(product.id).pipe(finalize(() => this.deactivatingProduct.set(false))).subscribe({
-      next: () => { this.success.set('Producto dado de baja.'); this.resetProduct(true); this.reload(false, true); },
+      next: () => { this.succeed('Producto dado de baja.'); this.resetProduct(true); this.reload(false, true); },
       error: () => this.fail('No se pudo dar de baja el producto.'),
     });
   }
@@ -380,7 +381,7 @@ export class AdminComponent {
         this.categories.update((categories) => editing === null ? [...categories, category] : categories.map((current) => current.id === category.id ? category : current));
         if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) this.form.categoryId = category.id;
         this.cancelCategoryEdit();
-        this.success.set(editing === null ? 'Categoría creada.' : 'Categoría actualizada.');
+        this.succeed(editing === null ? 'Categoría creada.' : 'Categoría actualizada.');
       },
       error: () => this.fail(editing === null ? 'No se pudo crear la categoría.' : 'No se pudo actualizar la categoría.'),
     });
@@ -408,7 +409,7 @@ export class AdminComponent {
       next: () => {
         if (this.editingCategoryId === category.id) this.cancelCategoryEdit();
         this.categories.update((categories) => categories.filter((current) => current.id !== category.id));
-        this.success.set('Categoría eliminada.');
+        this.succeed('Categoría eliminada.');
       },
       error: () => this.fail('No se puede eliminar la categoría mientras tenga productos activos.'),
     });
@@ -429,7 +430,7 @@ export class AdminComponent {
         this.brands.update((brands) => editing === null ? [...brands, brand] : brands.map((current) => current.id === brand.id ? brand : current));
         if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) this.form.brandId = brand.id;
         this.cancelBrandEdit();
-        this.success.set(editing === null ? 'Marca creada.' : 'Marca actualizada.');
+        this.succeed(editing === null ? 'Marca creada.' : 'Marca actualizada.');
       },
       error: () => this.fail(editing === null ? 'No se pudo crear la marca.' : 'No se pudo actualizar la marca.'),
     });
@@ -455,7 +456,7 @@ export class AdminComponent {
       next: () => {
         if (this.editingBrandId === brand.id) this.cancelBrandEdit();
         this.brands.update((brands) => brands.filter((current) => current.id !== brand.id));
-        this.success.set('Marca eliminada.');
+        this.succeed('Marca eliminada.');
       },
       error: () => this.fail('No se puede eliminar la marca mientras tenga productos activos.'),
     });
@@ -483,7 +484,7 @@ export class AdminComponent {
         this.inventories.update((items) => items.map((item) => item.variantId === inventory.variantId ? inventory : item));
         this.adjustment = 0;
         this.adjustmentReason = '';
-        this.success.set('Stock actualizado.');
+        this.succeed('Stock actualizado.');
       },
       error: () => this.fail('No se pudo ajustar el stock. El resultado no puede ser negativo.'),
     });
@@ -496,8 +497,11 @@ export class AdminComponent {
     this.service.updateOrderStatus(order.id, action.status).pipe(finalize(() => this.orderUpdating.set(null))).subscribe({
       next: (updated) => {
         this.orders.update((orders) => orders.map((current) => current.id === updated.id ? updated : current));
-        this.success.set(`Pedido #${order.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
-        this.service.inventories().subscribe((inventories) => this.inventories.set(inventories));
+        this.succeed(`Pedido #${order.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
+        this.service.inventories().subscribe({
+          next: (inventories) => this.inventories.set(inventories),
+          error: () => this.notifications.warning('El pedido se actualizó, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
+        });
       },
       error: () => this.fail('No se pudo actualizar el pedido. La reserva puede haber vencido.'),
     });
@@ -542,17 +546,25 @@ export class AdminComponent {
     } else {
       this.select(product, false, undefined, true);
     }
-    this.success.set(message);
-    this.service.inventories().subscribe((inventories) => {
-      this.inventories.set(inventories);
-      this.inventory.set(inventories.find((item) => item.variantId === this.selectedVariantId()) ?? null);
+    this.succeed(message, preservePendingImages ? 'warning' : 'success');
+    this.service.inventories().subscribe({
+      next: (inventories) => {
+        this.inventories.set(inventories);
+        this.inventory.set(inventories.find((item) => item.variantId === this.selectedVariantId()) ?? null);
+      },
+      error: () => this.notifications.warning('El producto se guardó, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
     });
   }
   private clearPendingImages(): void { this.revokePendingImages(); this.pendingImages.set([]); }
   private revokePendingImages(): void { this.pendingImages().forEach((item) => URL.revokeObjectURL(item.previewUrl)); }
   private slug(value: string): string { return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
-  private clearMessages(): void { this.error.set(''); this.success.set(''); }
-  private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private clearMessages(): void { this.error.set(''); }
+  private fail(message: string): void { this.error.set(message); }
+  private succeed(message: string, tone: 'success' | 'warning' = 'success'): void {
+    this.error.set('');
+    if (tone === 'warning') this.notifications.warning(message);
+    else this.notifications.success(message);
+  }
   private failAndFocus(message: string, selector: string): void {
     this.fail(message);
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus());

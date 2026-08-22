@@ -5,6 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CartService } from '../../core/cart/cart.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
@@ -23,6 +24,7 @@ export class ProductComponent {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notifications = inject(NotificationService);
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
   private readonly productId = Number(this.route.snapshot.paramMap.get('id'));
   readonly cart = inject(CartService);
@@ -35,7 +37,6 @@ export class ProductComponent {
   readonly priceWithoutNationalTax = computed(() => (this.product()?.price ?? 0) / 1.105);
   readonly loading = signal(true);
   readonly error = signal<'not-found' | 'request' | null>(null);
-  readonly feedback = signal('');
   readonly highlightedSpecifications = computed(() => this.product()?.specifications.filter((item) => item.highlighted) ?? []);
   readonly specificationGroups = computed(() => {
     const groups = new Map<string, NonNullable<Product['specifications']>>();
@@ -95,7 +96,6 @@ export class ProductComponent {
   selectImage(index: number): void { this.imageIndex.set(index); }
   selectVariant(variantId: number): void {
     this.selectedVariantId.set(variantId);
-    this.feedback.set('');
     void this.router.navigate([], { relativeTo: this.route, queryParams: { variant: variantId }, queryParamsHandling: 'merge' });
   }
 
@@ -112,18 +112,21 @@ export class ProductComponent {
     const product = this.product();
     const variant = this.selectedVariant();
     if (!product || !variant?.inStock) return;
-    this.cart.add(product, variant, this.quantity());
-    this.announce(`${this.quantity()} ${this.quantity() === 1 ? 'unidad agregada' : 'unidades agregadas'} en color ${variant.colorName}.`);
+    const result = this.cart.add(product, variant, this.quantity());
+    const message = result.added === 0
+      ? 'Ya alcanzaste el máximo de 99 unidades para este color.'
+      : result.capped
+        ? `Se ${result.added === 1 ? 'agregó 1 unidad' : `agregaron ${result.added} unidades`}; el máximo por color es 99.`
+        : `${result.added === 1 ? '1 unidad agregada' : `${result.added} unidades agregadas`} en color ${variant.colorName}.`;
+    const notification = result.capped
+      ? this.notifications.warning(message, 'Ver carrito')
+      : this.notifications.success(message, 'Ver carrito');
+    notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
   }
 
   private positiveNumber(value: string | null): number | null {
     const parsed = Number(value);
     return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  }
-
-  private announce(message: string): void {
-    this.feedback.set('');
-    queueMicrotask(() => this.feedback.set(message));
   }
 
   private showError(type: 'not-found' | 'request'): void {

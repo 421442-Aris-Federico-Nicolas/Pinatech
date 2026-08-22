@@ -17,6 +17,7 @@ import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.comp
 import { CreateTicketPayload, Ticket, TicketsService } from './tickets.service';
 
 interface PendingImage { file: File; previewUrl: string; }
+interface TicketMessage { text: string; tone: 'success' | 'warning' | 'error'; }
 
 @Component({
   imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
@@ -37,8 +38,9 @@ export class TicketsComponent {
   readonly uploadingTicket = signal<number | null>(null);
   readonly error = signal('');
   readonly success = signal('');
+  readonly successTone = signal<'success' | 'warning'>('success');
   readonly listError = signal('');
-  readonly ticketMessages = signal<Record<number, string>>({});
+  readonly ticketMessages = signal<Record<number, TicketMessage>>({});
   readonly createImages = signal<PendingImage[]>([]);
   readonly ticketImages = signal<Record<number, PendingImage[]>>({});
   readonly expandedTickets = signal<Set<number>>(new Set());
@@ -131,7 +133,7 @@ export class TicketsComponent {
     const images = [...this.pendingFor(ticket.id)];
     if (!images.length || this.uploadingTicket() !== null) return;
     this.clearMessages();
-    this.ticketMessages.update((messages) => ({ ...messages, [ticket.id]: '' }));
+    this.clearTicketMessage(ticket.id);
     this.uploadingTicket.set(ticket.id);
     this.upload(ticket.id, images).pipe(finalize(() => this.uploadingTicket.set(null))).subscribe((results) => {
       const { uploaded, succeeded, failed } = summarizeUploadResults(results);
@@ -139,9 +141,11 @@ export class TicketsComponent {
       this.tickets.update((tickets) => tickets.map((current) => current.id === ticket.id ? updated : current));
       this.revoke(succeeded);
       this.ticketImages.update((records) => ({ ...records, [ticket.id]: failed }));
-      const message = uploaded.length === images.length
-        ? `${uploaded.length} ${uploaded.length === 1 ? 'imagen agregada' : 'imágenes agregadas'} al ticket #${ticket.id}.`
-        : `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. Podés volver a intentar las restantes.`;
+      const message: TicketMessage = uploaded.length === images.length
+        ? { text: `${uploaded.length} ${uploaded.length === 1 ? 'imagen agregada' : 'imágenes agregadas'} al ticket #${ticket.id}.`, tone: 'success' }
+        : uploaded.length
+          ? { text: `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. Podés volver a intentar las restantes.`, tone: 'warning' }
+          : { text: `No se pudo agregar ninguna de las ${images.length} imágenes al ticket #${ticket.id}. Revisá tu conexión y reintentá.`, tone: 'error' };
       this.ticketMessages.update((messages) => ({ ...messages, [ticket.id]: message }));
     });
   }
@@ -187,6 +191,7 @@ export class TicketsComponent {
     this.createImages.set([]);
     if (failed.length) this.ticketImages.update((records) => ({ ...records, [ticket.id]: failed }));
     Object.assign(this.form, this.emptyForm());
+    this.successTone.set(failed.length ? 'warning' : 'success');
     this.success.set(!attempted
       ? `Solicitud #${ticket.id} creada.`
       : uploaded.length === attempted
@@ -216,8 +221,15 @@ export class TicketsComponent {
   private removePreview(images: PendingImage[], index: number): void { const image = images[index]; if (image) URL.revokeObjectURL(image.previewUrl); }
   private revoke(images: PendingImage[]): void { images.forEach((image) => URL.revokeObjectURL(image.previewUrl)); }
   private emptyForm() { return { deviceType: '', brand: '', model: '', reportedProblem: '' }; }
-  private clearMessages(): void { this.error.set(''); this.success.set(''); }
+  private clearMessages(): void { this.error.set(''); this.success.set(''); this.successTone.set('success'); }
   private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private clearTicketMessage(ticketId: number): void {
+    this.ticketMessages.update((messages) => {
+      const next = { ...messages };
+      delete next[ticketId];
+      return next;
+    });
+  }
   private invalid(message: string): void {
     this.fail(message);
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('form :is(app-input, app-select, app-textarea).ng-invalid')?.focus());

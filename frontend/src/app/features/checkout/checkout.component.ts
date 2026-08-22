@@ -24,15 +24,26 @@ export class CheckoutComponent {
 
   readonly capabilities = signal<CheckoutCapabilities | null>(null);
   readonly created = signal<OrderConfirmation | null>(this.cart.items().length ? null : this.cart.confirmation());
+  readonly reconciling = signal(false);
   readonly loadingCapabilities = signal(false);
   readonly submitting = signal(false);
+  readonly reconciliationError = signal('');
   readonly capabilitiesError = signal('');
   readonly submitError = signal('');
 
   constructor() {
+    this.reconcileCheckout();
+  }
+
+  reconcileCheckout(): void {
+    if (this.reconciling()) return;
+    this.reconciling.set(true);
+    this.reconciliationError.set('');
+    this.capabilities.set(null);
     this.cart.reconcile().subscribe((success) => {
+      this.reconciling.set(false);
       if (!success) {
-        this.capabilitiesError.set('No pudimos verificar la disponibilidad del carrito. Volvé al carrito y reintentá antes de continuar.');
+        this.reconciliationError.set('No pudimos verificar la disponibilidad del carrito. Reintentá la verificación antes de continuar.');
         return;
       }
       if (this.cart.items().length) this.loadCapabilities();
@@ -40,7 +51,7 @@ export class CheckoutComponent {
   }
 
   loadCapabilities(): void {
-    if (this.loadingCapabilities()) return;
+    if (this.reconciling() || this.reconciliationError() || this.loadingCapabilities()) return;
     this.loadingCapabilities.set(true);
     this.checkoutService.capabilities().pipe(finalize(() => this.loadingCapabilities.set(false))).subscribe({
       next: (capabilities) => {

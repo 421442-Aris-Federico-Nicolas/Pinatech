@@ -226,6 +226,7 @@ main {
   max-width: 1500px;
   padding: 0.8rem 1rem;
 }
+.page-message { position: sticky; top: 7rem; z-index: 10; }
 .message.error {
   background: #35151e;
   border-color: #843046;

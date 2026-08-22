@@ -130,10 +130,23 @@ describe('CartService', () => {
   it('caps quantities and computes item count and total', () => {
     const cart = TestBed.inject(CartService);
 
-    cart.add(product, variant, 120);
+    const first = cart.add(product, variant, 120);
+    const capped = cart.add(product, variant, 2);
 
     expect(cart.count()).toBe(99);
     expect(cart.total()).toBe(99000);
+    expect(first).toEqual({ requested: 99, added: 99, quantity: 99, capped: false });
+    expect(capped).toEqual({ requested: 2, added: 0, quantity: 99, capped: true });
+  });
+
+  it('reports the actual amount added when a request reaches the quantity cap', () => {
+    const cart = TestBed.inject(CartService);
+    cart.add(product, variant, 98);
+
+    const result = cart.add(product, variant, 5);
+
+    expect(result).toEqual({ requested: 5, added: 1, quantity: 99, capped: true });
+    expect(cart.count()).toBe(99);
   });
 
   it('keeps the cart after creating an order and clears it only when checkout is completed', () => {

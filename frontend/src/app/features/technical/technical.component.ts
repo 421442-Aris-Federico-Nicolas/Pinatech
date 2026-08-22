@@ -4,6 +4,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
@@ -37,6 +38,7 @@ export class TechnicalComponent {
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly router = inject(Router, { optional: true });
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+  private readonly notifications = inject(NotificationService);
   private detailsSnapshot = '';
   private historyRequestId = 0;
   readonly auth = inject(AuthService);
@@ -54,7 +56,7 @@ export class TechnicalComponent {
   readonly priorityFilter = signal<string>('ALL');
   readonly search = signal('');
   readonly error = signal('');
-  readonly success = signal('');
+  readonly assignmentDraft = signal<number | null>(null);
   readonly attachmentFile = signal<File | null>(null);
   readonly uploadingAttachment = signal(false);
   readonly editingBusy = computed(() => this.saving() || this.uploadingAttachment());
@@ -194,7 +196,7 @@ export class TechnicalComponent {
     this.saving.set(true);
     this.clearMessages();
     this.service.updateDetails(ticket.id, details).pipe(finalize(() => this.saving.set(false))).subscribe({
-      next: (updated) => { this.replace(updated); this.success.set('Ficha técnica actualizada.'); },
+      next: (updated) => { this.replace(updated); this.succeed('Ficha técnica actualizada.'); },
       error: () => this.fail('No se pudo guardar la ficha. Verificá la asignación y los importes.'),
     });
   }
@@ -209,7 +211,7 @@ export class TechnicalComponent {
       next: (updated) => {
         this.statusComment = '';
         this.replace(updated);
-        this.success.set(`Ticket #${ticket.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
+        this.succeed(`Ticket #${ticket.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
         this.loadHistory(ticket.id);
       },
       error: () => this.fail('No se pudo cambiar el estado. Revisá la transición o la asignación.'),
@@ -220,7 +222,7 @@ export class TechnicalComponent {
     if (this.editingBusy()) return;
     this.saving.set(true);
     this.service.claim(ticket.id).pipe(finalize(() => this.saving.set(false))).subscribe({
-      next: (updated) => { this.replace(updated); this.success.set(`Ticket #${ticket.id} asignado a tu mesa.`); },
+      next: (updated) => { this.replace(updated); this.succeed(`Ticket #${ticket.id} asignado a tu mesa.`); },
       error: () => this.fail('No se pudo tomar el ticket; puede haber sido asignado a otro técnico.'),
     });
   }
@@ -228,10 +230,12 @@ export class TechnicalComponent {
   assign(technicianId: number): void {
     const ticket = this.selected();
     if (!ticket || !technicianId || this.editingBusy()) return;
+    this.assignmentDraft.set(technicianId);
     this.saving.set(true);
+    this.clearMessages();
     this.service.assign(ticket.id, technicianId).pipe(finalize(() => this.saving.set(false))).subscribe({
-      next: (updated) => { this.replace(updated); this.success.set('Responsable actualizado.'); },
-      error: () => this.fail('No se pudo asignar el técnico.'),
+      next: (updated) => { this.replace(updated); this.succeed('Responsable actualizado.'); },
+      error: () => { this.assignmentDraft.set(ticket.technicianId); this.fail('No se pudo asignar el técnico.'); },
     });
   }
 
@@ -260,7 +264,7 @@ export class TechnicalComponent {
       next: (attachment) => {
         this.replace({ ...ticket, attachments: [...ticket.attachments, attachment] });
         this.attachmentFile.set(null);
-        this.success.set(`Imagen "${attachment.fileName}" agregada al ticket #${ticket.id}.`);
+        this.succeed(`Imagen "${attachment.fileName}" agregada al ticket #${ticket.id}.`);
       },
       error: () => this.fail('No se pudo subir la imagen. Verificá el archivo e intentá nuevamente.'),
     });
@@ -296,6 +300,7 @@ export class TechnicalComponent {
 
   private applySelected(ticket: TechnicalTicket): void {
     this.selected.set(ticket);
+    this.assignmentDraft.set(ticket.technicianId);
     this.priority = ticket.priority;
     this.diagnosis = ticket.diagnosis ?? '';
     this.estimatedPrice = ticket.estimatedPrice;
@@ -311,10 +316,11 @@ export class TechnicalComponent {
     this.detailsSnapshot = this.detailsState('');
   }
   private numberOrNull(value: number | null): number | null { return value === null || value === undefined || value === ('' as unknown as number) ? null : Number(value); }
-  private clearMessages(): void { this.error.set(''); this.success.set(''); }
-  private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private clearMessages(): void { this.error.set(''); }
+  private fail(message: string): void { this.error.set(message); }
+  private succeed(message: string): void { this.error.set(''); this.notifications.success(message); }
   private detailsState(statusComment = this.statusComment): string { return JSON.stringify({ priority: this.priority, diagnosis: this.diagnosis, estimatedPrice: this.estimatedPrice, finalPrice: this.finalPrice, statusComment }); }
-  private loadHistory(ticketId: number): void {
+  protected loadHistory(ticketId: number): void {
     const requestId = ++this.historyRequestId;
     this.history.set([]);
     this.historyError.set('');

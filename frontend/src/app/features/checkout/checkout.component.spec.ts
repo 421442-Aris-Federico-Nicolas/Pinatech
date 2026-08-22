@@ -197,6 +197,38 @@ describe('CheckoutComponent', () => {
     expect(fixture.nativeElement.querySelector('.error [role="status"]')?.textContent).toContain('Volviendo a consultar');
   });
 
+  it('retries cart availability instead of bypassing a failed reconciliation', async () => {
+    const reconcile = vi.fn()
+      .mockReturnValueOnce(of(false))
+      .mockReturnValueOnce(of(true));
+    const capabilitiesRequest = vi.fn(() => of(capabilities));
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of(order)), reconcile, notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: capabilitiesRequest } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    const retry = [...fixture.nativeElement.querySelectorAll('button')]
+      .find((button: HTMLButtonElement) => button.textContent?.includes('Reintentar verificación')) as HTMLButtonElement;
+
+    expect(capabilitiesRequest).not.toHaveBeenCalled();
+    retry.click();
+    fixture.detectChanges();
+
+    expect(reconcile).toHaveBeenCalledTimes(2);
+    expect(capabilitiesRequest).toHaveBeenCalledOnce();
+    expect(fixture.nativeElement.textContent).toContain('Pagar con Mercado Pago');
+  });
+
   it('marks an expired confirmation and lets the user dismiss it', async () => {
     const cart = {
       items: signal<CartItem[]>([]),

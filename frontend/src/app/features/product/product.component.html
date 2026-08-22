@@ -41,8 +41,7 @@
           </div>
           <button appButton="filled" type="button" [disabled]="!selectedVariant()?.inStock" (click)="addToCart()">{{ selectedVariant()?.inStock ? 'Agregar al carrito' : 'Sin stock' }}</button>
         </div>
-         <p class="feedback" aria-live="polite" aria-atomic="true">{{ feedback() }}</p>
-         <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd translate="no">{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
+          <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd translate="no">{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
       </div>
     </section>
     @if (item.specifications.length) {

@@ -4,6 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
 import { routes } from './app.routes';
 import { customerGuard } from './core/guards/customer.guard';
+import { NotificationService } from './core/notifications/notification.service';
 
 @Component({ template: '<h1>Catálogo</h1><input aria-label="Buscar">' })
 class TestCatalogPage {}
@@ -37,6 +38,22 @@ describe('App', () => {
     expect(instagram.target).toBe('_blank');
     expect(instagram.rel).toContain('noopener');
     expect(instagram.querySelector('iconify-icon')?.getAttribute('icon')).toBe('mdi:instagram');
+  });
+
+  it('renders and dismisses global interaction feedback', () => {
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    fixture.detectChanges();
+
+    notifications.success('Producto agregado al carrito.');
+    fixture.detectChanges();
+
+    const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    expect(feedback.textContent).toContain('Producto agregado al carrito.');
+    expect(feedback.getAttribute('role')).toBe('status');
+    (feedback.querySelector('button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.app-notification')).toBeNull();
   });
 
   it('protects customer order and checkout result routes', () => {

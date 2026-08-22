@@ -1,4 +1,5 @@
 <a class="skip-link" href="#main-content">Saltar al contenido</a>
+<div class="route-progress" [class.active]="navigating()" aria-hidden="true"></div>
 <div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
 <header>
 <mat-toolbar aria-label="Navegación principal">
@@ -23,7 +24,7 @@
     <span class="spacer"></span>
     @if (auth.isAuthenticated()) {
       <a class="user-name" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" [attr.aria-label]="'Ver perfil de ' + auth.user()?.firstName">Hola, {{ auth.user()?.firstName }}</a>
-      <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out" aria-hidden="true"></iconify-icon> Salir</button>
+      <button mat-button type="button" (click)="logout()" [disabled]="loggingOut()"><iconify-icon icon="line-md:log-out" aria-hidden="true"></iconify-icon> {{ loggingOut() ? 'Saliendo…' : 'Salir' }}</button>
     } @else {
       <a mat-button routerLink="/register">Crear cuenta</a>
       <a mat-button routerLink="/login"><iconify-icon icon="line-md:account" aria-hidden="true"></iconify-icon> Ingresar</a>
@@ -32,6 +33,13 @@
 </mat-toolbar>
 </header>
 <div id="main-content" tabindex="-1"><router-outlet /></div>
+@if (notifications.notification(); as notification) {
+  <aside class="app-notification" [attr.data-tone]="notification.tone" role="status" aria-live="polite" aria-atomic="true">
+    <span class="notification-mark" aria-hidden="true"></span>
+    <p>{{ notification.message }}</p>
+    <button type="button" (click)="notifications.activate()">{{ notification.action }}</button>
+  </aside>
+}
 <footer class="site-footer">
   <div class="footer-content">
     <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">

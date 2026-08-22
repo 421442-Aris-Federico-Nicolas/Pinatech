@@ -40,7 +40,7 @@
       <a appButton="text" routerLink="/cart">Editar carrito</a>
     </header>
 
-    <div class="checkout-layout" [attr.aria-busy]="loadingCapabilities() || submitting()">
+    <div class="checkout-layout" [attr.aria-busy]="reconciling() || loadingCapabilities() || submitting()">
       <div class="details">
         <section appCard class="panel products" aria-labelledby="products-title">
           <div class="section-heading">
@@ -65,7 +65,9 @@
             <span>02</span>
             <div><p>Logística</p><h2 id="delivery-title">Entrega</h2></div>
           </div>
-          @if (loadingCapabilities()) {
+          @if (reconciling()) {
+            <p class="loading" role="status">Verificando disponibilidad del carrito…</p>
+          } @else if (loadingCapabilities()) {
             <p class="loading" role="status">Consultando opciones de entrega…</p>
           } @else if (capabilities(); as options) {
             @if (options.deliveryQuotesEnabled) {
@@ -85,7 +87,9 @@
             <span>03</span>
             <div><p>Condiciones comerciales</p><h2 id="payment-title">Pago</h2></div>
           </div>
-          @if (loadingCapabilities()) {
+          @if (reconciling()) {
+            <p class="loading" role="status">Verificando disponibilidad antes del pago…</p>
+          } @else if (loadingCapabilities()) {
             <p class="loading" role="status">Consultando opciones de pago…</p>
           } @else if (capabilities(); as options) {
             @if (!options.orderRequestsEnabled) {
@@ -116,7 +120,12 @@
         <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
         <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a <span translate="no">Mercado Pago</span>.</p>
 
-        @if (capabilitiesError()) {
+        @if (reconciliationError()) {
+          <div class="error" [attr.aria-busy]="reconciling()">
+            <p role="alert">{{ reconciliationError() }}</p>
+            <button appButton="outlined" type="button" (click)="reconcileCheckout()" [disabled]="reconciling()">{{ reconciling() ? 'Verificando…' : 'Reintentar verificación' }}</button>
+          </div>
+        } @else if (capabilitiesError()) {
           <div class="error" [attr.aria-busy]="loadingCapabilities()">
             <p role="alert">{{ capabilitiesError() }}</p>
             <button appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button>
@@ -127,7 +136,7 @@
         }
 
         @if (mercadoPagoEnabled()) {
-          <button appButton="filled" type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
+          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
             @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
             <span>{{ submitting() ? 'Preparando pago…' : 'Pagar con ' }}@if (!submitting()) { <span translate="no">Mercado Pago</span> }</span>
           </button>

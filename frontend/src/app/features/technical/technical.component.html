@@ -16,11 +16,10 @@
   <main [attr.aria-busy]="loading()">
     <header class="page-heading">
       <div><p class="eyebrow">Operación técnica</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
-      <button class="refresh" appButton="outlined" type="button" [disabled]="loading() || editingBusy()" (click)="load()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> Actualizar</button>
+      <button class="refresh" appButton="outlined" type="button" [disabled]="loading() || editingBusy()" (click)="load()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>
     </header>
 
-    @if(error()){<p class="message error" role="alert">{{ error() }}</p>}
-    @if(success()){<p class="message success" role="status">{{ success() }}</p>}
+    @if(error()){<p class="message page-message error" role="alert">{{ error() }}</p>}
     @if(loading()){<section class="loading-state" role="status" aria-live="polite"><span aria-hidden="true"></span><p>Sincronizando laboratorio…</p></section>}
 
     @if(!loading() && section() === 'overview'){
@@ -93,8 +92,8 @@
             <div class="progress" role="progressbar" aria-label="Avance del ticket" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress(ticket)"><i aria-hidden="true" [style.width.%]="progress(ticket)"></i></div>
             <div class="detail-meta"><span><small>Estado</small><strong>{{ statusLabel(ticket.status) }}</strong></span><span><small>Responsable</small><strong>{{ ticket.technicianName }}</strong></span><span><small>Ingreso</small><strong>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</strong></span></div>
 
-            @if(!isAdmin() && ticket.technicianId === null){<button class="claim" appButton="filled" type="button" [disabled]="editingBusy()" (click)="claim(ticket)">Tomar este ticket</button>}
-            @if(isAdmin() && technicians().length){<app-select class="technician-select" label="Técnico responsable" name="ticketTechnician" [options]="technicianOptions()" [ngModel]="ticket.technicianId" (ngModelChange)="assign($event)" [disabled]="editingBusy()" />}
+            @if(!isAdmin() && ticket.technicianId === null){<button class="claim" appButton="filled" type="button" [disabled]="editingBusy()" (click)="claim(ticket)">{{ saving() ? 'Asignando…' : 'Tomar este ticket' }}</button>}
+            @if(isAdmin() && technicians().length){<app-select class="technician-select" label="Técnico responsable" name="ticketTechnician" [options]="technicianOptions()" [ngModel]="assignmentDraft()" (ngModelChange)="assign($event)" [disabled]="editingBusy()" />}
 
             <section class="problem"><h3>Problema informado</h3><p>{{ ticket.reportedProblem }}</p></section>
             <section class="attachments-section">
@@ -114,12 +113,12 @@
               <app-select label="Prioridad" name="ticketPriority" [options]="priorityOptions" [(ngModel)]="priority" [disabled]="!canEdit(ticket) || editingBusy()" />
               <app-textarea class="wide" label="Diagnóstico técnico" name="ticketDiagnosis" [rows]="4" [(ngModel)]="diagnosis" autocomplete="off" spellcheck="true" [disabled]="!canEdit(ticket) || editingBusy()" placeholder="Ej. Se verificó la fuente y se reemplazó el conector…" />
               <div class="price-fields"><app-input label="Presupuesto estimado (ARS)" type="number" name="estimatedPrice" [min]="0" step="0.01" [(ngModel)]="estimatedPrice" inputMode="decimal" [disabled]="!canEdit(ticket) || editingBusy()" /><app-input label="Precio final (ARS)" type="number" name="finalPrice" [min]="0" step="0.01" [(ngModel)]="finalPrice" inputMode="decimal" [disabled]="!canEdit(ticket) || editingBusy()" /></div>
-              <button appButton="outlined" type="submit" [disabled]="!canEdit(ticket) || editingBusy()">Guardar ficha técnica</button>
+              <button appButton="outlined" type="submit" [disabled]="!canEdit(ticket) || editingBusy()">{{ saving() ? 'Guardando…' : 'Guardar ficha técnica' }}</button>
             </form>
 
-            @if(statusActions(ticket.status).length){<section class="workflow-actions"><h3>Actualizar estado</h3><app-input label="Nota para el historial (opcional)" name="statusComment" [(ngModel)]="statusComment" autocomplete="off" spellcheck="true" placeholder="Ej. Cliente aprobó el presupuesto…" [disabled]="!canEdit(ticket) || editingBusy()" /><div>@for(action of statusActions(ticket.status);track action.status){<button appButton="filled" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="!canEdit(ticket) || editingBusy()" (click)="changeStatus(action)">{{ action.label }}</button>}</div></section>}
+            @if(statusActions(ticket.status).length){<section class="workflow-actions"><h3>Actualizar estado</h3><app-input label="Nota para el historial (opcional)" name="statusComment" [(ngModel)]="statusComment" autocomplete="off" spellcheck="true" placeholder="Ej. Cliente aprobó el presupuesto…" [disabled]="!canEdit(ticket) || editingBusy()" /><div>@for(action of statusActions(ticket.status);track action.status){<button appButton="filled" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="!canEdit(ticket) || editingBusy()" (click)="changeStatus(action)">{{ saving() ? 'Actualizando…' : action.label }}</button>}</div></section>}
 
-            <section class="timeline"><h3>Historial</h3>@if(historyLoading()){<p role="status">Cargando historial…</p>}@else if(historyError()){<p class="message error" role="alert">{{ historyError() }}</p>}@else if(history().length){@for(item of history();track item.id){<article><i></i><div><strong>{{ statusLabel(item.newStatus) }}</strong><small>{{ item.changedAt | date:'dd/MM/yy, HH:mm' }} · {{ item.changedBy }}</small>@if(item.comment){<p>{{ item.comment }}</p>}</div></article>}}@else{<article><i></i><div><strong>{{ statusLabel(ticket.status) }}</strong><small>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</small><p>Estado actual. Este ticket es anterior al historial detallado.</p></div></article>}</section>
+            <section class="timeline"><h3>Historial</h3>@if(historyLoading()){<p role="status">Cargando historial…</p>}@else if(historyError()){<div class="message error" role="alert"><p>{{ historyError() }}</p><button appButton="text" type="button" (click)="loadHistory(ticket.id)">Reintentar historial</button></div>}@else if(history().length){@for(item of history();track item.id){<article><i></i><div><strong>{{ statusLabel(item.newStatus) }}</strong><small>{{ item.changedAt | date:'dd/MM/yy, HH:mm' }} · {{ item.changedBy }}</small>@if(item.comment){<p>{{ item.comment }}</p>}</div></article>}}@else{<article><i></i><div><strong>{{ statusLabel(ticket.status) }}</strong><small>{{ ticket.createdAt | date:'dd/MM/yy, HH:mm' }}</small><p>Estado actual. Este ticket es anterior al historial detallado.</p></div></article>}</section>
           }@else{
             <div class="detail-placeholder"><iconify-icon aria-hidden="true" icon="line-md:arrow-left"></iconify-icon><h2>Seleccioná un ticket</h2><p>Acá vas a poder diagnosticar, presupuestar y actualizar su avance.</p></div>
           }

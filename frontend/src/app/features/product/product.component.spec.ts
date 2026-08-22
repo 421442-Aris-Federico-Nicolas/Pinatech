@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
 import { ProductComponent } from './product.component';
 
@@ -55,5 +56,33 @@ describe('ProductComponent', () => {
     expect(second.getAttribute('aria-checked')).toBe('true');
     expect(document.activeElement).toBe(second);
     expect(navigate).toHaveBeenCalled();
+  });
+
+  it('warns with the actual quantity when the cart cap is reached', async () => {
+    const warning = vi.fn(() => ({ onAction: () => EMPTY }));
+    const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 99, capped: true }));
+    await TestBed.configureTestingModule({
+      imports: [ProductComponent],
+      providers: [
+        { provide: CatalogService, useValue: { product: () => of(product) } },
+        { provide: CartService, useValue: { add } },
+        { provide: NotificationService, useValue: { warning, success: vi.fn() } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ id: 1 }), queryParamMap: convertToParamMap({}) },
+            queryParamMap: of(convertToParamMap({})),
+          },
+        },
+      ],
+    }).compileComponents();
+    const component = TestBed.createComponent(ProductComponent).componentInstance;
+    component.quantity.set(5);
+
+    component.addToCart();
+
+    expect(add).toHaveBeenCalledWith(product, product.variants[0], 5);
+    expect(warning).toHaveBeenCalledWith('Se agregó 1 unidad; el máximo por color es 99.', 'Ver carrito');
   });
 });

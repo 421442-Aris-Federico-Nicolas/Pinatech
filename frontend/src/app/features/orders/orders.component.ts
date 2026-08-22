@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
@@ -20,6 +21,7 @@ export class OrdersComponent {
   private readonly service = inject(OrderService);
   private readonly checkoutService = inject(CheckoutService);
   private readonly browserWindow = inject(CHECKOUT_WINDOW);
+  private readonly notifications = inject(NotificationService);
   readonly orders = signal<Order[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
@@ -78,13 +80,26 @@ export class OrdersComponent {
       && Date.parse(order.reservationExpiresAt) > Date.now();
   }
 
-  load(): void {
+  isReservationExpired(order: Order): boolean {
+    return !Number.isFinite(Date.parse(order.reservationExpiresAt)) || Date.parse(order.reservationExpiresAt) <= Date.now();
+  }
+
+  paymentUnavailableReason(order: Order): string | null {
+    if (order.status !== 'PENDING_PAYMENT' || !['PENDING', 'REJECTED'].includes(order.paymentStatus)) return null;
+    if (this.isReservationExpired(order)) return 'La reserva venció; este pedido ya no admite un nuevo intento de pago.';
+    if (this.loadingCapabilities()) return 'Estamos consultando las opciones de pago disponibles…';
+    if (!this.capabilitiesError() && !this.onlinePaymentAvailable()) return 'El pago online no está disponible en este momento.';
+    return null;
+  }
+
+  load(showConfirmation = false): void {
     if (this.loading()) return;
     this.loading.set(true);
     this.service.mine().pipe(finalize(() => this.loading.set(false))).subscribe({
       next: (orders) => {
         this.orders.set(orders);
         this.error.set('');
+        if (showConfirmation) this.notifications.success('Tus pedidos están actualizados.');
       },
       error: () => this.error.set('No pudimos cargar tus pedidos. Intentá nuevamente.'),
     });

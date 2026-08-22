@@ -16,7 +16,7 @@ describe('OrdersComponent', () => {
     deliveryMethod: null,
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
-    reservationExpiresAt: '2026-07-29T20:00:00Z',
+    reservationExpiresAt: '2099-07-29T20:00:00Z',
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
     items: [{ productId: 1, variantId: 11, productName: 'Teclado', colorName: 'Negro', colorHex: '#000000', unitPrice: 1500, quantity: 2, subtotal: 3000 }],
@@ -72,6 +72,25 @@ describe('OrdersComponent', () => {
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
     expect(fixture.nativeElement.querySelector('.state [role="status"]')?.textContent).toContain('Volviendo a cargar');
+  });
+
+  it('explains when an expired reservation can no longer be paid', async () => {
+    const expired = { ...order, reservationExpiresAt: '2000-07-29T20:00:00Z' };
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([expired]) } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Reserva vencida');
+    expect(fixture.nativeElement.textContent).toContain('ya no admite un nuevo intento de pago');
+    expect(fixture.nativeElement.textContent).not.toContain('Continuar pago');
   });
 
   it('shows a recoverable capability error and announces its retry', async () => {

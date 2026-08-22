@@ -17,13 +17,13 @@
     </label>
   </div>
 
-  <p class="sr-only" aria-live="polite" aria-atomic="true">{{ feedback() }}</p>
   <section class="catalog-layout">
     <aside appCard id="catalog-filters" class="filters" [class.open]="filtersOpen()">
        <div class="filter-heading"><h2>Filtros</h2><button appButton="text" type="button" aria-label="Limpiar todos los filtros" (click)="clearFilters()">Limpiar</button></div>
+       @if (optionsLoading()) { <p class="filter-status" role="status">Cargando marcas y categorías…</p> }
        @if (optionsError()) { <div class="filter-error" role="alert"><p>No se pudieron cargar las opciones de marca y categoría.</p><button appButton="text" type="button" (click)="retryOptions()">Reintentar opciones</button></div> }
-       <label>Categoría<select name="category" autocomplete="off" [(ngModel)]="filters.categoryId" (change)="applyFilters()"><option [ngValue]="null">Todas</option>@for(category of categories();track category.id){<option [ngValue]="category.id">{{category.name}}</option>}</select></label>
-       <label>Marca<select name="brand" autocomplete="off" [(ngModel)]="filters.brandId" (change)="applyFilters()"><option [ngValue]="null">Todas</option>@for(brand of brands();track brand.id){<option [ngValue]="brand.id" translate="no">{{brand.name}}</option>}</select></label>
+       <label>Categoría<select name="category" autocomplete="off" [(ngModel)]="filters.categoryId" (change)="applyFilters()" [disabled]="optionsLoading()"><option [ngValue]="null">Todas</option>@for(category of categories();track category.id){<option [ngValue]="category.id">{{category.name}}</option>}</select></label>
+       <label>Marca<select name="brand" autocomplete="off" [(ngModel)]="filters.brandId" (change)="applyFilters()" [disabled]="optionsLoading()"><option [ngValue]="null">Todas</option>@for(brand of brands();track brand.id){<option [ngValue]="brand.id" translate="no">{{brand.name}}</option>}</select></label>
        <div class="price"><label>Desde<input type="number" name="minPrice" min="0" inputmode="decimal" autocomplete="off" [(ngModel)]="filters.minPrice" (change)="applyFilters()" placeholder="Ej.: 10000…" aria-describedby="price-filter-error" [attr.aria-invalid]="priceError() ? 'true' : null"></label><label>Hasta<input type="number" name="maxPrice" min="0" inputmode="decimal" autocomplete="off" [(ngModel)]="filters.maxPrice" (change)="applyFilters()" placeholder="Ej.: 500000…" aria-describedby="price-filter-error" [attr.aria-invalid]="priceError() ? 'true' : null"></label></div>
        @if(priceError()){<p id="price-filter-error" class="filter-error" role="alert">{{ priceError() }}</p>}
     </aside>

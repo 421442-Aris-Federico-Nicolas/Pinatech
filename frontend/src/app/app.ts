@@ -3,10 +3,11 @@ import { Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs';
+import { NavigationCancel, NavigationEnd, NavigationError, NavigationSkipped, NavigationStart, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { finalize } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { CartService } from './core/cart/cart.service';
+import { NotificationService } from './core/notifications/notification.service';
 
 @Component({
   selector: 'app-root',
@@ -21,16 +22,19 @@ export class App {
   readonly menuOpen = signal(false);
   readonly catalogActive = signal(false);
   readonly currentYear = new Date().getFullYear();
+  readonly navigating = signal(false);
+  readonly loggingOut = signal(false);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
+  readonly notifications = inject(NotificationService);
   private currentPath: string | null = null;
 
   constructor() {
-    this.router.events.pipe(
-      filter((event) => event instanceof NavigationEnd),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe((event) => {
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
+      if (event instanceof NavigationStart) this.navigating.set(true);
+      if (event instanceof NavigationEnd || event instanceof NavigationCancel || event instanceof NavigationError || event instanceof NavigationSkipped) this.navigating.set(false);
+      if (!(event instanceof NavigationEnd)) return;
       const path = new URL(event.urlAfterRedirects, this.document.baseURI).pathname;
       const previousPath = this.currentPath;
       this.currentPath = path;
@@ -47,6 +51,11 @@ export class App {
   }
 
   logout(): void {
-    this.auth.logout().subscribe(() => void this.router.navigateByUrl('/login'));
+    if (this.loggingOut()) return;
+    this.loggingOut.set(true);
+    this.auth.logout().pipe(finalize(() => this.loggingOut.set(false))).subscribe(() => {
+      this.notifications.success('Sesión cerrada correctamente.');
+      void this.router.navigateByUrl('/login');
+    });
   }
 }

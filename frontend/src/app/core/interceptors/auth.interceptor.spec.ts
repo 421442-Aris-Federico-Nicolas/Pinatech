@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../notifications/notification.service';
 import { environment } from '../../../environments/environment';
 import { authInterceptor } from './auth.interceptor';
 
@@ -12,12 +13,14 @@ describe('authInterceptor', () => {
   let httpTesting: HttpTestingController;
   let token = 'initial-token';
   let refreshFails = false;
-  let navigation: { commands: string[]; options: { queryParams?: { returnUrl: string } } } | null;
+  let navigation: { commands: string[]; options: { queryParams?: { returnUrl?: string; reason?: string } } } | null;
+  const warning = vi.fn();
 
   beforeEach(() => {
     token = 'initial-token';
     refreshFails = false;
     navigation = null;
+    warning.mockClear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -35,6 +38,7 @@ describe('authInterceptor', () => {
           navigation = { commands, options };
           return Promise.resolve(true);
         } } },
+        { provide: NotificationService, useValue: { warning } },
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -72,6 +76,7 @@ describe('authInterceptor', () => {
 
     httpTesting.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
 
-    expect(navigation).toEqual({ commands: ['/login'], options: { queryParams: { returnUrl: '/orders?page=2' } } });
+    expect(navigation).toEqual({ commands: ['/login'], options: { queryParams: { returnUrl: '/orders?page=2', reason: 'session-expired' } } });
+    expect(warning).toHaveBeenCalledWith('Tu sesión venció. Ingresá nuevamente para continuar.');
   });
 });

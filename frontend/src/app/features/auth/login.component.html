@@ -3,7 +3,9 @@
   <section appCard class="auth-card" aria-labelledby="login-title">
     <p class="eyebrow">Tu cuenta</p>
     <h1 id="login-title">Iniciar sesión</h1>
-    @if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') {
+    @if (route.snapshot.queryParamMap.get('reason') === 'session-expired') {
+      <p class="context" role="status">Tu sesión venció. Ingresá nuevamente para continuar donde estabas.</p>
+    } @else if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') {
       <p class="context">Ingresá para continuar con tu carrito. Tus productos se conservarán.</p>
     }
     <form [formGroup]="form" (ngSubmit)="submit()">

@@ -1,7 +1,7 @@
 <main>
   <header class="page-header">
     <div><p class="eyebrow">Tu cuenta</p><h1>Mis pedidos</h1></div>
-    <a appButton="text" routerLink="/catalog">Seguir explorando</a>
+    <div class="header-actions"><button appButton="outlined" type="button" (click)="load(true)" [disabled]="loading()">{{ loading() ? 'Actualizando…' : 'Actualizar pedidos' }}</button><a appButton="text" routerLink="/catalog">Seguir explorando</a></div>
   </header>
 
   @if (paymentError()) { <p class="payment-error" role="alert">{{ paymentError() }}</p> }
@@ -38,7 +38,11 @@
           </header>
 
           @if (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED') {
-            <p class="reservation"><strong>Reserva vigente hasta:</strong> {{ order.reservationExpiresAt | date:'medium' }}. El registro no implica que el pago esté confirmado.</p>
+            @if (isReservationExpired(order)) {
+              <p class="reservation expired"><strong>Reserva vencida.</strong> El stock ya no está reservado para este pedido.</p>
+            } @else {
+              <p class="reservation"><strong>Reserva vigente hasta:</strong> {{ order.reservationExpiresAt | date:'medium' }}. El registro no implica que el pago esté confirmado.</p>
+            }
           }
 
           @if (canPay(order)) {
@@ -50,6 +54,8 @@
               </button>
               @if (payingOrder() === order.id) { <p class="payment-progress" role="status" aria-live="polite">Preparando la redirección segura a <span translate="no">Mercado Pago</span>.</p> }
             </div>
+          } @else if (paymentUnavailableReason(order); as reason) {
+            <p class="payment-unavailable" role="status">{{ reason }}</p>
           }
 
           <ul class="items" aria-label="Productos del pedido">

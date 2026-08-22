@@ -102,6 +102,27 @@ describe('TicketsComponent attachment gallery', () => {
     expect((fixture.nativeElement.querySelector('.selected-files button') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('shows an alert when every attachment upload fails', async () => {
+    await TestBed.configureTestingModule({
+      imports: [TicketsComponent],
+      providers: [
+        { provide: TicketsService, useValue: { tickets: () => of([ticket]) } },
+        { provide: TicketAttachmentService, useValue: { upload: () => throwError(() => new Error('network')), content: () => of(new Blob()) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TicketsComponent);
+    const component = fixture.componentInstance;
+    component.ticketImages.set({ 7: [{ file: new File(['image'], 'extra.jpg', { type: 'image/jpeg' }), previewUrl: 'blob:extra' }] });
+
+    component.uploadToTicket(ticket);
+    fixture.detectChanges();
+
+    const message = fixture.nativeElement.querySelector('.ticket-message.error') as HTMLElement;
+    expect(message.getAttribute('role')).toBe('alert');
+    expect(message.textContent).toContain('No se pudo agregar ninguna');
+    expect(component.pendingFor(7)).toHaveLength(1);
+  });
+
   it('shows a recoverable list error instead of an empty state when loading fails', async () => {
     await TestBed.configureTestingModule({
       imports: [TicketsComponent],

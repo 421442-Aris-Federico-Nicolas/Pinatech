@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../notifications/notification.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const isApiRequest = request.url === environment.apiBaseUrl || request.url.startsWith(`${environment.apiBaseUrl}/`);
@@ -13,6 +14,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
 
   const auth = inject(AuthService);
   const router = inject(Router);
+  const notifications = inject(NotificationService);
   const authenticate = (source: typeof request) => source.clone({
     headers: auth.getAccessToken() ? source.headers.set('Authorization', `Bearer ${auth.getAccessToken()}`) : source.headers,
     withCredentials: true,
@@ -29,8 +31,9 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       switchMap(() => next(authenticate(request))),
       catchError((refreshError: unknown) => {
         auth.clearSession();
+        notifications.warning('Tu sesión venció. Ingresá nuevamente para continuar.');
         const returnUrl = router.url.startsWith('/login') ? undefined : router.url;
-        void router.navigate(['/login'], { queryParams: returnUrl ? { returnUrl } : undefined });
+        void router.navigate(['/login'], { queryParams: returnUrl ? { returnUrl, reason: 'session-expired' } : { reason: 'session-expired' } });
         return throwError(() => refreshError);
       }),
     );

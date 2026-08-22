@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
@@ -24,6 +25,7 @@ export class CatalogComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notifications = inject(NotificationService);
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
 
@@ -34,10 +36,10 @@ export class CatalogComponent {
   readonly brands = signal<Brand[]>([]);
   readonly sort = signal<CatalogSort>('name,asc');
   readonly loading = signal(true);
+  readonly optionsLoading = signal(true);
   readonly error = signal(false);
   readonly optionsError = signal(false);
   readonly filtersOpen = signal(false);
-  readonly feedback = signal('');
   readonly priceError = signal('');
 
   constructor() {
@@ -76,9 +78,12 @@ export class CatalogComponent {
   }
 
   add(product: Product, variant: ProductVariant): void {
-    if (!variant.inStock) { this.announce('El color seleccionado no tiene stock disponible.'); return; }
-    this.cart.add(product, variant);
-    this.announce(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
+    if (!variant.inStock) { this.notifications.warning('El color seleccionado no tiene stock disponible.'); return; }
+    const result = this.cart.add(product, variant);
+    const notification = result.added === 0
+      ? this.notifications.warning('Ya alcanzaste el máximo de 99 unidades para este color.', 'Ver carrito')
+      : this.notifications.success(`${product.name} en color ${variant.colorName} se agregó al carrito.`, 'Ver carrito');
+    notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
   }
 
   retry(): void { this.loadPage(this.page()?.number ?? 0); }
@@ -86,9 +91,11 @@ export class CatalogComponent {
   retryOptions(): void { this.loadOptions(); }
 
   private loadOptions(): void {
+    if (this.optionsLoading() && (this.categories().length || this.brands().length)) return;
+    this.optionsLoading.set(true);
     this.optionsError.set(false);
     forkJoin({ categories: this.service.categories(), brands: this.service.brands() })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(finalize(() => this.optionsLoading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: ({ categories, brands }) => { this.categories.set(categories); this.brands.set(brands); },
         error: () => this.optionsError.set(true),
@@ -128,11 +135,6 @@ export class CatalogComponent {
   private nonNegativeNumber(value: string | null): number | null {
     const parsed = Number(value);
     return value !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-  }
-
-  private announce(message: string): void {
-    this.feedback.set('');
-    queueMicrotask(() => this.feedback.set(message));
   }
 
   private validatePrices(): boolean {

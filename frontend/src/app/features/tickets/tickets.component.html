@@ -18,7 +18,7 @@
        <button appButton="filled" class="wide" type="submit" [disabled]="creating()">{{ creating() ? (createImages().length ? 'Creando y subiendo imágenes…' : 'Creando solicitud…') : 'Enviar solicitud' }}</button>
     </form>
     @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
-    @if (success()) { <p class="message success" role="status">{{ success() }}</p> }
+    @if (success()) { <p class="message" [class.success]="successTone() === 'success'" [class.warning]="successTone() === 'warning'" role="status">{{ success() }}</p> }
   </section>
 
   <section appCard class="tickets-panel" [attr.aria-busy]="loading()">
@@ -42,7 +42,7 @@
               <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
             }
            </section>
-           @if(ticketMessages()[ticket.id]){<p class="ticket-message" role="status">{{ ticketMessages()[ticket.id] }}</p>}
+            @if(ticketMessages()[ticket.id]; as message){<p class="ticket-message" [class.success]="message.tone === 'success'" [class.warning]="message.tone === 'warning'" [class.error]="message.tone === 'error'" [attr.role]="message.tone === 'error' ? 'alert' : 'status'">{{ message.text }}</p>}
         </article>
       } @empty { <p class="empty">Aún no registraste solicitudes.</p> }
     }

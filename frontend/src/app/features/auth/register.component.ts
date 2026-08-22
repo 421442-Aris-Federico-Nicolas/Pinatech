@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -35,6 +36,10 @@ export class RegisterComponent {
     confirmPassword: ['', [Validators.required, Validators.maxLength(72)]],
   }, { validators: passwordsMatch });
 
+  constructor() {
+    this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.error.set(null));
+  }
+
   submit(): void {
     if (this.submitting()) return;
     if (this.form.invalid) {
@@ -51,7 +56,9 @@ export class RegisterComponent {
       next: () => void this.router.navigateByUrl(this.destination()),
       error: (response: HttpErrorResponse) => this.error.set(response.status === 409
         ? 'Ya existe una cuenta registrada con ese email.'
-        : 'No pudimos crear la cuenta. Revisá los datos e intentá nuevamente.'),
+        : response.status === 0 || response.status >= 500
+          ? 'No pudimos conectarnos con el servicio. Revisá tu conexión e intentá nuevamente.'
+          : 'No pudimos crear la cuenta. Revisá los datos marcados e intentá nuevamente.'),
     });
   }
 

@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartService } from '../../core/cart/cart.service';
+import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
@@ -19,13 +20,14 @@ import { CatalogService, Product, ProductVariant } from '../catalog/catalog.serv
 export class HomeComponent {
   private readonly catalog = inject(CatalogService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notifications = inject(NotificationService);
+  private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
   protected readonly cart = inject(CartService);
 
   protected readonly featured = signal<Product[]>([]);
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
-  protected readonly feedback = signal('');
 
   constructor() {
     this.loadFeatured();
@@ -50,13 +52,11 @@ export class HomeComponent {
   }
 
   protected add(product: Product, variant: ProductVariant): void {
-    if (!variant.inStock) { this.announce('El color seleccionado no tiene stock disponible.'); return; }
-    this.cart.add(product, variant);
-    this.announce(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
-  }
-
-  private announce(message: string): void {
-    this.feedback.set('');
-    queueMicrotask(() => this.feedback.set(message));
+    if (!variant.inStock) { this.notifications.warning('El color seleccionado no tiene stock disponible.'); return; }
+    const result = this.cart.add(product, variant);
+    const notification = result.added === 0
+      ? this.notifications.warning('Ya alcanzaste el máximo de 99 unidades para este color.', 'Ver carrito')
+      : this.notifications.success(`${product.name} en color ${variant.colorName} se agregó al carrito.`, 'Ver carrito');
+    notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
   }
 }
