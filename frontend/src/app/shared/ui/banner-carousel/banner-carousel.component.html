@@ -1,0 +1,46 @@
+<section
+  class="banner-carousel"
+  role="region"
+  aria-roledescription="carrusel"
+  [attr.aria-label]="ariaLabel()"
+  tabindex="0"
+  (keydown.arrowleft)="$event.preventDefault(); previous()"
+  (keydown.arrowright)="$event.preventDefault(); next()">
+  <div class="banner-carousel__stage">
+    <div class="banner-carousel__deck" [class.reverse]="direction() === -1">
+      @for (slide of slides(); track slide.src; let index = $index; let first = $first) {
+        <img
+          [class.active]="index === activeIndex()"
+          [class.entering]="index === enteringIndex()"
+          [class.leaving]="index === leavingIndex()"
+          [src]="slide.src"
+          [alt]="slide.alt"
+          [width]="slide.width"
+          [height]="slide.height"
+          [attr.aria-hidden]="index === activeIndex() ? null : 'true'"
+          [attr.loading]="imagePriority() && first ? 'eager' : 'lazy'"
+          [attr.fetchpriority]="imagePriority() && first ? 'high' : null"
+          (animationend)="finishTransition(index)">
+      }
+    </div>
+
+    @if (slides().length > 1) {
+      <button class="banner-carousel__control previous" type="button" (click)="previous()" aria-label="Ver banner anterior"><span aria-hidden="true">‹</span></button>
+      <button class="banner-carousel__control next" type="button" (click)="next()" aria-label="Ver banner siguiente"><span aria-hidden="true">›</span></button>
+    }
+  </div>
+
+  @if (slides().length > 1) {
+    <div class="banner-carousel__dots" role="group" aria-label="Seleccionar banner">
+      @for (slide of slides(); track slide.src; let index = $index) {
+        <button
+          type="button"
+          [class.active]="index === activeIndex()"
+          [attr.aria-current]="index === activeIndex() ? 'true' : null"
+          [attr.aria-label]="'Ver banner ' + (index + 1) + ' de ' + slides().length"
+          (click)="select(index)"></button>
+      }
+    </div>
+    <span class="sr-only">Banner {{ activeIndex() + 1 }} de {{ slides().length }}</span>
+  }
+</section>

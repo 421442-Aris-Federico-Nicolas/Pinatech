@@ -1,13 +1,12 @@
 <main>
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">Pinatech tecnología</p>
-      <p class="kicker">HARDWARE PARA TU PRÓXIMO NIVEL</p>
-      <h1>Elevá tu setup.<br><span>Elegí con claridad.</span></h1>
-      <p class="lead">Explorá el catálogo real de hardware y periféricos disponible en Pinatech.</p>
-      <div class="hero-actions"><a appButton="filled" routerLink="/catalog">Explorar catálogo</a>@if (!auth.isAuthenticated()) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
-    </div>
-    <div class="hero-visual"><img src="/pinatech-banner.png" alt="Identidad visual de Pinatech" width="2000" height="621" fetchpriority="high"><span class="scan-line" aria-hidden="true"></span></div>
+  <section class="hero" aria-labelledby="hero-title" (mouseenter)="heroPaused.set(true)" (mouseleave)="heroPaused.set(false)">
+    <app-banner-carousel [slides]="heroSlides" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPaused()" (indexChange)="selectHero($event)" />
+    @if (activeHeroPanel(); as panel) {
+      <div class="hero-copy">
+        <div><p class="eyebrow">{{ panel.eyebrow }}</p><h1 id="hero-title">{{ panel.title }} <span>{{ panel.accent }}</span></h1><p class="lead">{{ panel.description }}</p></div>
+        <div class="hero-actions"><a appButton="filled" [routerLink]="panel.link">{{ panel.linkLabel }}</a>@if (!auth.isAuthenticated() && heroIndex() === 0) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
+      </div>
+    }
   </section>
 
   <section class="paths" aria-label="Secciones principales">
@@ -15,20 +14,44 @@
     <a routerLink="/tickets"><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon><span><b>Servicio técnico</b><small>Crear y consultar solicitudes</small></span></a>
   </section>
 
-  <section class="featured">
-    <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2>Productos</h2></div><a routerLink="/catalog">Ver catálogo completo <span aria-hidden="true">→</span></a></header>
+  <section class="featured" aria-labelledby="products-title">
+    <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2 id="products-title">Productos para cada objetivo</h2></div><a routerLink="/catalog">Ver catálogo completo <span aria-hidden="true">→</span></a></header>
     @if (isLoading()) {
       <div class="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><p>Cargando productos…</p></div>
     } @else if (error()) {
       <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button appButton="text" type="button" (click)="loadFeatured()">Reintentar</button></div>
     } @else {
-      <ul class="products">
-        @for (product of featured(); track product.id) {
-          <li><app-product-card [product]="product" mode="featured" (addToCart)="add(product, $event)" /></li>
-        } @empty { <li class="status"><p>Por el momento no hay productos publicados.</p><a appButton="text" routerLink="/catalog">Ir al catálogo</a></li> }
-      </ul>
+      <div class="product-sections">
+        @for (group of productGroups(); track group.eyebrow; let index = $index) {
+          <section class="product-showcase" [style.--product-banner]="'url(' + group.banner.src + ')'" [attr.aria-labelledby]="'product-group-' + index">
+            <article class="product-promo">
+              <div class="product-promo__copy">
+                <p class="eyebrow">{{ group.eyebrow }}</p>
+                <h3 [id]="'product-group-' + index">{{ group.title }}</h3>
+                <p>{{ group.description }}</p>
+                <a appButton="outlined" routerLink="/catalog" [queryParams]="group.queryParams">{{ group.linkLabel }}</a>
+              </div>
+            </article>
+            <ul class="products" [attr.aria-label]="'Productos de ' + group.eyebrow">
+              @for (product of group.products; track product.id) {
+                <li><app-product-card [product]="product" mode="featured" (addToCart)="add(product, $event)" /></li>
+              } @empty {
+                <li class="status"><p>No hay productos publicados en {{ group.eyebrow.toLowerCase() }} por el momento.</p><a appButton="text" routerLink="/catalog" [queryParams]="group.queryParams">Revisar catálogo</a></li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
     }
   </section>
 
-  <section class="service"><div><p class="eyebrow">Pinatech service lab</p><h2>Tu equipo también<br>merece respawn.</h2><p>Registrá una solicitud y consultá su seguimiento desde tu cuenta.</p><a appButton="outlined" routerLink="/tickets">Ir a servicio técnico</a></div></section>
+  <section class="service" aria-labelledby="service-title">
+    <div class="service-copy">
+      <p class="eyebrow">Pinatech service lab</p>
+      <h2 id="service-title">Tu equipo también merece respawn.</h2>
+      <p>Registrá una solicitud, adjuntá imágenes y consultá su seguimiento desde tu cuenta.</p>
+      <ul><li>Diagnóstico y reparación</li><li>Seguimiento de la solicitud</li><li>Adjuntos para mostrar la falla</li></ul>
+      <a appButton="outlined" routerLink="/tickets">Ir a servicio técnico</a>
+    </div>
+  </section>
 </main>
