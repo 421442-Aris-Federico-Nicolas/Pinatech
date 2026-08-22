@@ -46,7 +46,7 @@ export class CatalogComponent {
     this.loadOptions();
 
     this.searchChanges.pipe(debounceTime(350), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.applyFilters());
+      .subscribe(() => this.applyFilters(1, true));
 
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readParams(params);
@@ -56,7 +56,7 @@ export class CatalogComponent {
 
   searchChanged(value: string): void { this.searchChanges.next(value); }
 
-  applyFilters(page = 1): void {
+  applyFilters(page = 1, replaceUrl = false): void {
     if (!this.validatePrices()) return;
     const queryParams: Record<string, string | number> = {};
     const search = this.filters.search.trim();
@@ -67,7 +67,7 @@ export class CatalogComponent {
     if (this.filters.maxPrice !== null && this.filters.maxPrice >= 0) queryParams['maxPrice'] = this.filters.maxPrice;
     if (this.sort() !== 'name,asc') queryParams['sort'] = this.sort();
     if (page > 1) queryParams['page'] = page;
-    void this.router.navigate([], { relativeTo: this.route, queryParams });
+    void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl });
   }
 
   clearFilters(): void {

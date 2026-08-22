@@ -9,13 +9,13 @@
       @if (form.deviceType !== 'PC de escritorio') {<mat-form-field><mat-label>Modelo</mat-label><input matInput [(ngModel)]="form.model" name="deviceModel" autocomplete="off" spellcheck="false" placeholder="Ej. IdeaPad 3 15ALC6…" [disabled]="creating()" required></mat-form-field>}
       <mat-form-field class="wide"><mat-label>Problema informado</mat-label><textarea matInput rows="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" autocomplete="off" spellcheck="true" placeholder="Ej. No enciende desde una actualización…" [disabled]="creating()" required></textarea></mat-form-field>
       <div class="upload-field wide">
-        <div><strong>Imágenes del equipo</strong><small>Opcional · JPEG o PNG · 5&nbsp;MiB por archivo · máximo 10</small></div>
-        <label [class.disabled]="creating()">Seleccionar<input type="file" name="newTicketImages" accept="image/jpeg,image/png" multiple [disabled]="creating()" (change)="selectCreateImages($event)"></label>
+        <div><strong>Imágenes del equipo</strong><small>{{ createLimitReached() ? 'Límite de 10 imágenes alcanzado' : 'Opcional · JPEG o PNG · 5 MiB por archivo · máximo 10' }}</small></div>
+        <label [class.disabled]="creating() || createLimitReached()">Seleccionar<input type="file" name="newTicketImages" accept="image/jpeg,image/png" multiple [disabled]="creating() || createLimitReached()" (change)="selectCreateImages($event)"></label>
       </div>
       @if (createImages().length) {
         <div class="local-previews wide">@for (image of createImages(); track image.previewUrl; let index = $index) {<article><img [src]="image.previewUrl" [alt]="'Vista previa de ' + image.file.name" width="640" height="480" loading="lazy"><span>{{ image.file.name }}</span><button type="button" [disabled]="creating()" (click)="removeCreateImage(index)">Quitar</button></article>}</div>
       }
-      <button mat-flat-button class="wide" type="submit" [disabled]="creating()">{{ creating() ? 'Creando y subiendo imágenes…' : 'Enviar solicitud' }}</button>
+      <button mat-flat-button class="wide" type="submit" [disabled]="creating()">{{ creating() ? (createImages().length ? 'Creando y subiendo imágenes…' : 'Creando solicitud…') : 'Enviar solicitud' }}</button>
     </form>
     @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
     @if (success()) { <p class="message success" role="status">{{ success() }}</p> }
@@ -24,23 +24,25 @@
   <section class="tickets-panel" [attr.aria-busy]="loading()">
     <header><div><p class="eyebrow">Seguimiento privado</p><h2>Mis solicitudes</h2></div><button type="button" (click)="load()" [disabled]="loading()">Actualizar</button></header>
     @if (loading()) { <p class="empty" role="status">Cargando solicitudes…</p> }
+    @else if (listError()) { <div class="list-error" role="alert"><p>{{ listError() }}</p><button type="button" (click)="load()">Reintentar</button></div> }
     @else {
       @for (ticket of tickets(); track ticket.id) {
         <article class="ticket-card">
-          <header><h3>#{{ ticket.id }} · {{ ticket.deviceType }} {{ ticket.brand }} {{ ticket.model }}</h3><span>{{ ticket.status }}</span></header>
+          <header><h3>#{{ ticket.id }} · {{ ticket.deviceType }} {{ ticket.brand }} {{ ticket.model }}</h3><span>{{ statusLabel(ticket.status) }}</span></header>
           <p>{{ ticket.reportedProblem }}</p><small>{{ ticket.createdAt | date:'medium' }}</small>
           @if (ticket.attachments.length) {
             <button type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" [attr.aria-controls]="'ticket-images-' + ticket.id" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
             @if (imagesExpanded(ticket.id)) { <div [id]="'ticket-images-' + ticket.id"><app-ticket-attachment-gallery [attachments]="ticket.attachments" /></div> }
           }
           <section class="ticket-upload">
-            <div><strong>Agregar imágenes</strong><small>Opcional, hasta completar 10 adjuntos.</small></div>
-             <label [class.disabled]="uploadingTicket() === ticket.id">Elegir<input type="file" [name]="'ticketImages' + ticket.id" accept="image/jpeg,image/png" multiple [disabled]="uploadingTicket() === ticket.id" (change)="selectTicketImages(ticket, $event)"></label>
+            <div><strong>Agregar imágenes</strong><small>{{ attachmentLimitReached(ticket) ? 'Límite de 10 adjuntos alcanzado' : 'Opcional, hasta completar 10 adjuntos.' }}</small></div>
+             <label [class.disabled]="uploadingTicket() === ticket.id || attachmentLimitReached(ticket)">Elegir<input type="file" [name]="'ticketImages' + ticket.id" accept="image/jpeg,image/png" multiple [disabled]="uploadingTicket() === ticket.id || attachmentLimitReached(ticket)" (change)="selectTicketImages(ticket, $event)"></label>
             @if (pendingFor(ticket.id).length) {
               <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" [disabled]="uploadingTicket() === ticket.id" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
               <button mat-stroked-button type="button" [disabled]="uploadingTicket() !== null" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
             }
-          </section>
+           </section>
+           @if(ticketMessages()[ticket.id]){<p class="ticket-message" role="status">{{ ticketMessages()[ticket.id] }}</p>}
         </article>
       } @empty { <p class="empty">Aún no registraste solicitudes.</p> }
     }

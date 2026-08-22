@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
 import { Ticket, TicketsService } from './tickets.service';
 import { TicketsComponent } from './tickets.component';
@@ -100,5 +100,36 @@ describe('TicketsComponent attachment gallery', () => {
 
     expect((fixture.nativeElement.querySelector('[name="ticketImages7"]') as HTMLInputElement).disabled).toBe(true);
     expect((fixture.nativeElement.querySelector('.selected-files button') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows a recoverable list error instead of an empty state when loading fails', async () => {
+    await TestBed.configureTestingModule({
+      imports: [TicketsComponent],
+      providers: [
+        { provide: TicketsService, useValue: { tickets: () => throwError(() => new Error('network')) } },
+        { provide: TicketAttachmentService, useValue: { upload: vi.fn() } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TicketsComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.list-error')?.textContent).toContain('Revisá tu conexión');
+    expect(fixture.nativeElement.querySelector('.tickets-panel .empty')).toBeNull();
+  });
+
+  it('keeps only one attachment gallery expanded', async () => {
+    await TestBed.configureTestingModule({
+      imports: [TicketsComponent],
+      providers: [
+        { provide: TicketsService, useValue: { tickets: () => of([]) } },
+        { provide: TicketAttachmentService, useValue: { upload: vi.fn() } },
+      ],
+    }).compileComponents();
+    const component = TestBed.createComponent(TicketsComponent).componentInstance;
+
+    component.toggleImages(7);
+    component.toggleImages(8);
+
+    expect([...component.expandedTickets()]).toEqual([8]);
   });
 });

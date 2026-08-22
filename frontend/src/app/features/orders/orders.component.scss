@@ -52,6 +52,7 @@ dd { font-size: .82rem; margin: 0; }
 @media (prefers-reduced-motion: reduce) { .loader, .button-spinner { animation: none; } }
 
 @media (max-width: 650px) {
+  .page-header { align-items: flex-start; flex-direction: column; gap: 1rem; }
   .order-header, footer { align-items: stretch; flex-direction: column; }
   .payment-action { align-items: stretch; flex-direction: column; }
   .badges { align-items: flex-start; justify-content: flex-start; }

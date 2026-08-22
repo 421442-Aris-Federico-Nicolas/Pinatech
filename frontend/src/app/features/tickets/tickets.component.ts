@@ -35,6 +35,8 @@ export class TicketsComponent {
   readonly uploadingTicket = signal<number | null>(null);
   readonly error = signal('');
   readonly success = signal('');
+  readonly listError = signal('');
+  readonly ticketMessages = signal<Record<number, string>>({});
   readonly createImages = signal<PendingImage[]>([]);
   readonly ticketImages = signal<Record<number, PendingImage[]>>({});
   readonly expandedTickets = signal<Set<number>>(new Set());
@@ -52,10 +54,11 @@ export class TicketsComponent {
   }
 
   load(): void {
+    this.listError.set('');
     this.loading.set(true);
     this.service.tickets().pipe(finalize(() => this.loading.set(false))).subscribe({
       next: (tickets) => this.tickets.set(tickets),
-      error: () => this.fail('No se pudieron cargar tus solicitudes.'),
+      error: () => this.listError.set('No se pudieron cargar tus solicitudes. Revisá tu conexión e intentá nuevamente.'),
     });
   }
 
@@ -121,6 +124,7 @@ export class TicketsComponent {
     const images = [...this.pendingFor(ticket.id)];
     if (!images.length || this.uploadingTicket() !== null) return;
     this.clearMessages();
+    this.ticketMessages.update((messages) => ({ ...messages, [ticket.id]: '' }));
     this.uploadingTicket.set(ticket.id);
     this.upload(ticket.id, images).pipe(finalize(() => this.uploadingTicket.set(null))).subscribe((results) => {
       const { uploaded, succeeded, failed } = summarizeUploadResults(results);
@@ -128,9 +132,10 @@ export class TicketsComponent {
       this.tickets.update((tickets) => tickets.map((current) => current.id === ticket.id ? updated : current));
       this.revoke(succeeded);
       this.ticketImages.update((records) => ({ ...records, [ticket.id]: failed }));
-      this.success.set(uploaded.length === images.length
+      const message = uploaded.length === images.length
         ? `${uploaded.length} ${uploaded.length === 1 ? 'imagen agregada' : 'imágenes agregadas'} al ticket #${ticket.id}.`
-        : `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. Podés volver a intentar las restantes.`);
+        : `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. Podés volver a intentar las restantes.`;
+      this.ticketMessages.update((messages) => ({ ...messages, [ticket.id]: message }));
     });
   }
 
@@ -139,13 +144,15 @@ export class TicketsComponent {
   imagesExpanded(ticketId: number): boolean { return this.expandedTickets().has(ticketId); }
 
   toggleImages(ticketId: number): void {
-    this.expandedTickets.update((expanded) => {
-      const updated = new Set(expanded);
-      updated.has(ticketId) ? updated.delete(ticketId) : updated.add(ticketId);
-      return updated;
-    });
+    this.expandedTickets.update((expanded) => expanded.has(ticketId) ? new Set() : new Set([ticketId]));
     this.syncUrl(this.imagesExpanded(ticketId) ? ticketId : null);
   }
+
+  createLimitReached(): boolean { return this.createImages().length >= 10; }
+  attachmentLimitReached(ticket: Ticket): boolean { return ticket.attachments.length + this.pendingFor(ticket.id).length >= 10; }
+  statusLabel(status: string): string { return {
+    RECEIVED: 'Recibido', UNDER_DIAGNOSIS: 'En diagnóstico', WAITING_FOR_APPROVAL: 'Esperando aprobación', APPROVED: 'Aprobado', IN_REPAIR: 'En reparación', WAITING_FOR_PARTS: 'Esperando repuesto', READY_FOR_PICKUP: 'Listo para retirar', DELIVERED: 'Entregado', CANCELLED: 'Cancelado',
+  }[status] ?? status; }
 
   @HostListener('window:beforeunload', ['$event'])
   protectUnfinishedRequest(event: BeforeUnloadEvent): void {

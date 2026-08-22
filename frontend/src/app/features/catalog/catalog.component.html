@@ -39,11 +39,11 @@
            @for (product of page()?.content ?? []; track product.id; let index = $index) {
              <li><mat-card>
                <a class="product-visual" [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" [attr.aria-label]="'Ver ' + product.name">
-                  @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name" width="640" height="480" [attr.loading]="index < 3 ? 'eager' : 'lazy'" [attr.fetchpriority]="index === 0 ? 'high' : null"> }
+                   @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name" width="640" height="480" [attr.loading]="index === 0 ? 'eager' : 'lazy'" [attr.fetchpriority]="index === 0 ? 'high' : null"> }
                  @else { <span>{{ product.brandName }}</span><b aria-hidden="true">PIN</b> }
                </a>
                <mat-card-header><mat-card-subtitle><span translate="no">{{ product.brandName }}</span> · {{ product.categoryName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" translate="no">{{ product.name }}</a></mat-card-title></mat-card-header>
-               <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | currency:'ARS':'code':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'code':'1.2-2' }}</small></mat-card-content>
+                <mat-card-content><p>{{ product.description }}</p><strong>{{ product.price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'symbol-narrow':'1.2-2' }}</small></mat-card-content>
                <mat-card-actions><label class="variant-select">Color<select [name]="'catalog-variant-' + product.id" autocomplete="off" [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [attr.aria-label]="'Agregar ' + product.name + ' al carrito'" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
              </mat-card></li>
            }

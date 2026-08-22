@@ -17,6 +17,8 @@ interface StatusAction { label: string; status: TicketStatus; danger?: boolean; 
 
 const CLOSED = new Set<TicketStatus>(['DELIVERED', 'CANCELLED']);
 const WORKFLOW: TicketStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS', 'WAITING_FOR_APPROVAL', 'APPROVED', 'IN_REPAIR', 'WAITING_FOR_PARTS', 'READY_FOR_PICKUP', 'DELIVERED'];
+const STATUS_FILTERS = ['ALL', 'ACTIVE', ...WORKFLOW, 'CANCELLED'];
+const PRIORITY_FILTERS = ['ALL', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
 
 @Component({
   selector: 'app-technical',
@@ -96,13 +98,19 @@ export class TechnicalComponent {
   constructor() {
     const section = this.route?.snapshot.queryParamMap.get('section');
     if (this.isSection(section)) this.section.set(section);
-    this.statusFilter.set(this.route?.snapshot.queryParamMap.get('status') ?? 'ACTIVE');
-    this.priorityFilter.set(this.route?.snapshot.queryParamMap.get('priority') ?? 'ALL');
+    const status = this.route?.snapshot.queryParamMap.get('status');
+    const priority = this.route?.snapshot.queryParamMap.get('priority');
+    this.statusFilter.set(status && STATUS_FILTERS.includes(status) ? status : 'ACTIVE');
+    this.priorityFilter.set(priority && PRIORITY_FILTERS.includes(priority) ? priority : 'ALL');
+    if (status && !STATUS_FILTERS.includes(status) || priority && !PRIORITY_FILTERS.includes(priority)) {
+      queueMicrotask(() => this.syncUrl({ status: this.statusFilter(), priority: this.priorityFilter() }));
+    }
     this.load(true);
   }
 
   load(force = false): void {
     if (this.loading() || this.editingBusy() || (!force && !this.confirmDiscardDetails())) return;
+    this.clearMessages();
     this.loading.set(true);
     const technicians = this.isAdmin() ? this.service.technicians() : of<Technician[]>([]);
     forkJoin({ tickets: this.service.tickets(), technicians }).pipe(finalize(() => this.loading.set(false))).subscribe({
@@ -110,10 +118,16 @@ export class TechnicalComponent {
         this.tickets.set(tickets);
         this.technicians.set(technicians);
         const requestedId = Number(this.route?.snapshot.queryParamMap.get('ticket'));
-        const selected = tickets.find((ticket) => ticket.id === (this.selected()?.id ?? requestedId)) ?? null;
+        const requested = tickets.find((ticket) => ticket.id === (this.selected()?.id ?? requestedId)) ?? null;
+        const selected = this.section() === 'overview' || requested && this.filteredTickets().some((ticket) => ticket.id === requested.id)
+          ? requested
+          : this.filteredTickets()[0] ?? null;
         if (selected) {
           this.applySelected(selected);
           this.loadHistory(selected.id);
+        } else {
+          this.selected.set(null);
+          this.history.set([]);
         }
       },
       error: () => this.fail('No se pudo cargar la operación técnica.'),
@@ -123,10 +137,7 @@ export class TechnicalComponent {
   navigate(section: TechnicalSection): void {
     if (section !== this.section() && !this.confirmDiscardDetails()) return;
     this.section.set(section);
-    if (section !== 'overview' && !this.selected()) {
-      const first = section === 'mine' ? this.myTickets()[0] : this.activeTickets()[0];
-      if (first) this.select(first);
-    }
+    if (section !== 'overview') this.reconcileSelection();
     this.syncUrl({ section, ticket: section === 'overview' ? null : this.selected()?.id ?? null });
     this.clearMessages();
   }
@@ -146,6 +157,9 @@ export class TechnicalComponent {
     this.attachmentFile.set(null);
     this.syncUrl({ section: this.section(), ticket: ticket.id });
     this.loadHistory(ticket.id);
+    queueMicrotask(() => {
+      if (globalThis.matchMedia?.('(max-width: 850px)').matches) this.host.nativeElement.querySelector<HTMLElement>('.ticket-detail')?.scrollIntoView({ block: 'start' });
+    });
   }
 
   saveDetails(detailsForm?: NgForm): void {
@@ -309,7 +323,20 @@ export class TechnicalComponent {
   }
   private isSection(value: string | null): value is TechnicalSection { return ['overview', 'queue', 'mine'].includes(value ?? ''); }
   syncFilters(): void { this.syncUrl({ status: this.statusFilter(), priority: this.priorityFilter() }); }
-  setStatusFilter(status: string): void { this.statusFilter.set(status); this.syncFilters(); }
+  setStatusFilter(status: string): void { this.statusFilter.set(STATUS_FILTERS.includes(status) ? status : 'ACTIVE'); this.reconcileSelection(); this.syncFilters(); }
+  setPriorityFilter(priority: string): void { this.priorityFilter.set(PRIORITY_FILTERS.includes(priority) ? priority : 'ALL'); this.reconcileSelection(); this.syncFilters(); }
+  private reconcileSelection(): void {
+    const current = this.selected();
+    if (current && this.filteredTickets().some((ticket) => ticket.id === current.id)) return;
+    const next = this.filteredTickets()[0] ?? null;
+    this.selected.set(next);
+    this.history.set([]);
+    if (next) {
+      this.applySelected(next);
+      this.loadHistory(next.id);
+    }
+    this.syncUrl({ ticket: next?.id ?? null });
+  }
   private syncUrl(queryParams: Record<string, string | number | null | undefined>): void {
     if (!this.router || !this.route) return;
     void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });

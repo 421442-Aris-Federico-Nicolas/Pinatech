@@ -1,7 +1,7 @@
 <div class="technical-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
   <aside class="technical-sidebar">
     <div class="sidebar-head">
-      <div class="service-mark"><iconify-icon aria-hidden="true" icon="line-md:cog-loop"></iconify-icon></div>
+      <div class="service-mark"><iconify-icon aria-hidden="true" icon="line-md:cog"></iconify-icon></div>
       <div class="sidebar-copy"><strong>Pinatech Lab</strong><small>Service center</small></div>
       <button class="collapse" type="button" (click)="sidebarCollapsed.update(value => !value)" [attr.aria-expanded]="!sidebarCollapsed()" [attr.aria-label]="sidebarCollapsed() ? 'Expandir navegación' : 'Contraer navegación'"><iconify-icon aria-hidden="true" [icon]="sidebarCollapsed() ? 'line-md:chevron-small-double-right' : 'line-md:chevron-small-double-left'"></iconify-icon></button>
     </div>
@@ -27,7 +27,7 @@
       <section class="kpis" aria-label="Indicadores técnicos">
         <article><div class="kpi-icon cyan"><iconify-icon aria-hidden="true" icon="line-md:clipboard-list"></iconify-icon></div><p>Tickets activos</p><strong>{{ activeTickets().length }}</strong><span>{{ unassignedTickets() }} todavía sin asignar</span></article>
         <article><div class="kpi-icon orange"><iconify-icon aria-hidden="true" icon="line-md:alert-circle"></iconify-icon></div><p>Prioridad alta</p><strong>{{ urgentTickets() }}</strong><span>Casos altos y urgentes</span></article>
-        <article><div class="kpi-icon violet"><iconify-icon aria-hidden="true" icon="line-md:cog-loop"></iconify-icon></div><p>Mi carga actual</p><strong>{{ myTickets().length }}</strong><span>Tickets bajo tu responsabilidad</span></article>
+        <article><div class="kpi-icon violet"><iconify-icon aria-hidden="true" icon="line-md:cog"></iconify-icon></div><p>Mi carga actual</p><strong>{{ myTickets().length }}</strong><span>Tickets bajo tu responsabilidad</span></article>
         <article><div class="kpi-icon green"><iconify-icon aria-hidden="true" icon="line-md:confirm-circle"></iconify-icon></div><p>Listos para retirar</p><strong>{{ readyTickets() }}</strong><span>{{ statusCount('DELIVERED') }} reparaciones entregadas</span></article>
       </section>
 
@@ -68,7 +68,7 @@
       <section class="queue-toolbar">
         <label class="search"><iconify-icon aria-hidden="true" icon="line-md:search"></iconify-icon><input type="search" name="ticketSearch" autocomplete="off" spellcheck="false" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Ej. #125, cliente o equipo…" aria-label="Buscar tickets"></label>
         <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); syncFilters()" aria-label="Filtrar por estado"><option value="ACTIVE">Activos</option><option value="ALL">Todos los estados</option>@for(status of statuses;track status){<option [value]="status">{{ statusLabel(status) }}</option>}<option value="CANCELLED">Cancelados</option></select>
-        <select [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event); syncFilters()" aria-label="Filtrar por prioridad"><option value="ALL">Todas las prioridades</option>@for(priority of priorities;track priority){<option [value]="priority">{{ priorityLabel(priority) }}</option>}</select>
+        <select [ngModel]="priorityFilter()" (ngModelChange)="setPriorityFilter($event)" aria-label="Filtrar por prioridad"><option value="ALL">Todas las prioridades</option>@for(priority of priorities;track priority){<option [value]="priority">{{ priorityLabel(priority) }}</option>}</select>
       </section>
 
       <section class="ticket-workspace">
@@ -103,8 +103,8 @@
               @else { <p class="no-attachments">Este ticket todavía no tiene imágenes.</p> }
               @if (canEdit(ticket)) {
                 <div class="attachment-upload" [attr.aria-busy]="uploadingAttachment()">
-                  <label [class.disabled]="editingBusy()">Elegir imagen<input type="file" name="ticketAttachment" accept="image/jpeg,image/png" [disabled]="editingBusy()" (change)="selectAttachment($event, ticket)"></label>
-                  <span>{{ attachmentFile()?.name || 'JPEG o PNG, hasta 5 MiB (opcional)' }}</span>
+                  <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Elegir imagen<input type="file" name="ticketAttachment" accept="image/jpeg,image/png" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
+                  <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : attachmentFile()?.name || 'JPEG o PNG, hasta 5 MiB (opcional)' }}</span>
                   <button mat-stroked-button type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
                 </div>
               }
@@ -113,7 +113,7 @@
               <div class="section-title"><div><h3>Ficha técnica</h3><p>Diagnóstico, prioridad y presupuesto.</p></div>@if(!canEdit(ticket)){<span class="locked">Asignado a otro técnico</span>}</div>
               <mat-form-field><mat-label>Prioridad</mat-label><mat-select [(ngModel)]="priority" name="ticketPriority" [disabled]="!canEdit(ticket) || editingBusy()">@for(item of priorities;track item){<mat-option [value]="item">{{ priorityLabel(item) }}</mat-option>}</mat-select></mat-form-field>
               <mat-form-field class="wide"><mat-label>Diagnóstico técnico</mat-label><textarea matInput rows="4" [(ngModel)]="diagnosis" name="ticketDiagnosis" autocomplete="off" spellcheck="true" [disabled]="!canEdit(ticket) || editingBusy()" placeholder="Ej. Se verificó la fuente y se reemplazó el conector…"></textarea></mat-form-field>
-              <div class="price-fields"><mat-form-field><mat-label>Presupuesto estimado</mat-label><input matInput type="number" min="0" [(ngModel)]="estimatedPrice" name="estimatedPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field><mat-form-field><mat-label>Precio final</mat-label><input matInput type="number" min="0" [(ngModel)]="finalPrice" name="finalPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field></div>
+              <div class="price-fields"><mat-form-field><mat-label>Presupuesto estimado</mat-label><input matInput type="number" min="0" step="0.01" [(ngModel)]="estimatedPrice" name="estimatedPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field><mat-form-field><mat-label>Precio final</mat-label><input matInput type="number" min="0" step="0.01" [(ngModel)]="finalPrice" name="finalPrice" inputmode="decimal" [disabled]="!canEdit(ticket) || editingBusy()"><span matTextSuffix>ARS</span></mat-form-field></div>
               <button mat-stroked-button type="submit" [disabled]="!canEdit(ticket) || editingBusy()">Guardar ficha técnica</button>
             </form>
 

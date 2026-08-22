@@ -1,17 +1,17 @@
 <a class="skip-link" href="#main-content">Saltar al contenido</a>
-<header>
 <div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
+<header>
 <mat-toolbar aria-label="Navegación principal">
   <a class="brand" routerLink="/">
-    <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="" width="75" height="75" fetchpriority="high"></span>
+    <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="" width="75" height="75"></span>
     <span translate="no">Pinatech</span>
   </a>
   <button class="menu-toggle" type="button" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav" aria-label="Abrir o cerrar menú" (click)="menuOpen.update(open => !open)">
-    <iconify-icon [icon]="menuOpen() ? 'line-md:menu-to-close-transition' : 'line-md:menu'" aria-hidden="true"></iconify-icon>
+    <iconify-icon [icon]="menuOpen() ? 'line-md:close' : 'line-md:menu'" aria-hidden="true"></iconify-icon>
   </button>
   <nav id="main-nav" [class.open]="menuOpen()">
     @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
-      <a class="nav-link" routerLink="/catalog" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:search" aria-hidden="true"></iconify-icon> Catálogo</a>
+      <a class="nav-link" routerLink="/catalog" [class.active]="catalogActive()" [attr.aria-current]="catalogActive() ? 'page' : null"><iconify-icon icon="line-md:search" aria-hidden="true"></iconify-icon> Catálogo</a>
       <a class="nav-link cart-link" routerLink="/cart" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:shopping-cart" aria-hidden="true"></iconify-icon> Carrito <span class="cart-count" [attr.aria-label]="cart.count() + (cart.count() === 1 ? ' producto en el carrito' : ' productos en el carrito')">{{ cart.count() }}</span></a>
     }
     @if (auth.user()?.roles?.includes('ADMIN')) { <a class="nav-link" routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:grid-3" aria-hidden="true"></iconify-icon> Gestión</a> }
@@ -22,7 +22,7 @@
     }
     <span class="spacer"></span>
     @if (auth.isAuthenticated()) {
-      <a class="user-name" routerLink="/profile" [attr.aria-label]="'Ver perfil de ' + auth.user()?.firstName">Hola, {{ auth.user()?.firstName }}</a>
+      <a class="user-name" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" [attr.aria-label]="'Ver perfil de ' + auth.user()?.firstName">Hola, {{ auth.user()?.firstName }}</a>
       <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out" aria-hidden="true"></iconify-icon> Salir</button>
     } @else {
       <a mat-button routerLink="/register">Crear cuenta</a>

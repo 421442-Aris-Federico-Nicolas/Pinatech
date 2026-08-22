@@ -31,7 +31,7 @@
               @else { <span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b> }
             </a>
             <mat-card-header><mat-card-subtitle translate="no">{{ product.brandName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" translate="no">{{ product.name }}</a></mat-card-title></mat-card-header>
-            <mat-card-content><strong>{{ product.price | currency:'ARS':'code':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'code':'1.2-2' }}</small></mat-card-content>
+            <mat-card-content><strong>{{ product.price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'symbol-narrow':'1.2-2' }}</small></mat-card-content>
             <mat-card-actions><label class="variant-select">Color<select [name]="'featured-variant-' + product.id" autocomplete="off" [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [attr.aria-label]="'Agregar ' + product.name + ' al carrito'" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
           </mat-card></li>
         } @empty { <li class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></li> }

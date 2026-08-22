@@ -16,6 +16,7 @@ import { AdminService, Brand, Category, Inventory, ProductPayload } from './admi
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
+const ORDER_FILTERS = ['ALL', 'PENDING_PAYMENT', 'PAID', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'];
 interface ProductForm extends ProductPayload {}
 interface PendingProductImage { file: File; previewUrl: string; altText: string; }
 interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
@@ -96,7 +97,8 @@ export class AdminComponent {
     const section = this.route?.snapshot.queryParamMap.get('section');
     if (this.isSection(section)) this.section.set(section);
     const filter = this.route?.snapshot.queryParamMap.get('orderStatus');
-    if (filter) this.orderFilter.set(filter);
+    if (filter && ORDER_FILTERS.includes(filter)) this.orderFilter.set(filter);
+    else if (filter) queueMicrotask(() => this.syncUrl({ orderStatus: null }));
     const orderId = Number(this.route?.snapshot.queryParamMap.get('order'));
     if (orderId > 0) this.expandedOrder.set(orderId);
     this.productSnapshot = this.productState();
@@ -104,8 +106,9 @@ export class AdminComponent {
     this.reload(true);
   }
 
-  reload(force = false): void {
+  reload(force = false, preserveMessages = false): void {
     if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock() || (!force && !this.confirmDiscardProductChanges())) return;
+    if (!preserveMessages) this.clearMessages();
     this.loading.set(true);
     forkJoin({
       products: this.service.products(),
@@ -345,7 +348,7 @@ export class AdminComponent {
     if (!product || this.saving() || this.deactivatingProduct() || !confirm(`¿Dar de baja "${product.name}"?`)) return;
     this.deactivatingProduct.set(true);
     this.service.deleteProduct(product.id).pipe(finalize(() => this.deactivatingProduct.set(false))).subscribe({
-      next: () => { this.success.set('Producto dado de baja.'); this.resetProduct(true); this.reload(); },
+      next: () => { this.success.set('Producto dado de baja.'); this.resetProduct(true); this.reload(false, true); },
       error: () => this.fail('No se pudo dar de baja el producto.'),
     });
   }

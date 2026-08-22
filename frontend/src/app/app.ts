@@ -19,16 +19,23 @@ export class App {
   readonly auth = inject(AuthService);
   readonly cart = inject(CartService);
   readonly menuOpen = signal(false);
+  readonly catalogActive = signal(false);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
+  private currentPath: string | null = null;
 
   constructor() {
     this.router.events.pipe(
       filter((event) => event instanceof NavigationEnd),
       takeUntilDestroyed(this.destroyRef),
-    ).subscribe(() => {
+    ).subscribe((event) => {
+      const path = new URL(event.urlAfterRedirects, this.document.baseURI).pathname;
+      const previousPath = this.currentPath;
+      this.currentPath = path;
+      this.catalogActive.set(path === '/catalog' || path.startsWith('/products/'));
       this.menuOpen.set(false);
+      if (previousPath === path) return;
       queueMicrotask(() => {
         const content = this.document.getElementById('main-content');
         const heading = content?.querySelector<HTMLElement>('h1');
