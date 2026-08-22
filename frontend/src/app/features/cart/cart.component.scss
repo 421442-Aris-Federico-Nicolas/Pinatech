@@ -80,6 +80,7 @@ article {
 .item-image { background: var(--color-surface-raised); border-radius: var(--radius-sm); height: 64px; object-fit: cover; width: 64px; }
 .item-info { display: grid; gap: var(--space-1); }
 .item-info small, .item-info span { color: var(--color-text-subtle); font-size: var(--text-sm); }
+.item-info .stock-note { color: var(--color-success-text); font-weight: var(--font-weight-medium); }
 .item-info a { color: var(--color-text-strong); font-weight: var(--font-weight-bold); text-decoration: none; }
 .item-info a:hover { color: var(--color-cyan); }
 

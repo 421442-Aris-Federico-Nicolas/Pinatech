@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { EMPTY, of } from 'rxjs';
@@ -20,8 +21,8 @@ describe('ProductComponent', () => {
     images: [],
     specifications: [],
     variants: [
-      { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true },
-      { id: 12, colorName: 'Blanco', colorHex: '#ffffff', inStock: true },
+      { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 5 },
+      { id: 12, colorName: 'Blanco', colorHex: '#ffffff', inStock: true, availableQuantity: 4 },
     ],
   };
 
@@ -31,7 +32,7 @@ describe('ProductComponent', () => {
       imports: [ProductComponent],
       providers: [
         { provide: CatalogService, useValue: { product: () => of(product) } },
-        { provide: CartService, useValue: { add: vi.fn() } },
+        { provide: CartService, useValue: { add: vi.fn(), items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -60,12 +61,12 @@ describe('ProductComponent', () => {
 
   it('warns with the actual quantity when the cart cap is reached', async () => {
     const warning = vi.fn(() => ({ onAction: () => EMPTY }));
-    const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 99, capped: true }));
+    const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 5, limit: 5, capped: true }));
     await TestBed.configureTestingModule({
       imports: [ProductComponent],
       providers: [
         { provide: CatalogService, useValue: { product: () => of(product) } },
-        { provide: CartService, useValue: { add } },
+        { provide: CartService, useValue: { add, items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
         { provide: NotificationService, useValue: { warning, success: vi.fn() } },
         { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
         {
@@ -83,6 +84,6 @@ describe('ProductComponent', () => {
     component.addToCart();
 
     expect(add).toHaveBeenCalledWith(product, product.variants[0], 5);
-    expect(warning).toHaveBeenCalledWith('Se agregó 1 unidad; el máximo por color es 99.', 'Ver carrito');
+    expect(warning).toHaveBeenCalledWith('Se agregó 1 unidad; solo hay 5 disponibles para este color.', 'Ver carrito');
   });
 });

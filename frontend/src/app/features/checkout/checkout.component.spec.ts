@@ -8,8 +8,8 @@ import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService, MercadoPagoChec
 
 describe('CheckoutComponent', () => {
   const item: CartItem = {
-    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true }] },
-    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true },
+    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 5 }] },
+    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 5 },
     quantity: 2,
   };
   const capabilities: CheckoutCapabilities = {

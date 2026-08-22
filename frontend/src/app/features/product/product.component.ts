@@ -34,6 +34,11 @@ export class ProductComponent {
   readonly quantity = signal(1);
   readonly selectedVariantId = signal<number | null>(null);
   readonly selectedVariant = computed<ProductVariant | null>(() => this.product()?.variants.find((variant) => variant.id === this.selectedVariantId()) ?? null);
+  readonly quantityInCart = computed(() => this.cart.items().find((item) => item.variant.id === this.selectedVariantId())?.quantity ?? 0);
+  readonly maxAddable = computed(() => {
+    const variant = this.selectedVariant();
+    return variant ? Math.max(0, this.cart.stockLimit(variant) - this.quantityInCart()) : 0;
+  });
   readonly priceWithoutNationalTax = computed(() => (this.product()?.price ?? 0) / 1.105);
   readonly loading = signal(true);
   readonly error = signal<'not-found' | 'request' | null>(null);
@@ -85,7 +90,7 @@ export class ProductComponent {
     });
   }
 
-  changeQuantity(change: number): void { this.quantity.update((quantity) => Math.min(99, Math.max(1, quantity + change))); }
+  changeQuantity(change: number): void { this.quantity.update((quantity) => Math.min(Math.max(1, this.maxAddable()), Math.max(1, quantity + change))); }
 
   changeImage(change: number): void {
     const total = this.product()?.images.length ?? 0;
@@ -96,6 +101,7 @@ export class ProductComponent {
   selectImage(index: number): void { this.imageIndex.set(index); }
   selectVariant(variantId: number): void {
     this.selectedVariantId.set(variantId);
+    this.quantity.set(1);
     void this.router.navigate([], { relativeTo: this.route, queryParams: { variant: variantId }, queryParamsHandling: 'merge' });
   }
 
@@ -114,14 +120,15 @@ export class ProductComponent {
     if (!product || !variant?.inStock) return;
     const result = this.cart.add(product, variant, this.quantity());
     const message = result.added === 0
-      ? 'Ya alcanzaste el máximo de 99 unidades para este color.'
+      ? `Ya tenés todas las unidades disponibles para este color en el carrito (${result.limit}).`
       : result.capped
-        ? `Se ${result.added === 1 ? 'agregó 1 unidad' : `agregaron ${result.added} unidades`}; el máximo por color es 99.`
+        ? `Se ${result.added === 1 ? 'agregó 1 unidad' : `agregaron ${result.added} unidades`}; solo hay ${result.limit} disponibles para este color.`
         : `${result.added === 1 ? '1 unidad agregada' : `${result.added} unidades agregadas`} en color ${variant.colorName}.`;
     const notification = result.capped
       ? this.notifications.warning(message, 'Ver carrito')
       : this.notifications.success(message, 'Ver carrito');
     notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
+    this.quantity.set(1);
   }
 
   private positiveNumber(value: string | null): number | null {

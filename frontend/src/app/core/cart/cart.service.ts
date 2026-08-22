@@ -6,7 +6,7 @@ import { Product, ProductVariant } from '../../features/catalog/catalog.service'
 import { AuthService } from '../auth/auth.service';
 
 export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
-export interface CartAddResult { requested: number; added: number; quantity: number; capped: boolean; }
+export interface CartAddResult { requested: number; added: number; quantity: number; limit: number; capped: boolean; }
 export interface OrderConfirmation {
   id: number;
   status: string;
@@ -67,8 +67,9 @@ export class CartService {
     const current = this.itemsState();
     const found = current.find((item) => item.variant.id === variant.id);
     const previousQuantity = found?.quantity ?? 0;
-    const nextQuantity = Math.min(MAX_QUANTITY, previousQuantity + requested);
-    const added = nextQuantity - previousQuantity;
+    const limit = this.stockLimit(variant);
+    const nextQuantity = Math.min(limit, previousQuantity + requested);
+    const added = Math.max(0, nextQuantity - previousQuantity);
     if (added > 0) {
       this.update(found
         ? current.map((item) => item.variant.id === variant.id
@@ -76,14 +77,16 @@ export class CartService {
           : item)
         : [...current, { product, variant, quantity: nextQuantity }]);
     }
-    return { requested, added, quantity: nextQuantity, capped: added < requested };
+    return { requested, added, quantity: added > 0 ? nextQuantity : previousQuantity, limit, capped: added < requested };
   }
 
   setQuantity(variantId: number, quantity: number): void {
     if (!Number.isFinite(quantity)) return;
     this.update(this.itemsState().flatMap((item) => {
       if (item.variant.id !== variantId) return [item];
-      return quantity <= 0 ? [] : [{ ...item, quantity: this.safeQuantity(quantity) }];
+      if (quantity <= 0) return [];
+      const bounded = Math.min(this.safeQuantity(quantity), this.stockLimit(item.variant));
+      return bounded > 0 ? [{ ...item, quantity: bounded }] : [];
     }));
   }
 
@@ -103,14 +106,24 @@ export class CartService {
         if (storageKey !== this.activeKey) return true;
         const byId = new Map(products.map((product) => [product.id, product]));
         const current = this.itemsState();
+        let removed = false;
+        let adjusted = false;
         const reconciled = current.flatMap((item) => {
           const product = byId.get(item.product.id);
           if (!product) return [item];
           const variant = product.variants.find((candidate) => candidate.id === item.variant.id);
-          return variant?.inStock ? [{ product, variant, quantity: item.quantity }] : [];
+          const limit = variant ? this.stockLimit(variant) : 0;
+          if (!variant || limit === 0) { removed = true; return []; }
+          const quantity = Math.min(item.quantity, limit);
+          if (quantity !== item.quantity) adjusted = true;
+          return [{ product, variant, quantity }];
         });
-        if (reconciled.length !== current.length) {
-          this.noticeState.set('Quitamos del carrito los colores que ya no están disponibles.');
+        if (removed || adjusted) {
+          this.noticeState.set(removed && adjusted
+            ? 'Quitamos los colores sin stock y ajustamos otras cantidades a la disponibilidad actual.'
+            : removed
+              ? 'Quitamos del carrito los colores que ya no están disponibles.'
+              : 'Ajustamos las cantidades del carrito al stock disponible actualmente.');
           this.update(reconciled);
         } else {
           this.itemsState.set(reconciled);
@@ -140,6 +153,13 @@ export class CartService {
     this.remove(this.confirmationKey(this.auth.user()?.id ?? null));
   }
 
+  stockLimit(variant: ProductVariant): number {
+    const available = Number.isInteger(variant.availableQuantity)
+      ? variant.availableQuantity
+      : variant.inStock ? MAX_QUANTITY : 0;
+    return Math.min(MAX_QUANTITY, Math.max(0, available));
+  }
+
   private update(items: CartItem[]): void {
     this.itemsState.set(items);
     this.persist(this.activeKey, items);
@@ -151,7 +171,7 @@ export class CartService {
     for (const item of incoming) {
       const index = merged.findIndex((candidate) => candidate.variant.id === item.variant.id);
       if (index === -1) merged.push(item);
-      else merged[index] = { product: item.product, variant: item.variant, quantity: Math.min(MAX_QUANTITY, merged[index].quantity + item.quantity) };
+      else merged[index] = { product: item.product, variant: item.variant, quantity: Math.min(this.stockLimit(item.variant), merged[index].quantity + item.quantity) };
     }
     return merged;
   }
@@ -202,11 +222,16 @@ export class CartService {
         this.remove(key);
       }
       return parsed.filter((item): item is CartItem => this.isCartItem(item))
-        .map((item) => ({
-          ...item,
-          product: { ...item.product, images: Array.isArray(item.product.images) ? item.product.images : [], variants: Array.isArray(item.product.variants) ? item.product.variants : [] },
-          quantity: this.safeQuantity(item.quantity),
-        }));
+        .flatMap((item) => {
+          const availableQuantity = this.stockLimit(item.variant);
+          if (availableQuantity === 0) return [];
+          return [{
+            ...item,
+            product: { ...item.product, images: Array.isArray(item.product.images) ? item.product.images : [], variants: Array.isArray(item.product.variants) ? item.product.variants : [] },
+            variant: { ...item.variant, availableQuantity },
+            quantity: Math.min(this.safeQuantity(item.quantity), availableQuantity),
+          }];
+        });
     } catch {
       return [];
     }
@@ -267,6 +292,8 @@ export class CartService {
       && typeof product['brandId'] === 'number' && typeof product['brandName'] === 'string'
       && typeof variant['id'] === 'number' && Number.isInteger(variant['id']) && variant['id'] > 0
       && typeof variant['colorName'] === 'string'
+      && typeof variant['inStock'] === 'boolean'
+      && (variant['availableQuantity'] === undefined || typeof variant['availableQuantity'] === 'number' && Number.isInteger(variant['availableQuantity']) && variant['availableQuantity'] >= 0)
       && Number.isFinite(item['quantity']) && item['quantity'] > 0;
   }
 

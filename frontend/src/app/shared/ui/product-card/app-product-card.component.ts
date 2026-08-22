@@ -17,6 +17,7 @@ export interface ProductCardVariant {
   readonly colorName: string;
   readonly colorHex: string | null;
   readonly inStock: boolean;
+  readonly availableQuantity: number;
 }
 
 export interface ProductCardProduct {

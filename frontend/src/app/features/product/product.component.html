@@ -31,15 +31,19 @@
         }
       </div>
       <div class="info">
-         <p class="category">{{item.categoryName}} · <span translate="no">{{item.brandName}}</span></p>
+         <nav class="product-breadcrumb" aria-label="Ubicación del producto"><a routerLink="/catalog">Catálogo</a><span aria-hidden="true">›</span><a routerLink="/catalog" [queryParams]="{ category: item.categoryId }">{{ item.categoryName }}</a><span aria-hidden="true">›</span><span translate="no">{{ item.brandName }}</span></nav>
          <h1 translate="no">{{item.name}}</h1>
-         <div class="price"><span>Precio publicado</span><strong>{{item.price|currency:'ARS':'symbol-narrow':'1.2-2'}}</strong><small>Precio sin impuesto nacional (10,5%): {{priceWithoutNationalTax()|currency:'ARS':'symbol-narrow':'1.2-2'}}</small></div>
+         <div class="product-meta"><span>Marca: <b translate="no">{{ item.brandName }}</b></span><span>ID: {{ item.id }}</span></div>
+         <section class="price" aria-labelledby="product-price-title"><span id="product-price-title">Precio publicado</span><strong>{{item.price|currency:'ARS':'symbol-narrow':'1.2-2'}}</strong><small>Precio sin impuesto nacional (10,5%): {{priceWithoutNationalTax()|currency:'ARS':'symbol-narrow':'1.2-2'}}</small></section>
           <section class="variants" aria-labelledby="color-title"><h2 id="color-title">Color</h2><div role="radiogroup" aria-labelledby="color-title">@for(variant of item.variants;track variant.id){<button type="button" role="radio" [attr.data-variant-id]="variant.id" [attr.tabindex]="selectedVariantId() === variant.id ? 0 : -1" [class.selected]="selectedVariantId() === variant.id" [disabled]="!variant.inStock" (click)="selectVariant(variant.id)" (keydown.arrowleft)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowup)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowright)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" (keydown.arrowdown)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" [attr.aria-checked]="selectedVariantId() === variant.id"><i aria-hidden="true" [style.background]="variant.colorHex || 'var(--color-text-subtle)'"></i><span>{{variant.colorName}}</span>@if(!variant.inStock){<small>Sin stock</small>}</button>}</div></section>
+        @if (selectedVariant(); as variant) {
+          <p class="stock-status" [class.unavailable]="!variant.inStock || maxAddable() === 0"><span aria-hidden="true">{{ variant.inStock && maxAddable() > 0 ? '✓' : '!' }}</span>@if (!variant.inStock) { Sin stock para este color. } @else if (maxAddable() === 0) { Ya agregaste las {{ variant.availableQuantity }} unidades disponibles al carrito. } @else { Stock disponible: {{ variant.availableQuantity }} {{ variant.availableQuantity === 1 ? 'unidad' : 'unidades' }}.@if (quantityInCart()) { Podés agregar {{ maxAddable() }} más. } }</p>
+        }
         <div class="purchase">
            <div class="quantity" role="group" aria-label="Cantidad">
-            <button type="button" [disabled]="quantity() === 1" (click)="changeQuantity(-1)" aria-label="Disminuir cantidad">−</button><span aria-live="polite">{{quantity()}}</span><button type="button" [disabled]="quantity() === 99" (click)="changeQuantity(1)" aria-label="Aumentar cantidad">+</button>
-          </div>
-          <button appButton="filled" type="button" [disabled]="!selectedVariant()?.inStock" (click)="addToCart()">{{ selectedVariant()?.inStock ? 'Agregar al carrito' : 'Sin stock' }}</button>
+             <button type="button" [disabled]="quantity() === 1 || maxAddable() === 0" (click)="changeQuantity(-1)" aria-label="Disminuir cantidad">−</button><span aria-live="polite">{{quantity()}}</span><button type="button" [disabled]="quantity() >= maxAddable()" (click)="changeQuantity(1)" aria-label="Aumentar cantidad">+</button>
+           </div>
+          <button appButton="filled" type="button" [disabled]="!selectedVariant()?.inStock || maxAddable() === 0" (click)="addToCart()">{{ !selectedVariant()?.inStock ? 'Sin stock' : maxAddable() === 0 ? 'Stock máximo en carrito' : 'Agregar al carrito' }}</button>
         </div>
           <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd translate="no">{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
       </div>

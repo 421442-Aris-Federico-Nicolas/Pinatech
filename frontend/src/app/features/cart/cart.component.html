@@ -20,11 +20,12 @@
                <a [routerLink]="['/products', item.product.id]" [queryParams]="{ variant: item.variant.id }" translate="no">{{ item.product.name }}</a>
               <span>Color: {{ item.variant.colorName }}</span>
               <span>{{ item.product.price | currency:'ARS':'symbol-narrow':'1.2-2' }} por unidad</span>
+              <span class="stock-note">Stock disponible: {{ cart.stockLimit(item.variant) }}</span>
             </div>
              <div class="quantity" role="group" aria-label="Cantidad de {{ item.product.name }}">
               <button type="button" [disabled]="item.quantity === 1" (click)="cart.setQuantity(item.variant.id, item.quantity - 1)" [attr.aria-label]="'Quitar una unidad de ' + item.product.name">−</button>
               <span aria-live="polite">{{ item.quantity }}</span>
-               <button type="button" [disabled]="item.quantity === 99" (click)="cart.setQuantity(item.variant.id, item.quantity + 1)" [attr.aria-label]="'Agregar una unidad de ' + item.product.name">+</button>
+                <button type="button" [disabled]="item.quantity >= cart.stockLimit(item.variant)" (click)="cart.setQuantity(item.variant.id, item.quantity + 1)" [attr.aria-label]="item.quantity >= cart.stockLimit(item.variant) ? 'Alcanzaste el stock disponible de ' + item.product.name : 'Agregar una unidad de ' + item.product.name">+</button>
             </div>
             <strong class="subtotal">{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
               <button class="remove" appButton="text" tone="danger" type="button" (click)="removeItem(item)" [attr.aria-label]="'Eliminar ' + item.product.name + ', color ' + item.variant.colorName + ', del carrito'">Eliminar</button>

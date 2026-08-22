@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
 
 describe('CartService', () => {
   const user = signal<AuthenticatedUser | null>(null);
-  const variant = { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true };
+  const variant = { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 99 };
   const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [variant] };
 
   beforeEach(() => {
@@ -40,6 +40,16 @@ describe('CartService', () => {
     expect(cart.total()).toBe(2000);
   });
 
+  it('keeps carts saved before exact stock quantities were introduced', () => {
+    const { availableQuantity: _availableQuantity, ...previousVariant } = variant;
+    localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, variant: previousVariant, quantity: 2 }]));
+
+    const cart = TestBed.inject(CartService);
+
+    expect(cart.items()[0].quantity).toBe(2);
+    expect(cart.items()[0].variant.availableQuantity).toBe(99);
+  });
+
   it('merges the guest cart into the customer cart after login', () => {
     localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, variant, quantity: 2 }]));
     localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 3 }]));
@@ -54,7 +64,7 @@ describe('CartService', () => {
 
   it('keeps colors of the same product as independent cart lines', () => {
     const cart = TestBed.inject(CartService);
-    const blue = { id: 12, colorName: 'Azul', colorHex: '#0000FF', inStock: true };
+    const blue = { id: 12, colorName: 'Azul', colorHex: '#0000FF', inStock: true, availableQuantity: 99 };
 
     cart.add(product, variant);
     cart.add({ ...product, variants: [variant, blue] }, blue, 2);
@@ -77,10 +87,23 @@ describe('CartService', () => {
 
     cart.reconcile().subscribe();
     TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/products/1`)
-      .flush({ ...product, variants: [{ ...variant, inStock: false }] });
+      .flush({ ...product, variants: [{ ...variant, inStock: false, availableQuantity: 0 }] });
 
     expect(cart.items()).toEqual([]);
     expect(cart.notice()).toContain('ya no están disponibles');
+  });
+
+  it('reduces a cart line when current stock drops below its quantity', () => {
+    const cart = TestBed.inject(CartService);
+    cart.add(product, variant, 5);
+
+    cart.reconcile().subscribe();
+    TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/products/1`)
+      .flush({ ...product, variants: [{ ...variant, availableQuantity: 3 }] });
+
+    expect(cart.items()[0].quantity).toBe(3);
+    expect(cart.items()[0].variant.availableQuantity).toBe(3);
+    expect(cart.notice()).toContain('Ajustamos las cantidades');
   });
 
   it('does not restore an expired confirmation and removes it from storage', () => {
@@ -135,8 +158,8 @@ describe('CartService', () => {
 
     expect(cart.count()).toBe(99);
     expect(cart.total()).toBe(99000);
-    expect(first).toEqual({ requested: 99, added: 99, quantity: 99, capped: false });
-    expect(capped).toEqual({ requested: 2, added: 0, quantity: 99, capped: true });
+    expect(first).toEqual({ requested: 99, added: 99, quantity: 99, limit: 99, capped: false });
+    expect(capped).toEqual({ requested: 2, added: 0, quantity: 99, limit: 99, capped: true });
   });
 
   it('reports the actual amount added when a request reaches the quantity cap', () => {
@@ -145,8 +168,23 @@ describe('CartService', () => {
 
     const result = cart.add(product, variant, 5);
 
-    expect(result).toEqual({ requested: 5, added: 1, quantity: 99, capped: true });
+    expect(result).toEqual({ requested: 5, added: 1, quantity: 99, limit: 99, capped: true });
     expect(cart.count()).toBe(99);
+  });
+
+  it('never adds more units than the variant stock', () => {
+    const cart = TestBed.inject(CartService);
+    const limited = { ...variant, availableQuantity: 5 };
+
+    const first = cart.add({ ...product, variants: [limited] }, limited, 4);
+    const second = cart.add({ ...product, variants: [limited] }, limited, 3);
+
+    expect(first.added).toBe(4);
+    expect(second).toEqual({ requested: 3, added: 1, quantity: 5, limit: 5, capped: true });
+    expect(cart.count()).toBe(5);
+
+    cart.setQuantity(limited.id, 20);
+    expect(cart.items()[0].quantity).toBe(5);
   });
 
   it('keeps the cart after creating an order and clears it only when checkout is completed', () => {

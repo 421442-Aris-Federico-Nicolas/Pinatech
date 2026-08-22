@@ -8,8 +8,8 @@ import { CartComponent } from './cart.component';
 
 describe('CartComponent', () => {
   const item: CartItem = {
-    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true }] },
-    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true },
+    product: { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1500, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [{ id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 5 }] },
+    variant: { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 5 },
     quantity: 2,
   };
 
@@ -18,6 +18,7 @@ describe('CartComponent', () => {
       items: signal([item]),
       count: signal(2),
       total: signal(3000),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
       setQuantity: vi.fn(),
       add: vi.fn(),
       removeItem: vi.fn(),
@@ -54,6 +55,7 @@ describe('CartComponent', () => {
       items: signal([item]),
       count: signal(2),
       total: signal(3000),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
       setQuantity: vi.fn(),
       add: vi.fn(),
       removeItem: vi.fn(),
@@ -85,11 +87,12 @@ describe('CartComponent', () => {
     const secondItem: CartItem = {
       ...item,
       product: { ...item.product, id: 2, name: 'Mouse' },
-      variant: { id: 12, colorName: 'Blanco', colorHex: '#ffffff', inStock: true },
+      variant: { id: 12, colorName: 'Blanco', colorHex: '#ffffff', inStock: true, availableQuantity: 5 },
       quantity: 1,
     };
     const cart = {
       items: signal([item, secondItem]), count: signal(3), total: signal(4500),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
       setQuantity: vi.fn(), add: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
       reconcile: vi.fn(() => of(true)), legacyCartDiscarded: signal(false), dismissLegacyCartWarning: vi.fn(),
       notice: signal(''), dismissNotice: vi.fn(),

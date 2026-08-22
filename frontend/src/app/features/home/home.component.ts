@@ -55,7 +55,7 @@ export class HomeComponent {
     if (!variant.inStock) { this.notifications.warning('El color seleccionado no tiene stock disponible.'); return; }
     const result = this.cart.add(product, variant);
     const notification = result.added === 0
-      ? this.notifications.warning('Ya alcanzaste el máximo de 99 unidades para este color.', 'Ver carrito')
+      ? this.notifications.warning(`Ya tenés las ${result.limit} ${result.limit === 1 ? 'unidad disponible' : 'unidades disponibles'} para este color en el carrito.`, 'Ver carrito')
       : this.notifications.success(`${product.name} en color ${variant.colorName} se agregó al carrito.`, 'Ver carrito');
     notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
   }

@@ -12,8 +12,8 @@ describe('AppProductCardComponent', () => {
     brandName: 'Pinatech',
     images: [],
     variants: [
-      { id: 11, colorName: 'Blanco', colorHex: '#ffffff', inStock: false },
-      { id: 12, colorName: 'Negro', colorHex: '#000000', inStock: true },
+      { id: 11, colorName: 'Blanco', colorHex: '#ffffff', inStock: false, availableQuantity: 0 },
+      { id: 12, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 8 },
     ],
   };
 
