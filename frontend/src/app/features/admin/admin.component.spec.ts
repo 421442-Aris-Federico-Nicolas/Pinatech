@@ -37,4 +37,33 @@ describe('AdminComponent payments', () => {
     expect(component.orderActions('PAID').map((action) => action.label)).toEqual(['Preparar pedido']);
     expect(component.orderActions('PREPARING').map((action) => action.label)).toEqual(['Marcar listo']);
   });
+
+  it('initializes real taxonomy selections and does not refresh over dirty product edits without confirmation', async () => {
+    const products = vi.fn(() => of({ content: [] }));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products,
+          categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]),
+          inventories: () => of([]),
+          orders: () => of([]),
+        },
+      }],
+    }).compileComponents();
+    const component = TestBed.createComponent(AdminComponent).componentInstance;
+
+    expect(component.form.categoryId).toBe(3);
+    expect(component.form.brandId).toBe(8);
+    component.section.set('catalog');
+    component.form.name = 'Edición pendiente';
+    const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+
+    component.reload();
+
+    expect(confirmation).toHaveBeenCalledOnce();
+    expect(products).toHaveBeenCalledOnce();
+  });
 });

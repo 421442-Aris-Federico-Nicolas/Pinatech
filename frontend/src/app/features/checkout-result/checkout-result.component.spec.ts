@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
 import { CheckoutResultComponent } from './checkout-result.component';
 
@@ -42,6 +42,8 @@ describe('CheckoutResultComponent', () => {
     expect(get).toHaveBeenCalledWith(42);
     expect(fixture.nativeElement.textContent).toContain('Pago rechazado');
     expect(fixture.nativeElement.textContent).not.toContain('Pago aprobado');
+    expect(fixture.nativeElement.querySelector('.state[role="status"]')?.querySelector('button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Mercado Pago');
     fixture.destroy();
   });
 
@@ -64,6 +66,47 @@ describe('CheckoutResultComponent', () => {
     expect(get).toHaveBeenCalledTimes(6);
     expect(fixture.nativeElement.textContent).toContain('Pago pendiente');
     expect(fixture.nativeElement.textContent).toContain('Todavía no recibimos una confirmación definitiva');
+    const retry = [...fixture.nativeElement.querySelectorAll('button')]
+      .find((button: HTMLButtonElement) => button.textContent?.includes('Volver a verificar el pago'));
+    expect(retry).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.state[role="status"]')?.contains(retry)).toBe(false);
+
+    (retry as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect((retry as HTMLButtonElement).isConnected).toBe(true);
+    expect((retry as HTMLButtonElement).disabled).toBe(true);
+    expect((retry as HTMLButtonElement).getAttribute('aria-busy')).toBe('true');
+    fixture.destroy();
+  });
+
+  it('keeps the error retry control mounted while verifying again', async () => {
+    const retry = new Subject<Order>();
+    const get = vi.fn()
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(retry);
+    await TestBed.configureTestingModule({
+      imports: [CheckoutResultComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ orderId: '42' }) } } },
+        { provide: OrderService, useValue: { get } },
+      ],
+    }).compileComponents();
+    vi.useFakeTimers();
+
+    const fixture = TestBed.createComponent(CheckoutResultComponent);
+    vi.advanceTimersByTime(0);
+    fixture.detectChanges();
+    const retryButton = fixture.nativeElement.querySelector('.result-card > button') as HTMLButtonElement;
+
+    retryButton.click();
+    vi.advanceTimersByTime(0);
+    fixture.detectChanges();
+
+    expect(retryButton.isConnected).toBe(true);
+    expect(retryButton.disabled).toBe(true);
+    expect(retryButton.getAttribute('aria-busy')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.result-card > [role="status"]')?.textContent).toContain('Volviendo a verificar');
     fixture.destroy();
   });
 });

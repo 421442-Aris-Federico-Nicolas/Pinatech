@@ -28,15 +28,23 @@ export class CheckoutComponent {
   readonly submitError = signal('');
 
   constructor() {
-    this.cart.reconcile().subscribe(() => { if (this.cart.items().length) this.loadCapabilities(); });
+    this.cart.reconcile().subscribe((success) => {
+      if (!success) {
+        this.capabilitiesError.set('No pudimos verificar la disponibilidad del carrito. Volvé al carrito y reintentá antes de continuar.');
+        return;
+      }
+      if (this.cart.items().length) this.loadCapabilities();
+    });
   }
 
   loadCapabilities(): void {
     if (this.loadingCapabilities()) return;
     this.loadingCapabilities.set(true);
-    this.capabilitiesError.set('');
     this.checkoutService.capabilities().pipe(finalize(() => this.loadingCapabilities.set(false))).subscribe({
-      next: (capabilities) => this.capabilities.set(capabilities),
+      next: (capabilities) => {
+        this.capabilities.set(capabilities);
+        this.capabilitiesError.set('');
+      },
       error: () => {
         this.capabilities.set(null);
         this.capabilitiesError.set('No pudimos consultar las opciones disponibles. Intentá nuevamente antes de continuar con el pago.');
@@ -69,7 +77,9 @@ export class CheckoutComponent {
   }
 
   mercadoPagoEnabled(capabilities = this.capabilities()): boolean {
-    return !!capabilities?.onlinePaymentsEnabled && capabilities.paymentMethods.includes('MERCADO_PAGO');
+    return !!capabilities?.orderRequestsEnabled
+      && capabilities.onlinePaymentsEnabled
+      && capabilities.paymentMethods.includes('MERCADO_PAGO');
   }
 
   dismissConfirmation(): void {

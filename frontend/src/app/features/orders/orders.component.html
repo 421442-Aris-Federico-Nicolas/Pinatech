@@ -5,24 +5,36 @@
   </header>
 
   @if (paymentError()) { <p class="payment-error" role="alert">{{ paymentError() }}</p> }
+  @if (loadingCapabilities() && !capabilitiesError()) {
+    <p class="capability-status" role="status" aria-live="polite">Consultando disponibilidad del pago online…</p>
+  }
+  @if (capabilitiesError()) {
+    <div class="capability-error" [attr.aria-busy]="loadingCapabilities()">
+      <p role="alert">{{ capabilitiesError() }}</p>
+      <button mat-stroked-button type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando disponibilidad del pago online' : 'Reintentar consulta de pago online'">
+        {{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}
+      </button>
+      @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar la disponibilidad del pago online.</p> }
+    </div>
+  }
 
-  @if (loading()) {
-    <section class="state" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></section>
-  } @else if (error()) {
-    <section class="state error" role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p><button mat-stroked-button type="button" (click)="load()">Reintentar</button></section>
+  @if (error()) {
+    <section class="state error" [attr.aria-busy]="loading()"><div role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p></div><button mat-stroked-button type="button" (click)="load()" [disabled]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="loading() ? 'Cargando tus pedidos nuevamente' : 'Reintentar carga de pedidos'">{{ loading() ? 'Cargando pedidos…' : 'Reintentar carga de pedidos' }}</button>@if (loading()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a cargar tus pedidos.</p> }</section>
+  } @else if (loading()) {
+    <section class="state"><div role="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></div></section>
   } @else if (!orders().length) {
-    <section class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés pedidos</h2><p>Cuando inicies uno desde el checkout, vas a poder seguirlo desde acá.</p><a mat-flat-button routerLink="/catalog">Ver catálogo</a></section>
+    <section class="state"><span class="empty-mark" aria-hidden="true">PIN</span><h2>Todavía no tenés pedidos</h2><p>Cuando inicies uno desde el carrito, vas a poder seguirlo desde acá.</p><a mat-flat-button routerLink="/catalog">Ver catálogo</a></section>
   } @else {
-    <section class="orders" aria-label="Historial de pedidos">
+    <ol class="orders" aria-label="Historial de pedidos">
       @for (order of orders(); track order.id) {
-        <article>
+        <li><article>
           <header class="order-header">
             <div><p>Pedido</p><h2>#{{ order.id }}</h2><small>Registrado el {{ order.createdAt | date:'medium' }}</small></div>
-            <div class="badges" aria-label="Estados del pedido">
-              <span [attr.data-status]="order.status">{{ statusLabel(order.status) }}</span>
-              <span [attr.data-status]="order.paymentStatus">{{ paymentLabel(order.paymentStatus) }}</span>
-              <span [attr.data-status]="order.fulfillmentStatus">{{ fulfillmentLabel(order.fulfillmentStatus) }}</span>
-            </div>
+            <ul class="badges" aria-label="Estados del pedido">
+              <li [attr.data-status]="order.status">{{ statusLabel(order.status) }}</li>
+              <li [attr.data-status]="order.paymentStatus">{{ paymentLabel(order.paymentStatus) }}</li>
+              <li [attr.data-status]="order.fulfillmentStatus">{{ fulfillmentLabel(order.fulfillmentStatus) }}</li>
+            </ul>
           </header>
 
           @if (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED') {
@@ -30,29 +42,31 @@
           }
 
           @if (canPay(order)) {
-            <div class="payment-action">
-              <p>{{ order.paymentStatus === 'REJECTED' ? 'El pago anterior no fue aprobado. Podés iniciar un nuevo intento mientras la reserva siga vigente.' : 'El pago todavía está pendiente. Podés continuar en Mercado Pago.' }}</p>
-              <button mat-flat-button type="button" [disabled]="payingOrder() !== null" (click)="pay(order)">
-                {{ payingOrder() === order.id ? 'Preparando Mercado Pago…' : order.paymentStatus === 'REJECTED' ? 'Reintentar pago' : 'Continuar pago' }}
+            <div class="payment-action" [attr.aria-busy]="payingOrder() === order.id">
+              <p>{{ order.paymentStatus === 'REJECTED' ? 'El pago anterior no fue aprobado. Podés iniciar un nuevo intento mientras la reserva siga vigente.' : 'El pago todavía está pendiente. Podés continuar en ' }}@if (order.paymentStatus !== 'REJECTED') { <span translate="no">Mercado Pago</span>. }</p>
+              <button mat-flat-button type="button" [disabled]="payingOrder() !== null" [attr.aria-busy]="payingOrder() === order.id" [attr.aria-label]="payingOrder() === order.id ? 'Preparando el pago del pedido ' + order.id : (order.paymentStatus === 'REJECTED' ? 'Reintentar el pago del pedido ' : 'Continuar el pago del pedido ') + order.id" (click)="pay(order)">
+                @if (payingOrder() === order.id) { <span class="button-spinner" aria-hidden="true"></span> }
+                <span>{{ payingOrder() === order.id ? 'Preparando pago…' : order.paymentStatus === 'REJECTED' ? 'Reintentar pago' : 'Continuar pago' }}</span>
               </button>
+              @if (payingOrder() === order.id) { <p class="payment-progress" role="status" aria-live="polite">Preparando la redirección segura a <span translate="no">Mercado Pago</span>.</p> }
             </div>
           }
 
-          <div class="items">
+          <ul class="items" aria-label="Productos del pedido">
             @for (item of order.items; track item.variantId) {
-              <div><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+              <li><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></li>
             }
-          </div>
+          </ul>
 
           <footer>
             <dl>
-              <div><dt>Pago</dt><dd>{{ methodLabel(order.paymentMethod) }}</dd></div>
+              <div><dt>Pago</dt><dd [attr.translate]="order.paymentMethod === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(order.paymentMethod) }}</dd></div>
               <div><dt>Entrega</dt><dd>{{ methodLabel(order.deliveryMethod) }}</dd></div>
             </dl>
             <div class="total"><span>Total</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
           </footer>
-        </article>
+        </article></li>
       }
-    </section>
+    </ol>
   }
 </main>

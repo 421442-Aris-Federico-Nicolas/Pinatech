@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { CartItem, CartService, OrderConfirmation } from '../../core/cart/cart.service';
 import { CheckoutComponent } from './checkout.component';
 import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService, MercadoPagoCheckout } from './checkout.service';
@@ -50,7 +50,7 @@ describe('CheckoutComponent', () => {
       confirmation: signal(null),
       checkout: vi.fn(() => { calls.push('order'); return of(order); }),
       completeCheckout: vi.fn(() => calls.push('complete')),
-      reconcile: vi.fn(() => of(undefined)),
+      reconcile: vi.fn(() => of(true)),
       notice: signal(''),
       dismissNotice: vi.fn(),
     };
@@ -71,6 +71,10 @@ describe('CheckoutComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Pagar con Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Las cotizaciones y los proveedores de entrega todavía no están configurados.');
+    const paymentButton = [...fixture.nativeElement.querySelectorAll('button')]
+      .find((candidate: HTMLButtonElement) => candidate.textContent?.includes('Pagar con Mercado Pago')) as HTMLButtonElement;
+    expect(paymentButton.getAttribute('aria-label')).toBe('Pagar con Mercado Pago');
+    expect(fixture.nativeElement.querySelector('.product-list')?.tagName).toBe('UL');
 
     fixture.componentInstance.submit();
     fixture.detectChanges();
@@ -89,7 +93,7 @@ describe('CheckoutComponent', () => {
       confirmation: signal(null),
       checkout: vi.fn(() => of(order)),
       completeCheckout: vi.fn(),
-      reconcile: vi.fn(() => of(undefined)),
+      reconcile: vi.fn(() => of(true)),
       notice: signal(''),
       dismissNotice: vi.fn(),
     };
@@ -118,7 +122,7 @@ describe('CheckoutComponent', () => {
   it('does not create an order when Mercado Pago is disabled', async () => {
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
-      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(undefined)), notice: signal(''), dismissNotice: vi.fn(),
+      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],
@@ -135,6 +139,61 @@ describe('CheckoutComponent', () => {
     expect(cart.checkout).not.toHaveBeenCalled();
   });
 
+  it('does not create an order when order requests are disabled', async () => {
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, orderRequestsEnabled: false }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.submit();
+
+    expect(cart.checkout).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('No se pueden iniciar pedidos en este momento.');
+    expect(fixture.nativeElement.textContent).not.toContain('Pagar con Mercado Pago');
+  });
+
+  it('keeps the capabilities retry control mounted while retrying', async () => {
+    const retry = new Subject<CheckoutCapabilities>();
+    const capabilitiesRequest = vi.fn()
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(retry);
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: capabilitiesRequest } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    const retryButton = [...fixture.nativeElement.querySelectorAll('button')]
+      .find((button: HTMLButtonElement) => button.textContent?.includes('Reintentar consulta')) as HTMLButtonElement;
+
+    retryButton.click();
+    fixture.detectChanges();
+
+    expect(retryButton.isConnected).toBe(true);
+    expect(retryButton.disabled).toBe(true);
+    expect(retryButton.getAttribute('aria-busy')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.error [role="status"]')?.textContent).toContain('Volviendo a consultar');
+  });
+
   it('marks an expired confirmation and lets the user dismiss it', async () => {
     const cart = {
       items: signal<CartItem[]>([]),
@@ -145,7 +204,7 @@ describe('CheckoutComponent', () => {
         reservationExpiresAt: '2000-01-01T20:00:00Z',
       }),
       dismissConfirmation: vi.fn(),
-      reconcile: vi.fn(() => of(undefined)),
+      reconcile: vi.fn(() => of(true)),
       notice: signal(''),
       dismissNotice: vi.fn(),
     };
@@ -166,6 +225,8 @@ describe('CheckoutComponent', () => {
     const dismissButton = [...fixture.nativeElement.querySelectorAll('button')]
       .find((button: HTMLButtonElement) => button.textContent?.includes('Cerrar confirmación')) as HTMLButtonElement;
     expect(dismissButton).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.result')?.getAttribute('role')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.result-status')?.getAttribute('role')).toBe('status');
 
     dismissButton.click();
     fixture.detectChanges();

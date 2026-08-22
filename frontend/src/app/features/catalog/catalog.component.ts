@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +13,7 @@ import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Pro
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
 @Component({
-  imports: [DecimalPipe, FormsModule, MatButtonModule, MatCardModule, RouterLink],
+  imports: [CurrencyPipe, FormsModule, MatButtonModule, MatCardModule, RouterLink],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',
@@ -39,20 +39,16 @@ export class CatalogComponent {
   readonly optionsError = signal(false);
   readonly filtersOpen = signal(false);
   readonly feedback = signal('');
+  readonly priceError = signal('');
   readonly selectedVariants = signal<Record<number, number>>({});
 
   constructor() {
-    forkJoin({ categories: this.service.categories(), brands: this.service.brands() })
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: ({ categories, brands }) => { this.categories.set(categories); this.brands.set(brands); },
-        error: () => this.optionsError.set(true),
-      });
+    this.loadOptions();
 
     this.searchChanges.pipe(debounceTime(350), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.applyFilters());
 
-    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readParams(params);
       this.loadPage(this.pageNumber(params));
     });
@@ -61,6 +57,7 @@ export class CatalogComponent {
   searchChanged(value: string): void { this.searchChanges.next(value); }
 
   applyFilters(page = 1): void {
+    if (!this.validatePrices()) return;
     const queryParams: Record<string, string | number> = {};
     const search = this.filters.search.trim();
     if (search) queryParams['search'] = search;
@@ -76,14 +73,15 @@ export class CatalogComponent {
   clearFilters(): void {
     Object.assign(this.filters, { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null });
     this.sort.set('name,asc');
+    this.priceError.set('');
     this.applyFilters();
   }
 
   add(product: Product): void {
     const variant = this.selectedVariant(product);
-    if (!variant?.inStock) { this.feedback.set('El color seleccionado no tiene stock disponible.'); return; }
+    if (!variant?.inStock) { this.announce('El color seleccionado no tiene stock disponible.'); return; }
     this.cart.add(product, variant);
-    this.feedback.set(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
+    this.announce(`${product.name} en color ${variant.colorName} se agregó al carrito.`);
   }
 
   selectedVariant(product: Product): ProductVariant | undefined {
@@ -93,14 +91,25 @@ export class CatalogComponent {
 
   selectVariant(productId: number, variantId: number): void { this.selectedVariants.update((selected) => ({ ...selected, [productId]: variantId })); }
 
-  openProduct(productId: number): void { void this.router.navigate(['/products', productId]); }
-
   retry(): void { this.loadPage(this.page()?.number ?? 0); }
+
+  retryOptions(): void { this.loadOptions(); }
+
+  private loadOptions(): void {
+    this.optionsError.set(false);
+    forkJoin({ categories: this.service.categories(), brands: this.service.brands() })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ categories, brands }) => { this.categories.set(categories); this.brands.set(brands); },
+        error: () => this.optionsError.set(true),
+      });
+  }
 
   private loadPage(page: number): void {
     this.request?.unsubscribe();
     this.loading.set(true);
     this.error.set(false);
+    this.page.set(null);
     this.request = this.service.getProducts(this.filters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (result) => { this.page.set(result); this.selectedVariants.update((selected) => ({ ...Object.fromEntries(result.content.map((product) => [product.id, product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id])), ...selected })); }, error: () => { this.page.set(null); this.error.set(true); } });
@@ -129,5 +138,22 @@ export class CatalogComponent {
   private nonNegativeNumber(value: string | null): number | null {
     const parsed = Number(value);
     return value !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  private announce(message: string): void {
+    this.feedback.set('');
+    queueMicrotask(() => this.feedback.set(message));
+  }
+
+  private validatePrices(): boolean {
+    const minimum = this.filters.minPrice;
+    const maximum = this.filters.maxPrice;
+    const message = minimum !== null && minimum < 0 || maximum !== null && maximum < 0
+      ? 'Los precios deben ser mayores o iguales a cero.'
+      : minimum !== null && maximum !== null && minimum > maximum
+        ? 'El precio desde no puede superar el precio hasta.'
+        : '';
+    this.priceError.set(message);
+    return !message;
   }
 }

@@ -1,6 +1,7 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
+import { FormsModule, NgForm } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -21,7 +22,7 @@ interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
 @Component({
   selector: 'app-admin',
-  imports: [DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
@@ -30,10 +31,14 @@ interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 export class AdminComponent {
   private readonly service = inject(AdminService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
+  private productSnapshot = '';
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
   readonly sidebarCollapsed = signal(false);
-  readonly loading = signal(true);
+  readonly loading = signal(false);
   readonly products = signal<Product[]>([]);
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
@@ -51,6 +56,8 @@ export class AdminComponent {
   readonly taxonomySaving = signal(false);
   readonly deletingTaxonomy = signal('');
   readonly deletingImage = signal<number | null>(null);
+  readonly deactivatingProduct = signal(false);
+  readonly adjustingStock = signal(false);
   readonly pendingImages = signal<PendingProductImage[]>([]);
   readonly form: ProductForm = this.emptyProduct();
   categoryName = '';
@@ -86,11 +93,19 @@ export class AdminComponent {
   });
 
   constructor() {
+    const section = this.route?.snapshot.queryParamMap.get('section');
+    if (this.isSection(section)) this.section.set(section);
+    const filter = this.route?.snapshot.queryParamMap.get('orderStatus');
+    if (filter) this.orderFilter.set(filter);
+    const orderId = Number(this.route?.snapshot.queryParamMap.get('order'));
+    if (orderId > 0) this.expandedOrder.set(orderId);
+    this.productSnapshot = this.productState();
     this.destroyRef.onDestroy(() => this.revokePendingImages());
-    this.reload();
+    this.reload(true);
   }
 
-  reload(): void {
+  reload(force = false): void {
+    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock() || (!force && !this.confirmDiscardProductChanges())) return;
     this.loading.set(true);
     forkJoin({
       products: this.service.products(),
@@ -105,20 +120,35 @@ export class AdminComponent {
         this.brands.set(brands);
         this.inventories.set(inventories);
         this.orders.set(orders);
-        const selectedId = this.selected()?.id;
+        const requestedId = Number(this.route?.snapshot.queryParamMap.get('product'));
+        const selectedId = this.selected()?.id ?? (requestedId > 0 ? requestedId : null);
         if (selectedId) {
           const product = products.content.find((candidate) => candidate.id === selectedId) ?? null;
           this.selected.set(product);
-          const variantId = product?.variants.some((variant) => variant.id === this.selectedVariantId()) ? this.selectedVariantId() : product?.variants[0]?.id ?? null;
+          const requestedVariantId = Number(this.route?.snapshot.queryParamMap.get('variant'));
+          const currentVariantId = this.selectedVariantId() ?? (requestedVariantId > 0 ? requestedVariantId : null);
+          const variantId = product?.variants.some((variant) => variant.id === currentVariantId) ? currentVariantId : product?.variants[0]?.id ?? null;
           this.selectedVariantId.set(variantId);
           this.inventory.set(inventories.find((item) => item.variantId === variantId) ?? null);
+          if (product) {
+            Object.assign(this.form, this.productForm(product));
+            this.productSnapshot = this.productState();
+          }
+        } else {
+          this.initializeTaxonomySelections();
         }
       },
       error: () => this.fail('No se pudieron cargar los datos de administración.'),
     });
   }
 
-  navigate(section: AdminSection): void { this.section.set(section); this.clearMessages(); }
+  navigate(section: AdminSection): boolean {
+    if (section !== this.section() && !this.confirmDiscardProductChanges()) return false;
+    this.section.set(section);
+    this.syncUrl({ section, product: section === 'catalog' || section === 'inventory' ? this.selected()?.id ?? null : null, order: section === 'sales' ? this.expandedOrder() : null });
+    this.clearMessages();
+    return true;
+  }
   sectionTitle(): string { return { overview: 'Resumen del negocio', sales: 'Ventas y pedidos', catalog: 'Catálogo', inventory: 'Inventario' }[this.section()]; }
   sectionDescription(): string { return {
     overview: 'Indicadores comerciales y operativos en tiempo real.',
@@ -127,38 +157,76 @@ export class AdminComponent {
     inventory: 'Disponibilidad, reservas y ajustes de stock.',
   }[this.section()]; }
 
-  openNewProduct(): void { this.navigate('catalog'); this.resetProduct(); }
+  openNewProduct(): void { if (this.navigate('catalog')) this.resetProduct(); }
 
-  select(product: Product, openInventory = false, variantId?: number): void {
+  select(product: Product, openInventory = false, variantId?: number, force = false): void {
+    if (!force && this.selected()?.id !== product.id && !this.confirmDiscardProductChanges()) return;
     this.clearPendingImages();
     this.selected.set(product);
-    Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) });
+    Object.assign(this.form, this.productForm(product));
     const selectedVariantId = variantId ?? product.variants[0]?.id ?? null;
     this.selectedVariantId.set(selectedVariantId);
     this.inventory.set(this.inventories().find((item) => item.variantId === selectedVariantId) ?? null);
+    this.productSnapshot = this.productState();
+    this.syncUrl({ product: product.id, variant: selectedVariantId });
     if (openInventory) this.navigate('inventory');
   }
 
-  resetProduct(): void {
+  resetProduct(force = false): void {
+    if (!force && !this.confirmDiscardProductChanges()) return;
     this.clearPendingImages();
     this.selected.set(null);
     this.inventory.set(null);
     this.selectedVariantId.set(null);
     Object.assign(this.form, this.emptyProduct());
+    this.productSnapshot = this.productState();
+    this.syncUrl({ product: null, variant: null });
   }
 
   updateSlug(): void {
     if (!this.selected()) this.form.slug = this.slug(this.form.name);
   }
 
-  saveProduct(): void {
+  saveProduct(productForm?: NgForm): void {
+    if (this.saving()) return;
     this.clearMessages();
-    if (this.form.specifications.some((item) => !item.groupName.trim() || !item.name.trim() || !item.value.trim())) return this.fail('Completá grupo, característica y valor en todas las filas.');
+    if (productForm?.invalid) {
+      this.fail('Revisá los campos requeridos del producto.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.editor :is(input, textarea, mat-select).ng-invalid')?.focus());
+      return;
+    }
+    if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) {
+      this.failAndFocus('Seleccioná una categoría válida.', '[name="productCategory"]');
+      return;
+    }
+    if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) {
+      this.failAndFocus('Seleccioná una marca válida.', '[name="productBrand"]');
+      return;
+    }
+    const incompleteSpecification = this.form.specifications.findIndex((item) => !item.groupName.trim() || !item.name.trim() || !item.value.trim());
+    if (incompleteSpecification >= 0) {
+      const item = this.form.specifications[incompleteSpecification];
+      const field = !item.groupName.trim() ? 'specGroup' : !item.name.trim() ? 'specName' : 'specValue';
+      this.failAndFocus('Completá grupo, característica y valor en todas las filas.', `[name="${field}${incompleteSpecification}"]`);
+      return;
+    }
     const names = this.form.specifications.map((item) => item.name.trim().toLowerCase());
-    if (new Set(names).size !== names.length) return this.fail('No puede haber características con el mismo nombre.');
-    if (!this.form.variants.length || this.form.variants.some((variant) => !variant.colorName.trim())) return this.fail('Agregá al menos un color y completá todos sus nombres.');
+    const duplicateSpecification = names.findIndex((name, index) => names.indexOf(name) !== index);
+    if (duplicateSpecification >= 0) {
+      this.failAndFocus('No puede haber características con el mismo nombre.', `[name="specName${duplicateSpecification}"]`);
+      return;
+    }
+    const incompleteVariant = this.form.variants.findIndex((variant) => !variant.colorName.trim());
+    if (!this.form.variants.length || incompleteVariant >= 0) {
+      this.failAndFocus('Agregá al menos un color y completá todos sus nombres.', incompleteVariant >= 0 ? `[name="variantName${incompleteVariant}"]` : '.variants-editor button');
+      return;
+    }
     const colors=this.form.variants.map((variant)=>variant.colorName.trim().toLowerCase());
-    if (new Set(colors).size !== colors.length) return this.fail('No puede haber colores repetidos.');
+    const duplicateColor = colors.findIndex((color, index) => colors.indexOf(color) !== index);
+    if (duplicateColor >= 0) {
+      this.failAndFocus('No puede haber colores repetidos.', `[name="variantName${duplicateColor}"]`);
+      return;
+    }
     this.saving.set(true);
     const request = this.selected()
       ? this.service.updateProduct(this.selected()!.id, this.form)
@@ -196,6 +264,7 @@ export class AdminComponent {
   }
 
   selectProductImages(event: Event): void {
+    if (this.saving()) return;
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
@@ -212,6 +281,7 @@ export class AdminComponent {
   }
 
   removePendingImage(index: number): void {
+    if (this.saving()) return;
     const item = this.pendingImages()[index];
     if (item) URL.revokeObjectURL(item.previewUrl);
     this.pendingImages.update((items) => items.filter((_, currentIndex) => currentIndex !== index));
@@ -272,9 +342,10 @@ export class AdminComponent {
 
   deleteProduct(): void {
     const product = this.selected();
-    if (!product || !confirm(`¿Dar de baja "${product.name}"?`)) return;
-    this.service.deleteProduct(product.id).subscribe({
-      next: () => { this.success.set('Producto dado de baja.'); this.resetProduct(); this.reload(); },
+    if (!product || this.saving() || this.deactivatingProduct() || !confirm(`¿Dar de baja "${product.name}"?`)) return;
+    this.deactivatingProduct.set(true);
+    this.service.deleteProduct(product.id).pipe(finalize(() => this.deactivatingProduct.set(false))).subscribe({
+      next: () => { this.success.set('Producto dado de baja.'); this.resetProduct(true); this.reload(); },
       error: () => this.fail('No se pudo dar de baja el producto.'),
     });
   }
@@ -283,14 +354,22 @@ export class AdminComponent {
     if (this.taxonomySaving()) return;
     const name = this.categoryName.trim();
     const slug = this.categorySlug.trim() || this.slug(name);
-    if (!name || !slug) return this.fail('Indicá nombre y slug para la categoría.');
+    if (!name || !slug) {
+      this.failAndFocus('Indicá nombre y slug para la categoría.', `[name="${!name ? 'categoryName' : 'categorySlug'}"]`);
+      return;
+    }
     const editing = this.editingCategoryId;
     const request = editing === null
       ? this.service.createCategory({ name, slug })
       : this.service.updateCategory(editing, { name, slug });
     this.taxonomySaving.set(true);
     request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
-      next: () => { this.cancelCategoryEdit(); this.success.set(editing === null ? 'Categoría creada.' : 'Categoría actualizada.'); this.reload(); },
+      next: (category) => {
+        this.categories.update((categories) => editing === null ? [...categories, category] : categories.map((current) => current.id === category.id ? category : current));
+        if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) this.form.categoryId = category.id;
+        this.cancelCategoryEdit();
+        this.success.set(editing === null ? 'Categoría creada.' : 'Categoría actualizada.');
+      },
       error: () => this.fail(editing === null ? 'No se pudo crear la categoría.' : 'No se pudo actualizar la categoría.'),
     });
   }
@@ -326,12 +405,20 @@ export class AdminComponent {
   addBrand(): void {
     if (this.taxonomySaving()) return;
     const name = this.brandName.trim();
-    if (!name) return this.fail('Indicá un nombre para la marca.');
+    if (!name) {
+      this.failAndFocus('Indicá un nombre para la marca.', '[name="brandName"]');
+      return;
+    }
     const editing = this.editingBrandId;
     const request = editing === null ? this.service.createBrand(name) : this.service.updateBrand(editing, name);
     this.taxonomySaving.set(true);
     request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
-      next: () => { this.cancelBrandEdit(); this.success.set(editing === null ? 'Marca creada.' : 'Marca actualizada.'); this.reload(); },
+      next: (brand) => {
+        this.brands.update((brands) => editing === null ? [...brands, brand] : brands.map((current) => current.id === brand.id ? brand : current));
+        if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) this.form.brandId = brand.id;
+        this.cancelBrandEdit();
+        this.success.set(editing === null ? 'Marca creada.' : 'Marca actualizada.');
+      },
       error: () => this.fail(editing === null ? 'No se pudo crear la marca.' : 'No se pudo actualizar la marca.'),
     });
   }
@@ -364,8 +451,21 @@ export class AdminComponent {
 
   adjustStock(): void {
     const current = this.inventory();
-    if (!current || !this.adjustment || !this.adjustmentReason.trim()) return this.fail('Indicá un color, un ajuste distinto de cero y su motivo.');
-    this.service.adjustInventory(current.variantId, Number(this.adjustment), this.adjustmentReason.trim()).subscribe({
+    if (this.adjustingStock()) return;
+    if (!current) {
+      this.failAndFocus('Indicá un color, un ajuste distinto de cero y su motivo.', '.inventory-products button');
+      return;
+    }
+    if (!Number.isFinite(Number(this.adjustment)) || !Number(this.adjustment)) {
+      this.failAndFocus('Indicá un color, un ajuste distinto de cero y su motivo.', '[name="stockAdjustment"]');
+      return;
+    }
+    if (!this.adjustmentReason.trim()) {
+      this.failAndFocus('Indicá un color, un ajuste distinto de cero y su motivo.', '[name="stockReason"]');
+      return;
+    }
+    this.adjustingStock.set(true);
+    this.service.adjustInventory(current.variantId, Number(this.adjustment), this.adjustmentReason.trim()).pipe(finalize(() => this.adjustingStock.set(false))).subscribe({
       next: (inventory) => {
         this.inventory.set(inventory);
         this.inventories.update((items) => items.map((item) => item.variantId === inventory.variantId ? inventory : item));
@@ -406,10 +506,17 @@ export class AdminComponent {
   }
 
   statusCount(status: string): number { return this.orders().filter((order) => order.status === status).length; }
+  filterOrders(status: string): void { this.orderFilter.set(status); this.syncUrl({ orderStatus: status }); }
+  openOrder(orderId: number): void { this.expandedOrder.set(orderId); this.navigate('sales'); this.syncUrl({ order: orderId }); }
+  toggleOrder(orderId: number): void {
+    const expanded = this.expandedOrder() === orderId ? null : orderId;
+    this.expandedOrder.set(expanded);
+    this.syncUrl({ order: expanded });
+  }
   stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
-  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: 0, brandId: 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null }] }; }
+  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null }] }; }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
     this.products.update((products) => products.some((current) => current.id === product.id)
       ? products.map((current) => current.id === product.id ? product : current)
@@ -417,10 +524,11 @@ export class AdminComponent {
     if (preservePendingImages) {
       this.selected.set(product);
       Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) });
+      this.productSnapshot = this.productState();
       this.selectedVariantId.set(product.variants[0]?.id ?? null);
       this.inventory.set(this.inventories().find((item) => item.variantId === this.selectedVariantId()) ?? null);
     } else {
-      this.select(product);
+      this.select(product, false, undefined, true);
     }
     this.success.set(message);
     this.service.inventories().subscribe((inventories) => {
@@ -433,4 +541,29 @@ export class AdminComponent {
   private slug(value: string): string { return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
   private clearMessages(): void { this.error.set(''); this.success.set(''); }
   private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private failAndFocus(message: string, selector: string): void {
+    this.fail(message);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus());
+  }
+  private initializeTaxonomySelections(): void {
+    if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) this.form.categoryId = this.categories()[0]?.id ?? 0;
+    if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) this.form.brandId = this.brands()[0]?.id ?? 0;
+    this.productSnapshot = this.productState();
+  }
+  private isValidTaxonomyId(value: number, items: Array<{ id: number }>): boolean {
+    return Number.isInteger(value) && value > 0 && items.some((item) => item.id === value);
+  }
+  private productForm(product: Product): ProductForm {
+    return { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) };
+  }
+  private productState(): string { return JSON.stringify(this.form); }
+  private confirmDiscardProductChanges(): boolean {
+    if (this.section() !== 'catalog' || (this.productState() === this.productSnapshot && !this.pendingImages().length)) return true;
+    return confirm('Tenés cambios sin guardar en el producto. ¿Querés descartarlos?');
+  }
+  private isSection(value: string | null): value is AdminSection { return ['overview', 'sales', 'catalog', 'inventory'].includes(value ?? ''); }
+  private syncUrl(queryParams: Record<string, string | number | null | undefined>): void {
+    if (!this.router || !this.route) return;
+    void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
 }

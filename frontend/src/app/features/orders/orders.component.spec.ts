@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
 import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 import { OrdersComponent } from './orders.component';
@@ -39,14 +39,21 @@ describe('OrdersComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Preparación pendiente');
     expect(fixture.nativeElement.textContent).toContain('Reserva vigente hasta');
     expect(fixture.nativeElement.textContent).toContain('A definir');
+    expect(fixture.nativeElement.querySelector('.orders')?.tagName).toBe('OL');
+    expect(fixture.nativeElement.querySelector('.items')?.tagName).toBe('UL');
+    expect(fixture.nativeElement.querySelector('.badges')?.tagName).toBe('UL');
   });
 
   it('shows a recoverable error when loading fails', async () => {
+    const retry = new Subject<Order[]>();
+    const mine = vi.fn()
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(retry);
     await TestBed.configureTestingModule({
       imports: [OrdersComponent],
       providers: [
         provideRouter([]),
-        { provide: OrderService, useValue: { mine: () => throwError(() => new Error('network')) } },
+        { provide: OrderService, useValue: { mine } },
         { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
       ],
     }).compileComponents();
@@ -55,7 +62,50 @@ describe('OrdersComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('No pudimos mostrar tus pedidos');
-    expect(fixture.nativeElement.querySelector('button')?.textContent).toContain('Reintentar');
+    const retryButton = fixture.nativeElement.querySelector('.state button') as HTMLButtonElement;
+    expect(retryButton.textContent).toContain('Reintentar');
+
+    retryButton.click();
+    fixture.detectChanges();
+
+    expect(retryButton.isConnected).toBe(true);
+    expect(retryButton.disabled).toBe(true);
+    expect(retryButton.getAttribute('aria-busy')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.state [role="status"]')?.textContent).toContain('Volviendo a cargar');
+  });
+
+  it('shows a recoverable capability error and announces its retry', async () => {
+    const payable = { ...order, reservationExpiresAt: '2099-07-29T20:00:00Z' };
+    const retry = new Subject<{ onlinePaymentsEnabled: boolean; paymentMethods: string[] }>();
+    const capabilitiesRequest = vi.fn()
+      .mockReturnValueOnce(throwError(() => new Error('network')))
+      .mockReturnValueOnce(retry);
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([payable]) } },
+        { provide: CheckoutService, useValue: { capabilities: capabilitiesRequest } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+    const retryButton = fixture.nativeElement.querySelector('.capability-error button') as HTMLButtonElement;
+    expect(fixture.nativeElement.textContent).toContain('No pudimos consultar si el pago online está disponible.');
+
+    retryButton.click();
+    fixture.detectChanges();
+
+    expect(retryButton.isConnected).toBe(true);
+    expect(retryButton.disabled).toBe(true);
+    expect(retryButton.getAttribute('aria-busy')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.capability-error [role="status"]')?.textContent).toContain('Volviendo a consultar');
+
+    retry.next({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] });
+    retry.complete();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Continuar pago');
   });
 
   it('continues a payable order through the backend-provided checkout URL', async () => {
@@ -82,6 +132,7 @@ describe('OrdersComponent', () => {
     fixture.detectChanges();
     const button = [...fixture.nativeElement.querySelectorAll('button')]
       .find((candidate: HTMLButtonElement) => candidate.textContent?.includes('Continuar pago')) as HTMLButtonElement;
+    expect(button.getAttribute('aria-label')).toBe('Continuar el pago del pedido 42');
     button.click();
 
     expect(mercadoPago).toHaveBeenCalledWith(42, 'PENDING');

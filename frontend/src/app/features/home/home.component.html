@@ -7,35 +7,35 @@
       <p class="lead">Explorá el catálogo real de hardware y periféricos disponible en Pinatech.</p>
       <div class="hero-actions"><a mat-flat-button routerLink="/catalog">Explorar catálogo</a>@if (!auth.isAuthenticated()) { <a mat-stroked-button routerLink="/login">Ingresar</a> }</div>
     </div>
-    <div class="hero-visual"><img src="/pinatech-banner.png" alt="Identidad visual de Pinatech"><span class="scan-line"></span></div>
+    <div class="hero-visual"><img src="/pinatech-banner.png" alt="Identidad visual de Pinatech" width="2000" height="621" fetchpriority="high"><span class="scan-line" aria-hidden="true"></span></div>
   </section>
 
   <section class="paths" aria-label="Secciones principales">
-    <a routerLink="/catalog"><iconify-icon icon="line-md:computer"></iconify-icon><span><b>Comprar tecnología</b><small>Buscar, filtrar y comparar el catálogo</small></span></a>
-    <a routerLink="/tickets"><iconify-icon icon="line-md:cog"></iconify-icon><span><b>Servicio técnico</b><small>Crear y consultar solicitudes</small></span></a>
+    <a routerLink="/catalog"><iconify-icon icon="line-md:computer" aria-hidden="true"></iconify-icon><span><b>Comprar tecnología</b><small>Buscar, filtrar y comparar el catálogo</small></span></a>
+    <a routerLink="/tickets"><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon><span><b>Servicio técnico</b><small>Crear y consultar solicitudes</small></span></a>
   </section>
 
   <section class="featured">
-    <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2>Productos</h2></div><a routerLink="/catalog">Ver catálogo completo <span>→</span></a></header>
-    <p class="sr-only" aria-live="polite">{{ feedback() }}</p>
+    <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2>Productos</h2></div><a routerLink="/catalog">Ver catálogo completo <span aria-hidden="true">→</span></a></header>
+    <p class="sr-only" aria-live="polite" aria-atomic="true">{{ feedback() }}</p>
     @if (isLoading()) {
-      <div class="status" aria-live="polite"><span class="loader"></span><p>Cargando productos…</p></div>
+      <div class="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><p>Cargando productos…</p></div>
     } @else if (error()) {
       <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button mat-button type="button" (click)="loadFeatured()">Reintentar</button></div>
     } @else {
-      <div class="products">
+      <ul class="products">
         @for (product of featured(); track product.id) {
-          <mat-card (click)="openProduct(product.id)">
-            <div class="product-visual">
-              @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name"> }
+          <li><mat-card>
+            <a class="product-visual" [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" [attr.aria-label]="'Ver ' + product.name">
+              @if (product.images[0]; as image) { <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || product.name" width="640" height="480" loading="lazy"> }
               @else { <span>{{ product.categoryName }}</span><b aria-hidden="true">PIN</b> }
-            </div>
-            <mat-card-header><mat-card-subtitle>{{ product.brandName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" (click)="$event.stopPropagation()">{{ product.name }}</a></mat-card-title></mat-card-header>
-            <mat-card-content><strong>{{ product.price | number:'1.2-2' }} <em>ARS</em></strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | number:'1.2-2' }} ARS</small></mat-card-content>
-            <mat-card-actions (click)="$event.stopPropagation()"><label class="variant-select">Color<select [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
-          </mat-card>
-        } @empty { <div class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></div> }
-      </div>
+            </a>
+            <mat-card-header><mat-card-subtitle translate="no">{{ product.brandName }}</mat-card-subtitle><mat-card-title><a [routerLink]="['/products', product.id]" [queryParams]="{ variant: selectedVariant(product)?.id }" translate="no">{{ product.name }}</a></mat-card-title></mat-card-header>
+            <mat-card-content><strong>{{ product.price | currency:'ARS':'code':'1.2-2' }}</strong><small class="net-price">Sin impuesto nacional: {{ product.price / 1.105 | currency:'ARS':'code':'1.2-2' }}</small></mat-card-content>
+            <mat-card-actions><label class="variant-select">Color<select [name]="'featured-variant-' + product.id" autocomplete="off" [ngModel]="selectedVariant(product)?.id" (ngModelChange)="selectVariant(product.id, $event)">@for(variant of product.variants;track variant.id){<option [ngValue]="variant.id" [disabled]="!variant.inStock">{{variant.colorName}}{{variant.inStock ? '' : ' · sin stock'}}</option>}</select></label><button mat-flat-button type="button" [attr.aria-label]="'Agregar ' + product.name + ' al carrito'" [disabled]="!selectedVariant(product)?.inStock" (click)="add(product)">Agregar</button></mat-card-actions>
+          </mat-card></li>
+        } @empty { <li class="status"><p>Por el momento no hay productos publicados.</p><a mat-button routerLink="/catalog">Ir al catálogo</a></li> }
+      </ul>
     }
   </section>
 

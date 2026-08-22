@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.production.example
+indicaciones.md
 
 # Java and Maven
 backend/target/

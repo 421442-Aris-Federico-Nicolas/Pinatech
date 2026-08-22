@@ -1,27 +1,38 @@
 :host { background: var(--pin-surface); display: block; min-height: calc(100dvh - 110px); }
 main { margin: auto; max-width: 1040px; padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem) 5rem; }
 .page-header { align-items: end; display: flex; justify-content: space-between; margin-bottom: 2rem; }
-.eyebrow { color: var(--pin-teal); font-size: .7rem; font-weight: 900; letter-spacing: .15em; margin: 0; text-transform: uppercase; }
+.eyebrow { color: #00677f; font-size: .7rem; font-weight: 900; letter-spacing: .15em; margin: 0; text-transform: uppercase; }
 h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); letter-spacing: -.065em; line-height: 1; margin: .4rem 0 0; }
-.orders { display: grid; gap: 1rem; }
+.orders { display: grid; gap: 1rem; list-style: none; margin: 0; padding: 0; }
 article { background: #fff; border: 1px solid #d9e4eb; border-left: 4px solid var(--pin-teal); }
 .order-header { align-items: start; border-bottom: 1px solid #e2e8ec; display: flex; gap: 1.5rem; justify-content: space-between; padding: 1.35rem; }
 .order-header p { color: var(--pin-muted); font-size: .68rem; font-weight: 800; letter-spacing: .12em; margin: 0; text-transform: uppercase; }
 .order-header h2 { font-size: 1.7rem; margin: .1rem 0; }
 .order-header small { color: var(--pin-muted); }
 .badges { align-items: flex-end; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
-.badges span { background: #eaf3f6; border-radius: 999px; color: var(--pin-navy); font-size: .7rem; font-weight: 800; padding: .35rem .65rem; }
-.badges span[data-status="PENDING"], .badges span[data-status="PENDING_PAYMENT"], .badges span[data-status="REQUESTED"], .badges span[data-status="RESERVED"] { background: #fff1d9; color: #794500; }
-.badges span[data-status="PAID"], .badges span[data-status="READY"], .badges span[data-status="DELIVERED"] { background: #def6ed; color: #096344; }
-.badges span[data-status="CANCELLED"], .badges span[data-status="FAILED"], .badges span[data-status="REJECTED"], .badges span[data-status="EXPIRED"] { background: #fde7e7; color: #912828; }
+.badges { list-style: none; margin: 0; padding: 0; }
+.badges li { background: #eaf3f6; border-radius: 999px; color: var(--pin-navy); font-size: .7rem; font-weight: 800; padding: .35rem .65rem; }
+.badges li[data-status="PENDING"], .badges li[data-status="PENDING_PAYMENT"], .badges li[data-status="REQUESTED"], .badges li[data-status="RESERVED"] { background: #fff1d9; color: #794500; }
+.badges li[data-status="PAID"], .badges li[data-status="READY"], .badges li[data-status="DELIVERED"] { background: #def6ed; color: #096344; }
+.badges li[data-status="CANCELLED"], .badges li[data-status="FAILED"], .badges li[data-status="REJECTED"], .badges li[data-status="EXPIRED"] { background: #fde7e7; color: #912828; }
 .reservation { background: #fff7e9; border-left: 3px solid var(--pin-orange); line-height: 1.5; margin: 1rem 1.35rem 0; padding: .75rem 1rem; }
 .payment-error { background: #fff0f0; border: 1px solid #e4b8b8; color: #8f2424; margin: 0 0 1rem; padding: .8rem 1rem; }
-.payment-action { align-items: center; background: #eaf6f8; display: flex; gap: 1rem; justify-content: space-between; margin: 1rem 1.35rem 0; padding: .85rem 1rem; }
+.capability-status { background: #eef6f8; color: #244757; margin: 0 0 1rem; padding: .8rem 1rem; }
+.capability-error { align-items: center; background: #fff0f0; border: 1px solid #e4b8b8; color: #8f2424; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; margin: 0 0 1rem; padding: .8rem 1rem; }
+.capability-error p { margin: 0; }
+.payment-action { align-items: center; background: #eaf6f8; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin: 1rem 1.35rem 0; padding: .85rem 1rem; }
 .payment-action p { color: #244757; font-size: .84rem; line-height: 1.45; margin: 0; }
 .payment-action button { flex: 0 0 auto; }
-.items { padding: .5rem 1.35rem; }
-.items > div { align-items: baseline; border-bottom: 1px solid #edf1f3; display: flex; gap: 1rem; justify-content: space-between; padding: .85rem 0; }
+.payment-action button, .page-header a, .state button, .state a { touch-action: manipulation; }
+.payment-action button:active, .page-header a:active, .state button:active, .state a:active { opacity: .78; }
+.page-header a:hover, .state a:hover { text-decoration-thickness: 2px; }
+.payment-progress { flex-basis: 100%; }
+.button-spinner { animation: spin .8s linear infinite; border: 2px solid rgb(255 255 255 / .45); border-radius: 50%; border-top-color: currentColor; display: inline-block; height: 1rem; margin-right: .45rem; vertical-align: -.15rem; width: 1rem; }
+.items { list-style: none; margin: 0; padding: .5rem 1.35rem; }
+.items > li { align-items: baseline; border-bottom: 1px solid #edf1f3; display: flex; gap: 1rem; justify-content: space-between; padding: .85rem 0; }
 .items span { color: #344c5d; }
+.items span, .payment-action p, dd { overflow-wrap: anywhere; }
+.items > li > strong, .total strong, .order-header h2 { font-variant-numeric: tabular-nums; white-space: nowrap; }
 footer { align-items: end; background: #f8fafb; display: flex; gap: 2rem; justify-content: space-between; padding: 1rem 1.35rem; }
 dl { display: flex; gap: 2rem; margin: 0; }
 dl div { display: grid; gap: .2rem; }
@@ -34,10 +45,11 @@ dd { font-size: .82rem; margin: 0; }
 .state h2 { margin: 1rem 0 .4rem; }
 .state p { color: var(--pin-muted); line-height: 1.55; }
 .state.error { border-top: 4px solid #a12b2b; }
+.visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .empty-mark { align-items: center; background: linear-gradient(145deg, var(--pin-navy), var(--pin-teal)); color: #fff; display: flex; font-size: .7rem; font-weight: 900; height: 64px; justify-content: center; letter-spacing: .15em; margin: auto; width: 64px; }
 .loader { animation: spin .8s linear infinite; border: 3px solid #dce8ed; border-top-color: var(--pin-teal); border-radius: 50%; display: inline-block; height: 36px; width: 36px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .loader { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .loader, .button-spinner { animation: none; } }
 
 @media (max-width: 650px) {
   .order-header, footer { align-items: stretch; flex-direction: column; }

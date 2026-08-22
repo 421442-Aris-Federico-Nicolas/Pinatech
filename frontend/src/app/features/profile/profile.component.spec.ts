@@ -29,6 +29,8 @@ describe('ProfileComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Ada Lovelace');
     expect(fixture.nativeElement.textContent).toContain('ada@example.com');
     expect(fixture.nativeElement.textContent).toContain('Cliente');
-    expect(fixture.nativeElement.textContent).toContain('Ver Mis pedidos');
+    expect(fixture.nativeElement.textContent).toContain('Ver mis pedidos');
+    expect(fixture.nativeElement.querySelector('.roles')?.tagName).toBe('UL');
+    expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Pinatech');
   });
 });

@@ -1,11 +1,12 @@
 :host { background: var(--pin-surface); display: block; min-height: calc(100dvh - 110px); }
 main { display: grid; min-height: calc(100dvh - 110px); padding: clamp(2rem, 6vw, 5rem) 1rem; place-items: center; }
 .result-card { background: #fff; border: 1px solid #d9e4eb; border-top: 5px solid var(--pin-teal); max-width: 720px; padding: clamp(2rem, 6vw, 4rem); width: 100%; }
-.eyebrow { color: var(--pin-teal); font-size: .7rem; font-weight: 900; letter-spacing: .15em; margin: 0; text-transform: uppercase; }
+.eyebrow { color: #00677f; font-size: .7rem; font-weight: 900; letter-spacing: .15em; margin: 0; text-transform: uppercase; }
 .state { margin: 1.5rem 0; }
 .state > span { align-items: center; border-radius: 50%; display: flex; font-size: .72rem; font-weight: 950; height: 52px; justify-content: center; letter-spacing: .04em; width: 52px; }
 .state h1 { font-size: clamp(2.3rem, 7vw, 4.3rem); letter-spacing: -.06em; line-height: .98; margin: 1rem 0 .75rem; }
 .state p, .authority { color: var(--pin-muted); line-height: 1.6; }
+.state p, .authority { overflow-wrap: anywhere; }
 .approved > span { background: #dff7ed; color: #096344; }
 .pending > span { background: #e3f4f8; color: #087c98; }
 .rejected > span { background: #fde7e7; color: #912828; }
@@ -16,8 +17,13 @@ dl div { padding: 1rem 0; }
 dl div + div { border-left: 1px solid #d9e4eb; padding-left: 1.25rem; }
 dt { color: var(--pin-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; }
 dd { font-size: 1.1rem; font-weight: 900; margin: .3rem 0 0; }
+dd { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .authority { background: #f3f7f9; border-left: 3px solid var(--pin-navy); font-size: .82rem; padding: .75rem 1rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.5rem; }
+.actions a, button { touch-action: manipulation; }
+.actions a:active, button:active { opacity: .75; }
+.actions a:hover { text-decoration-thickness: 2px; }
+.visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .loader { animation: none; } }
 @media (max-width: 500px) { dl { grid-template-columns: 1fr; } dl div + div { border-left: 0; border-top: 1px solid #d9e4eb; padding-left: 0; } }

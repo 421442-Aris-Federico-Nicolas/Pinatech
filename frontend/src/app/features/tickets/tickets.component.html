@@ -1,19 +1,19 @@
 <main>
-  <section class="request-panel">
+  <section class="request-panel" [attr.aria-busy]="creating()">
     <p class="eyebrow">Servicio técnico</p>
     <h1>Solicitá una reparación</h1>
     <p class="lead">Contanos qué equipo necesitás revisar. Las imágenes son opcionales y privadas.</p>
     <form (ngSubmit)="create()">
-      <mat-form-field><mat-label>Equipo</mat-label><mat-select [(ngModel)]="form.deviceType" (ngModelChange)="form.brand = ''; form.model = ''" name="deviceType" required><mat-option value="" disabled>Seleccioná un equipo</mat-option>@for (deviceType of deviceTypes; track deviceType) {<mat-option [value]="deviceType">{{ deviceType }}</mat-option>}</mat-select></mat-form-field>
-      @if (form.deviceType === 'Notebook') {<mat-form-field><mat-label>Marca</mat-label><input matInput [(ngModel)]="form.brand" name="brand" required></mat-form-field>}
-      @if (form.deviceType !== 'PC de escritorio') {<mat-form-field><mat-label>Modelo</mat-label><input matInput [(ngModel)]="form.model" name="model" required></mat-form-field>}
-      <mat-form-field class="wide"><mat-label>Problema informado</mat-label><textarea matInput rows="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" required></textarea></mat-form-field>
+      <mat-form-field><mat-label>Equipo</mat-label><mat-select [(ngModel)]="form.deviceType" (ngModelChange)="form.brand = ''; form.model = ''" name="deviceType" [disabled]="creating()" required><mat-option value="" disabled>Seleccioná un equipo</mat-option>@for (deviceType of deviceTypes; track deviceType) {<mat-option [value]="deviceType">{{ deviceType }}</mat-option>}</mat-select></mat-form-field>
+      @if (form.deviceType === 'Notebook') {<mat-form-field><mat-label>Marca</mat-label><input matInput [(ngModel)]="form.brand" name="deviceBrand" autocomplete="organization" spellcheck="false" placeholder="Ej. Lenovo…" [disabled]="creating()" required></mat-form-field>}
+      @if (form.deviceType !== 'PC de escritorio') {<mat-form-field><mat-label>Modelo</mat-label><input matInput [(ngModel)]="form.model" name="deviceModel" autocomplete="off" spellcheck="false" placeholder="Ej. IdeaPad 3 15ALC6…" [disabled]="creating()" required></mat-form-field>}
+      <mat-form-field class="wide"><mat-label>Problema informado</mat-label><textarea matInput rows="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" autocomplete="off" spellcheck="true" placeholder="Ej. No enciende desde una actualización…" [disabled]="creating()" required></textarea></mat-form-field>
       <div class="upload-field wide">
-        <div><strong>Imágenes del equipo</strong><small>Opcional · JPEG o PNG · 5 MiB por archivo · máximo 10</small></div>
-        <label>Seleccionar<input type="file" accept="image/jpeg,image/png" multiple (change)="selectCreateImages($event)"></label>
+        <div><strong>Imágenes del equipo</strong><small>Opcional · JPEG o PNG · 5&nbsp;MiB por archivo · máximo 10</small></div>
+        <label [class.disabled]="creating()">Seleccionar<input type="file" name="newTicketImages" accept="image/jpeg,image/png" multiple [disabled]="creating()" (change)="selectCreateImages($event)"></label>
       </div>
       @if (createImages().length) {
-        <div class="local-previews wide">@for (image of createImages(); track image.previewUrl; let index = $index) {<article><img [src]="image.previewUrl" [alt]="'Vista previa de ' + image.file.name"><span>{{ image.file.name }}</span><button type="button" (click)="removeCreateImage(index)">Quitar</button></article>}</div>
+        <div class="local-previews wide">@for (image of createImages(); track image.previewUrl; let index = $index) {<article><img [src]="image.previewUrl" [alt]="'Vista previa de ' + image.file.name" width="640" height="480" loading="lazy"><span>{{ image.file.name }}</span><button type="button" [disabled]="creating()" (click)="removeCreateImage(index)">Quitar</button></article>}</div>
       }
       <button mat-flat-button class="wide" type="submit" [disabled]="creating()">{{ creating() ? 'Creando y subiendo imágenes…' : 'Enviar solicitud' }}</button>
     </form>
@@ -21,24 +21,24 @@
     @if (success()) { <p class="message success" role="status">{{ success() }}</p> }
   </section>
 
-  <section class="tickets-panel">
+  <section class="tickets-panel" [attr.aria-busy]="loading()">
     <header><div><p class="eyebrow">Seguimiento privado</p><h2>Mis solicitudes</h2></div><button type="button" (click)="load()" [disabled]="loading()">Actualizar</button></header>
     @if (loading()) { <p class="empty" role="status">Cargando solicitudes…</p> }
     @else {
       @for (ticket of tickets(); track ticket.id) {
         <article class="ticket-card">
-          <header><strong>#{{ ticket.id }} · {{ ticket.deviceType }} {{ ticket.brand }} {{ ticket.model }}</strong><span>{{ ticket.status }}</span></header>
+          <header><h3>#{{ ticket.id }} · {{ ticket.deviceType }} {{ ticket.brand }} {{ ticket.model }}</h3><span>{{ ticket.status }}</span></header>
           <p>{{ ticket.reportedProblem }}</p><small>{{ ticket.createdAt | date:'medium' }}</small>
           @if (ticket.attachments.length) {
-            <button type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
-            @if (imagesExpanded(ticket.id)) { <app-ticket-attachment-gallery [attachments]="ticket.attachments" /> }
+            <button type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" [attr.aria-controls]="'ticket-images-' + ticket.id" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
+            @if (imagesExpanded(ticket.id)) { <div [id]="'ticket-images-' + ticket.id"><app-ticket-attachment-gallery [attachments]="ticket.attachments" /></div> }
           }
           <section class="ticket-upload">
             <div><strong>Agregar imágenes</strong><small>Opcional, hasta completar 10 adjuntos.</small></div>
-            <label>Elegir<input type="file" accept="image/jpeg,image/png" multiple (change)="selectTicketImages(ticket, $event)"></label>
+             <label [class.disabled]="uploadingTicket() === ticket.id">Elegir<input type="file" [name]="'ticketImages' + ticket.id" accept="image/jpeg,image/png" multiple [disabled]="uploadingTicket() === ticket.id" (change)="selectTicketImages(ticket, $event)"></label>
             @if (pendingFor(ticket.id).length) {
-              <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
-              <button mat-stroked-button type="button" [disabled]="uploadingTicket() !== null" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
+              <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" [disabled]="uploadingTicket() === ticket.id" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
+              <button mat-stroked-button type="button" [disabled]="uploadingTicket() !== null" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
             }
           </section>
         </article>

@@ -7,8 +7,11 @@
         <span aria-hidden="true">!</span>
         <h1>No pudimos verificar el pago</h1>
         <p>{{ error() }}</p>
-        @if (orderId !== null) { <button mat-stroked-button type="button" (click)="load()">Reintentar verificación</button> }
       </div>
+      @if (orderId !== null) {
+        <button mat-stroked-button type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago nuevamente' : 'Reintentar verificación del pago'">{{ polling() ? 'Verificando pago…' : 'Reintentar verificación del pago' }}</button>
+        @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a verificar el pago.</p> }
+      }
     } @else if (order(); as currentOrder) {
       @switch (result(currentOrder)) {
         @case ('approved') {
@@ -44,8 +47,9 @@
             <span class="loader" aria-hidden="true"></span>
             <h1>Pago pendiente</h1>
             <p>{{ polling() ? 'Estamos consultando la confirmación del pedido con nuestro servidor.' : 'Todavía no recibimos una confirmación definitiva del pago.' }}</p>
-            @if (!polling()) { <button mat-stroked-button type="button" (click)="load()">Volver a verificar</button> }
           </div>
+          <button mat-stroked-button type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago' : 'Volver a verificar el pago'">{{ polling() ? 'Verificando pago…' : 'Volver a verificar el pago' }}</button>
+          @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Verificando nuevamente el estado del pago.</p> }
         }
       }
 
@@ -61,7 +65,7 @@
       </div>
     }
 
-    <p class="authority">La vuelta desde Mercado Pago no confirma el pago. Solo mostramos el estado informado por nuestro backend.</p>
+    <p class="authority">La vuelta desde <span translate="no">Mercado Pago</span> no confirma el pago. Solo mostramos el estado informado por nuestro sistema.</p>
     <div class="actions"><a mat-flat-button routerLink="/orders">Ir a Mis pedidos</a><a mat-button routerLink="/catalog">Volver al catálogo</a></div>
   </section>
 </main>

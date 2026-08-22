@@ -89,11 +89,11 @@ export class CartService {
     const items = this.itemsState();
     const storageKey = this.activeKey;
     const productIds = [...new Set(items.map((item) => item.product.id))];
-    if (!productIds.length) return of(undefined);
+    if (!productIds.length) return of(true);
 
     return forkJoin(productIds.map((id) => this.http.get<Product>(`${environment.apiBaseUrl}/products/${id}`))).pipe(
       map((products) => {
-        if (storageKey !== this.activeKey) return;
+        if (storageKey !== this.activeKey) return true;
         const byId = new Map(products.map((product) => [product.id, product]));
         const current = this.itemsState();
         const reconciled = current.flatMap((item) => {
@@ -109,8 +109,9 @@ export class CartService {
           this.itemsState.set(reconciled);
           this.persist(this.activeKey, reconciled);
         }
+        return true;
       }),
-      catchError(() => of(undefined)),
+      catchError(() => of(false)),
     );
   }
 

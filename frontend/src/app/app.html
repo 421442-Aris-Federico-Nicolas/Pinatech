@@ -3,32 +3,32 @@
 <div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
 <mat-toolbar aria-label="Navegación principal">
   <a class="brand" routerLink="/">
-    <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="Logo de Pinatech"></span>
-    <span>Pinatech</span>
+    <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="" width="75" height="75" fetchpriority="high"></span>
+    <span translate="no">Pinatech</span>
   </a>
   <button class="menu-toggle" type="button" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav" aria-label="Abrir o cerrar menú" (click)="menuOpen.update(open => !open)">
-    <iconify-icon [icon]="menuOpen() ? 'line-md:menu-to-close-transition' : 'line-md:menu'"></iconify-icon>
+    <iconify-icon [icon]="menuOpen() ? 'line-md:menu-to-close-transition' : 'line-md:menu'" aria-hidden="true"></iconify-icon>
   </button>
   <nav id="main-nav" [class.open]="menuOpen()">
     @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
-      <a class="nav-link" routerLink="/catalog" routerLinkActive="active"><iconify-icon icon="line-md:search"></iconify-icon> Catálogo</a>
-      <a class="nav-link cart-link" routerLink="/cart" routerLinkActive="active"><iconify-icon icon="line-md:shopping-cart"></iconify-icon> Carrito <span class="cart-count">{{ cart.count() }}</span></a>
+      <a class="nav-link" routerLink="/catalog" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:search" aria-hidden="true"></iconify-icon> Catálogo</a>
+      <a class="nav-link cart-link" routerLink="/cart" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:shopping-cart" aria-hidden="true"></iconify-icon> Carrito <span class="cart-count" [attr.aria-label]="cart.count() + (cart.count() === 1 ? ' producto en el carrito' : ' productos en el carrito')">{{ cart.count() }}</span></a>
     }
-    @if (auth.user()?.roles?.includes('ADMIN')) { <a class="nav-link" routerLink="/admin" routerLinkActive="active"><iconify-icon icon="line-md:grid-3"></iconify-icon> Gestión</a> }
-    @if (auth.user()?.roles?.includes('ADMIN') || auth.user()?.roles?.includes('TECHNICIAN')) { <a class="nav-link" routerLink="/technical" routerLinkActive="active"><iconify-icon icon="line-md:cog-loop"></iconify-icon> Laboratorio</a> }
+    @if (auth.user()?.roles?.includes('ADMIN')) { <a class="nav-link" routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:grid-3" aria-hidden="true"></iconify-icon> Gestión</a> }
+    @if (auth.user()?.roles?.includes('ADMIN') || auth.user()?.roles?.includes('TECHNICIAN')) { <a class="nav-link" routerLink="/technical" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon> Laboratorio</a> }
     @if (auth.user()?.roles?.includes('CUSTOMER')) {
-      <a class="nav-link" routerLink="/orders" routerLinkActive="active">Mis pedidos</a>
-      <a class="nav-link" routerLink="/tickets" routerLinkActive="active">Servicio técnico</a>
+      <a class="nav-link" routerLink="/orders" routerLinkActive="active" ariaCurrentWhenActive="page">Mis pedidos</a>
+      <a class="nav-link" routerLink="/tickets" routerLinkActive="active" ariaCurrentWhenActive="page">Servicio técnico</a>
     }
     <span class="spacer"></span>
     @if (auth.isAuthenticated()) {
-      <a class="user-name" routerLink="/profile">Hola, {{ auth.user()?.firstName }}</a>
-      <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out"></iconify-icon> Salir</button>
+      <a class="user-name" routerLink="/profile" [attr.aria-label]="'Ver perfil de ' + auth.user()?.firstName">Hola, {{ auth.user()?.firstName }}</a>
+      <button mat-button type="button" (click)="logout()"><iconify-icon icon="line-md:log-out" aria-hidden="true"></iconify-icon> Salir</button>
     } @else {
       <a mat-button routerLink="/register">Crear cuenta</a>
-      <a mat-button routerLink="/login"><iconify-icon icon="line-md:account"></iconify-icon> Ingresar</a>
+      <a mat-button routerLink="/login"><iconify-icon icon="line-md:account" aria-hidden="true"></iconify-icon> Ingresar</a>
     }
   </nav>
 </mat-toolbar>
 </header>
-<div id="main-content"><router-outlet /></div>
+<div id="main-content" tabindex="-1"><router-outlet /></div>

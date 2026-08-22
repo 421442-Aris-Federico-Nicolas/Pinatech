@@ -21,16 +21,30 @@ export class OrdersComponent {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly onlinePaymentAvailable = signal(false);
+  readonly loadingCapabilities = signal(false);
+  readonly capabilitiesError = signal('');
   readonly payingOrder = signal<number | null>(null);
   readonly paymentError = signal('');
 
   constructor() {
     this.load();
-    this.checkoutService.capabilities().subscribe({
-      next: (capabilities) => this.onlinePaymentAvailable.set(
-        capabilities.onlinePaymentsEnabled && capabilities.paymentMethods.includes('MERCADO_PAGO'),
-      ),
-      error: () => this.onlinePaymentAvailable.set(false),
+    this.loadCapabilities();
+  }
+
+  loadCapabilities(): void {
+    if (this.loadingCapabilities()) return;
+    this.loadingCapabilities.set(true);
+    this.checkoutService.capabilities().pipe(finalize(() => this.loadingCapabilities.set(false))).subscribe({
+      next: (capabilities) => {
+        this.onlinePaymentAvailable.set(
+          capabilities.onlinePaymentsEnabled && capabilities.paymentMethods.includes('MERCADO_PAGO'),
+        );
+        this.capabilitiesError.set('');
+      },
+      error: () => {
+        this.onlinePaymentAvailable.set(false);
+        this.capabilitiesError.set('No pudimos consultar si el pago online está disponible.');
+      },
     });
   }
 
@@ -63,9 +77,11 @@ export class OrdersComponent {
   load(): void {
     if (this.loading()) return;
     this.loading.set(true);
-    this.error.set('');
     this.service.mine().pipe(finalize(() => this.loading.set(false))).subscribe({
-      next: (orders) => this.orders.set(orders),
+      next: (orders) => {
+        this.orders.set(orders);
+        this.error.set('');
+      },
       error: () => this.error.set('No pudimos cargar tus pedidos. Intentá nuevamente.'),
     });
   }

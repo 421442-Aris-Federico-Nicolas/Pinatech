@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef, computed, inject, signal } from '@angular/core';
+import { FormsModule, NgForm } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -28,14 +29,21 @@ const WORKFLOW: TicketStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS', 'WAITING_FOR_AP
 export class TechnicalComponent {
   private readonly service = inject(TechnicalService);
   private readonly attachments = inject(TicketAttachmentService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+  private detailsSnapshot = '';
+  private historyRequestId = 0;
   readonly auth = inject(AuthService);
   readonly section = signal<TechnicalSection>('overview');
   readonly sidebarCollapsed = signal(false);
-  readonly loading = signal(true);
+  readonly loading = signal(false);
   readonly saving = signal(false);
   readonly tickets = signal<TechnicalTicket[]>([]);
   readonly technicians = signal<Technician[]>([]);
   readonly history = signal<TicketHistory[]>([]);
+  readonly historyLoading = signal(false);
+  readonly historyError = signal('');
   readonly selected = signal<TechnicalTicket | null>(null);
   readonly statusFilter = signal<string>('ACTIVE');
   readonly priorityFilter = signal<string>('ALL');
@@ -44,6 +52,7 @@ export class TechnicalComponent {
   readonly success = signal('');
   readonly attachmentFile = signal<File | null>(null);
   readonly uploadingAttachment = signal(false);
+  readonly editingBusy = computed(() => this.saving() || this.uploadingAttachment());
   readonly statuses = WORKFLOW;
   readonly priorities: TicketPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
   statusComment = '';
@@ -84,28 +93,41 @@ export class TechnicalComponent {
     count: this.activeTickets().filter((ticket) => ticket.technicianId === technician.id).length,
   })).sort((left, right) => right.count - left.count));
 
-  constructor() { this.load(); }
+  constructor() {
+    const section = this.route?.snapshot.queryParamMap.get('section');
+    if (this.isSection(section)) this.section.set(section);
+    this.statusFilter.set(this.route?.snapshot.queryParamMap.get('status') ?? 'ACTIVE');
+    this.priorityFilter.set(this.route?.snapshot.queryParamMap.get('priority') ?? 'ALL');
+    this.load(true);
+  }
 
-  load(): void {
+  load(force = false): void {
+    if (this.loading() || this.editingBusy() || (!force && !this.confirmDiscardDetails())) return;
     this.loading.set(true);
     const technicians = this.isAdmin() ? this.service.technicians() : of<Technician[]>([]);
     forkJoin({ tickets: this.service.tickets(), technicians }).pipe(finalize(() => this.loading.set(false))).subscribe({
       next: ({ tickets, technicians }) => {
         this.tickets.set(tickets);
         this.technicians.set(technicians);
-        const selected = tickets.find((ticket) => ticket.id === this.selected()?.id) ?? null;
-        if (selected) this.applySelected(selected);
+        const requestedId = Number(this.route?.snapshot.queryParamMap.get('ticket'));
+        const selected = tickets.find((ticket) => ticket.id === (this.selected()?.id ?? requestedId)) ?? null;
+        if (selected) {
+          this.applySelected(selected);
+          this.loadHistory(selected.id);
+        }
       },
       error: () => this.fail('No se pudo cargar la operación técnica.'),
     });
   }
 
   navigate(section: TechnicalSection): void {
+    if (section !== this.section() && !this.confirmDiscardDetails()) return;
     this.section.set(section);
     if (section !== 'overview' && !this.selected()) {
       const first = section === 'mine' ? this.myTickets()[0] : this.activeTickets()[0];
       if (first) this.select(first);
     }
+    this.syncUrl({ section, ticket: section === 'overview' ? null : this.selected()?.id ?? null });
     this.clearMessages();
   }
 
@@ -117,16 +139,23 @@ export class TechnicalComponent {
   }[this.section()]; }
 
   select(ticket: TechnicalTicket, navigate = false): void {
+    if (this.editingBusy()) return;
+    if (this.selected()?.id !== ticket.id && !this.confirmDiscardDetails()) return;
     if (navigate) this.section.set('queue');
     this.applySelected(ticket);
     this.attachmentFile.set(null);
-    this.history.set([]);
-    this.service.history(ticket.id).subscribe({ next: (history) => this.history.set(history), error: () => this.fail('No se pudo cargar el historial del ticket.') });
+    this.syncUrl({ section: this.section(), ticket: ticket.id });
+    this.loadHistory(ticket.id);
   }
 
-  saveDetails(): void {
+  saveDetails(detailsForm?: NgForm): void {
     const ticket = this.selected();
-    if (!ticket || !this.canEdit(ticket) || this.saving()) return;
+    if (!ticket || !this.canEdit(ticket) || this.editingBusy()) return;
+    if (detailsForm?.invalid) {
+      this.fail('Revisá los importes de la ficha técnica.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.technical-form input.ng-invalid')?.focus());
+      return;
+    }
     const details: TechnicalDetails = {
       priority: this.priority,
       diagnosis: this.diagnosis.trim() || null,
@@ -143,22 +172,23 @@ export class TechnicalComponent {
 
   changeStatus(action: StatusAction): void {
     const ticket = this.selected();
-    if (!ticket || !this.canEdit(ticket) || this.saving()) return;
+    if (!ticket || !this.canEdit(ticket) || this.editingBusy()) return;
     if (action.danger && !confirm(`¿Cancelar el ticket #${ticket.id}?`)) return;
     this.saving.set(true);
     this.clearMessages();
     this.service.updateStatus(ticket.id, action.status, this.statusComment.trim() || null).pipe(finalize(() => this.saving.set(false))).subscribe({
       next: (updated) => {
-        this.replace(updated);
         this.statusComment = '';
+        this.replace(updated);
         this.success.set(`Ticket #${ticket.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
-        this.service.history(ticket.id).subscribe((history) => this.history.set(history));
+        this.loadHistory(ticket.id);
       },
       error: () => this.fail('No se pudo cambiar el estado. Revisá la transición o la asignación.'),
     });
   }
 
   claim(ticket: TechnicalTicket): void {
+    if (this.editingBusy()) return;
     this.saving.set(true);
     this.service.claim(ticket.id).pipe(finalize(() => this.saving.set(false))).subscribe({
       next: (updated) => { this.replace(updated); this.success.set(`Ticket #${ticket.id} asignado a tu mesa.`); },
@@ -168,7 +198,7 @@ export class TechnicalComponent {
 
   assign(technicianId: number): void {
     const ticket = this.selected();
-    if (!ticket || !technicianId) return;
+    if (!ticket || !technicianId || this.editingBusy()) return;
     this.saving.set(true);
     this.service.assign(ticket.id, technicianId).pipe(finalize(() => this.saving.set(false))).subscribe({
       next: (updated) => { this.replace(updated); this.success.set('Responsable actualizado.'); },
@@ -180,6 +210,7 @@ export class TechnicalComponent {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
     input.value = '';
+    if (this.editingBusy()) return;
     this.attachmentFile.set(null);
     if (!file) return;
     if (!this.canEdit(ticket)) return this.fail('No tenés permisos para agregar imágenes a este ticket.');
@@ -193,7 +224,7 @@ export class TechnicalComponent {
   uploadAttachment(): void {
     const ticket = this.selected();
     const file = this.attachmentFile();
-    if (!ticket || !file || !this.canEdit(ticket) || this.uploadingAttachment()) return;
+    if (!ticket || !file || !this.canEdit(ticket) || this.editingBusy()) return;
     this.clearMessages();
     this.uploadingAttachment.set(true);
     this.attachments.upload(ticket.id, file).pipe(finalize(() => this.uploadingAttachment.set(false))).subscribe({
@@ -228,7 +259,8 @@ export class TechnicalComponent {
   priorityLabel(priority: TicketPriority | string): string { return { LOW: 'Baja', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente' }[priority] ?? priority; }
   age(ticket: TechnicalTicket): string {
     const hours = Math.max(0, Math.floor((Date.now() - new Date(ticket.createdAt).getTime()) / 3_600_000));
-    return hours < 24 ? `${hours} h` : `${Math.floor(hours / 24)} d`;
+    const formatter = new Intl.RelativeTimeFormat('es-AR', { numeric: 'auto' });
+    return hours < 24 ? formatter.format(-hours, 'hour') : formatter.format(-Math.floor(hours / 24), 'day');
   }
   progress(ticket: TechnicalTicket): number {
     if (ticket.status === 'CANCELLED') return 100;
@@ -241,12 +273,45 @@ export class TechnicalComponent {
     this.diagnosis = ticket.diagnosis ?? '';
     this.estimatedPrice = ticket.estimatedPrice;
     this.finalPrice = ticket.finalPrice;
+    this.statusComment = '';
+    this.detailsSnapshot = this.detailsState();
   }
   private replace(ticket: TechnicalTicket): void {
+    const statusComment = this.statusComment;
     this.tickets.update((tickets) => tickets.map((current) => current.id === ticket.id ? ticket : current));
     this.applySelected(ticket);
+    this.statusComment = statusComment;
+    this.detailsSnapshot = this.detailsState('');
   }
   private numberOrNull(value: number | null): number | null { return value === null || value === undefined || value === ('' as unknown as number) ? null : Number(value); }
   private clearMessages(): void { this.error.set(''); this.success.set(''); }
   private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private detailsState(statusComment = this.statusComment): string { return JSON.stringify({ priority: this.priority, diagnosis: this.diagnosis, estimatedPrice: this.estimatedPrice, finalPrice: this.finalPrice, statusComment }); }
+  private loadHistory(ticketId: number): void {
+    const requestId = ++this.historyRequestId;
+    this.history.set([]);
+    this.historyError.set('');
+    this.historyLoading.set(true);
+    this.service.history(ticketId).pipe(finalize(() => {
+      if (requestId === this.historyRequestId) this.historyLoading.set(false);
+    })).subscribe({
+      next: (history) => {
+        if (requestId === this.historyRequestId && this.selected()?.id === ticketId) this.history.set(history);
+      },
+      error: () => {
+        if (requestId === this.historyRequestId && this.selected()?.id === ticketId) this.historyError.set('No se pudo cargar el historial del ticket.');
+      },
+    });
+  }
+  private confirmDiscardDetails(): boolean {
+    if (!this.selected() || this.detailsState() === this.detailsSnapshot) return true;
+    return confirm('Tenés cambios sin guardar en la ficha técnica. ¿Querés descartarlos?');
+  }
+  private isSection(value: string | null): value is TechnicalSection { return ['overview', 'queue', 'mine'].includes(value ?? ''); }
+  syncFilters(): void { this.syncUrl({ status: this.statusFilter(), priority: this.priorityFilter() }); }
+  setStatusFilter(status: string): void { this.statusFilter.set(status); this.syncFilters(); }
+  private syncUrl(queryParams: Record<string, string | number | null | undefined>): void {
+    if (!this.router || !this.route) return;
+    void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
 }

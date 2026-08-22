@@ -1,11 +1,13 @@
 <main>
-  @if (cart.notice()) { <p class="reconciliation-warning" role="status">{{ cart.notice() }} <button type="button" (click)="cart.dismissNotice()">Cerrar</button></p> }
+  @if (cart.notice()) { <p class="reconciliation-warning"><span role="status">{{ cart.notice() }}</span> <button type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></p> }
   @if (created(); as order) {
-    <section class="result" aria-labelledby="request-title" role="status">
+    <section class="result" aria-labelledby="request-title">
       <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
-      <p class="eyebrow">Pedido registrado</p>
-      <h1 id="request-title">Tu pedido #{{ order.id }} está registrado</h1>
-      <p class="result-lead">El pedido se registró y se inició el checkout de Mercado Pago. Esta pantalla no confirma un pago: consultá el estado informado por nuestro backend.</p>
+      <div class="result-status" role="status" aria-live="polite">
+        <p class="eyebrow">Pedido registrado</p>
+        <h1 id="request-title">Tu pedido #{{ order.id }} está registrado</h1>
+        <p class="result-lead">El pedido se registró y se inició el proceso de pago en <span translate="no">Mercado Pago</span>. Esta pantalla no confirma un pago: consultá el estado informado por nuestro sistema.</p>
+      </div>
       @if (isReservationExpired(order)) {
         <p class="expiration-warning" role="alert">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</p>
       } @else {
@@ -33,7 +35,7 @@
       <div>
         <p class="eyebrow">Paso final</p>
         <h1>Revisá tu pedido</h1>
-        <p>Verificá los productos antes de continuar a Mercado Pago.</p>
+        <p>Verificá los productos antes de continuar a <span translate="no">Mercado Pago</span>.</p>
       </div>
       <a routerLink="/cart">Editar carrito</a>
     </header>
@@ -45,15 +47,17 @@
             <span>01</span>
             <div><p>Tu selección</p><h2 id="products-title">Productos</h2></div>
           </div>
-          @for (item of cart.items(); track item.variant.id) {
-            <article>
-              @if (item.product.images[0]; as image) {
-                <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name">
-              } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
-              <div><strong>{{ item.product.name }}</strong><small>{{ item.product.brandName }} · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
-              <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
-            </article>
-          }
+          <ul class="product-list">
+            @for (item of cart.items(); track item.variant.id; let first = $first) {
+              <li><article>
+                @if (item.product.images[0]; as image) {
+                  <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'" decoding="async">
+                } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
+                <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span> · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
+                <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
+              </article></li>
+            }
+          </ul>
         </section>
 
         <section class="panel capability" aria-labelledby="delivery-title">
@@ -84,19 +88,23 @@
           @if (loadingCapabilities()) {
             <p class="loading" role="status">Consultando opciones de pago…</p>
           } @else if (capabilities(); as options) {
-            @if (options.onlinePaymentsEnabled) {
+            @if (!options.orderRequestsEnabled) {
+              <p class="notice">No se pueden iniciar pedidos en este momento.</p>
+            } @else if (options.onlinePaymentsEnabled) {
               @if (options.paymentMethods.includes('MERCADO_PAGO')) {
-                <p class="notice available">Podés pagar online de forma segura en Mercado Pago.</p>
+                <p class="notice available">Podés pagar online de forma segura en <span translate="no">Mercado Pago</span>.</p>
               } @else {
-                <p class="notice">Mercado Pago no está disponible en este momento.</p>
+                <p class="notice"><span translate="no">Mercado Pago</span> no está disponible en este momento.</p>
               }
             } @else {
               <p class="notice">Los pagos online no están disponibles en este momento.</p>
             }
             @if (options.paymentMethods.length) {
-              <p class="methods"><strong>Métodos informados:</strong> {{ options.paymentMethods.map(methodLabel).join(', ') }}.</p>
+              <p class="methods"><strong>Métodos informados:</strong>
+                @for (method of options.paymentMethods; track method; let last = $last) { <span [attr.translate]="method === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(method) }}</span>{{ last ? '.' : ', ' }} }
+              </p>
             }
-            <p class="fine-print">Ingresarás los datos de pago únicamente en Mercado Pago. La redirección no acredita el pago por sí sola.</p>
+            <p class="fine-print">Ingresarás los datos de pago únicamente en <span translate="no">Mercado Pago</span>. La redirección no acredita el pago por sí sola.</p>
           }
         </section>
       </div>
@@ -106,22 +114,25 @@
         <h2 id="summary-title">Tu pedido</h2>
         <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
         <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a Mercado Pago.</p>
+        <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a <span translate="no">Mercado Pago</span>.</p>
 
         @if (capabilitiesError()) {
-          <div class="error" role="alert">
-            <p>{{ capabilitiesError() }}</p>
-            <button mat-button type="button" (click)="loadCapabilities()">Reintentar consulta</button>
+          <div class="error" [attr.aria-busy]="loadingCapabilities()">
+            <p role="alert">{{ capabilitiesError() }}</p>
+            <button mat-button type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button>
+            @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar las opciones disponibles.</p> }
           </div>
         } @else if (capabilities() && !mercadoPagoEnabled()) {
-          <p class="error" role="alert">Mercado Pago no está disponible en este momento.</p>
+          <p class="error" role="alert"><span translate="no">Mercado Pago</span> no está disponible en este momento.</p>
         }
 
         @if (mercadoPagoEnabled()) {
-          <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()">
-            {{ submitting() ? 'Preparando Mercado Pago…' : 'Pagar con Mercado Pago' }}
+          <button mat-flat-button type="button" (click)="submit()" [disabled]="loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
+            @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
+            <span>{{ submitting() ? 'Preparando pago…' : 'Pagar con ' }}@if (!submitting()) { <span translate="no">Mercado Pago</span> }</span>
           </button>
-          <small>El pago se confirma únicamente después de que nuestro backend lo verifique.</small>
+          @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y preparando la redirección segura.</p> }
+          <small>El pago se confirma únicamente después de que nuestro sistema lo verifique.</small>
         }
         @if (submitError()) { <p class="submit-error" role="alert">{{ submitError() }}</p> }
       </aside>

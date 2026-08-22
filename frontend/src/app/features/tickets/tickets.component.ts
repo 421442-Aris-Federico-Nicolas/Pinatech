@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -18,12 +19,16 @@ interface PendingImage { file: File; previewUrl: string; }
   imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, TicketAttachmentGalleryComponent],
   templateUrl: './tickets.component.html',
   styleUrl: './tickets.component.scss',
+  styles: [`button,.upload-field label,.ticket-upload label{touch-action:manipulation}button:active:not(:disabled){transform:translateY(1px)}.upload-field label:has(input:focus-visible),.ticket-upload label:has(input:focus-visible),button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--pin-orange);outline-offset:3px}.ticket-card h3{font-size:inherit;margin:0;overflow-wrap:anywhere}.ticket-card small,.ticket-card header span{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}`],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TicketsComponent {
   private readonly service = inject(TicketsService);
   private readonly attachments = inject(TicketAttachmentService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
   readonly tickets = signal<Ticket[]>([]);
   readonly loading = signal(true);
   readonly creating = signal(false);
@@ -37,6 +42,8 @@ export class TicketsComponent {
   readonly form = this.emptyForm();
 
   constructor() {
+    const expanded = Number(this.route?.snapshot.queryParamMap.get('ticket'));
+    if (expanded > 0) this.expandedTickets.set(new Set([expanded]));
     this.destroyRef.onDestroy(() => {
       this.revoke(this.createImages());
       Object.values(this.ticketImages()).forEach((images) => this.revoke(images));
@@ -60,9 +67,9 @@ export class TicketsComponent {
       model: this.form.deviceType === 'PC de escritorio' ? '' : this.form.model.trim(),
       reportedProblem: this.form.reportedProblem.trim(),
     };
-    if (!payload.deviceType || !payload.reportedProblem) return this.fail('Completá equipo y problema informado.');
-    if (payload.deviceType === 'Notebook' && !payload.brand) return this.fail('Completá la marca de la notebook.');
-    if (payload.deviceType !== 'PC de escritorio' && !payload.model) return this.fail('Completá el modelo del equipo.');
+    if (!payload.deviceType || !payload.reportedProblem) return this.invalid('Completá equipo y problema informado.');
+    if (payload.deviceType === 'Notebook' && !payload.brand) return this.invalid('Completá la marca de la notebook.');
+    if (payload.deviceType !== 'PC de escritorio' && !payload.model) return this.invalid('Completá el modelo del equipo.');
 
     this.clearMessages();
     this.creating.set(true);
@@ -81,6 +88,7 @@ export class TicketsComponent {
   }
 
   selectCreateImages(event: Event): void {
+    if (this.creating()) return;
     const files = this.readFiles(event);
     if (!files.length || !this.validate(files, 10 - this.createImages().length)) return;
     this.createImages.update((current) => [...current, ...this.previews(files)]);
@@ -88,6 +96,7 @@ export class TicketsComponent {
   }
 
   selectTicketImages(ticket: Ticket, event: Event): void {
+    if (this.uploadingTicket() === ticket.id) return;
     const files = this.readFiles(event);
     const current = this.pendingFor(ticket.id);
     if (!files.length || !this.validate(files, 10 - ticket.attachments.length - current.length)) return;
@@ -96,11 +105,13 @@ export class TicketsComponent {
   }
 
   removeCreateImage(index: number): void {
+    if (this.creating()) return;
     this.removePreview(this.createImages(), index);
     this.createImages.update((images) => images.filter((_, current) => current !== index));
   }
 
   removeTicketImage(ticketId: number, index: number): void {
+    if (this.uploadingTicket() === ticketId) return;
     const images = this.pendingFor(ticketId);
     this.removePreview(images, index);
     this.ticketImages.update((records) => ({ ...records, [ticketId]: images.filter((_, current) => current !== index) }));
@@ -133,6 +144,16 @@ export class TicketsComponent {
       updated.has(ticketId) ? updated.delete(ticketId) : updated.add(ticketId);
       return updated;
     });
+    this.syncUrl(this.imagesExpanded(ticketId) ? ticketId : null);
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  protectUnfinishedRequest(event: BeforeUnloadEvent): void {
+    const hasFormValues = Object.values(this.form).some((value) => value.trim());
+    const hasLocalImages = this.createImages().length > 0 || Object.values(this.ticketImages()).some((images) => images.length > 0);
+    if (!hasFormValues && !hasLocalImages) return;
+    event.preventDefault();
+    event.returnValue = '';
   }
 
   private upload(ticketId: number, images: PendingImage[]) {
@@ -167,9 +188,9 @@ export class TicketsComponent {
       return false;
     }
     const invalid = files.find((file) => !['image/jpeg', 'image/png'].includes(file.type));
-    if (invalid) { this.fail(`"${invalid.name}" no es JPEG ni PNG.`); return false; }
+    if (invalid) { this.fail(`“${invalid.name}” no es JPEG ni PNG.`); return false; }
     const oversized = files.find((file) => file.size > 5 * 1024 * 1024);
-    if (oversized) { this.fail(`"${oversized.name}" supera el máximo de 5 MiB.`); return false; }
+    if (oversized) { this.fail(`“${oversized.name}” supera el máximo de 5 MiB.`); return false; }
     return true;
   }
 
@@ -185,4 +206,12 @@ export class TicketsComponent {
   private emptyForm() { return { deviceType: '', brand: '', model: '', reportedProblem: '' }; }
   private clearMessages(): void { this.error.set(''); this.success.set(''); }
   private fail(message: string): void { this.success.set(''); this.error.set(message); }
+  private invalid(message: string): void {
+    this.fail(message);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('form :is(input, textarea, mat-select).ng-invalid')?.focus());
+  }
+  private syncUrl(ticket: number | null): void {
+    if (!this.router || !this.route) return;
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { ticket }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
 }

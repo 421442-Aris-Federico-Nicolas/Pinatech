@@ -40,7 +40,6 @@ export class CheckoutResultComponent {
   load(): void {
     if (this.orderId === null || this.polling()) return;
     this.polling.set(true);
-    this.error.set('');
 
     timer(0, POLL_INTERVAL_MS).pipe(
       take(MAX_POLL_ATTEMPTS),
@@ -49,7 +48,10 @@ export class CheckoutResultComponent {
       finalize(() => this.polling.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: (order) => this.order.set(order),
+      next: (order) => {
+        this.order.set(order);
+        this.error.set('');
+      },
       error: () => this.error.set('No pudimos verificar el pedido con el servidor. Intentá nuevamente.'),
     });
   }

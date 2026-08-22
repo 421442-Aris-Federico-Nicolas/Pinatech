@@ -1,22 +1,26 @@
 @if (previews().length) {
-  <div class="attachment-gallery" aria-label="Imágenes adjuntas">
+  <section class="attachment-region" aria-label="Imágenes adjuntas">
+  <ul class="attachment-gallery">
     @for (item of previews(); track item.attachment.id) {
-      <article>
-        <div class="preview">
+      <li><article [attr.aria-busy]="item.loading">
+        <div #preview class="preview" [attr.data-attachment-id]="item.attachment.id">
           @if (item.url) {
             <a [href]="item.url" target="_blank" rel="noopener" [attr.aria-label]="'Abrir ' + item.attachment.fileName">
-              <img [src]="item.url" [alt]="'Adjunto ' + item.attachment.fileName + ' subido por ' + item.attachment.uploadedByName">
+              <img [src]="item.url" [alt]="'Adjunto ' + item.attachment.fileName + ' subido por ' + item.attachment.uploadedByName" width="640" height="480" loading="lazy">
             </a>
           } @else if (item.error) {
-            <span role="alert">No se pudo cargar</span>
+            <div class="download-error" role="alert"><span>No se pudo cargar.</span><button type="button" (click)="retry(item.attachment)">Reintentar</button></div>
+          } @else if (item.loading) {
+            <span role="status">Descargando “{{ item.attachment.fileName }}”…</span>
           } @else {
-            <span>Descargando…</span>
+            <span>Vista previa pendiente</span>
           }
         </div>
-        <strong>{{ item.attachment.fileName }}</strong>
+        <h3>{{ item.attachment.fileName }}</h3>
         <small>{{ item.attachment.uploadedByName }} · {{ roleLabel(item.attachment.uploaderRole) }}</small>
         <small>{{ item.attachment.createdAt | date:'short' }} · {{ item.attachment.sizeBytes / 1048576 | number:'1.1-1' }} MiB</small>
-      </article>
+      </article></li>
     }
-  </div>
+  </ul>
+  </section>
 }
