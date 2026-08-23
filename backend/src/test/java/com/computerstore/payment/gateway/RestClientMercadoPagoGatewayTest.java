@@ -1,11 +1,13 @@
 package com.computerstore.payment.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -16,13 +18,28 @@ import java.util.UUID;
 
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
+import com.computerstore.payment.exception.PaymentNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 class RestClientMercadoPagoGatewayTest {
+
+    @Test
+    void reportsANotFoundPaymentSeparatelyForWebhookSimulation() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/123"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThrows(PaymentNotFoundException.class, () -> gateway.getPayment("123"));
+        server.verify();
+    }
 
     @Test
     void createsAnExpiringSandboxPreferenceWithOnlyImmediatePaymentTypes() {

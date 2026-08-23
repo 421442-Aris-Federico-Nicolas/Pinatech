@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import com.computerstore.config.SecurityConfiguration;
 import com.computerstore.payment.dto.PaymentCheckoutResponse;
+import com.computerstore.payment.exception.PaymentNotFoundException;
 import com.computerstore.payment.service.MercadoPagoSignatureValidator;
 import com.computerstore.payment.service.PaymentCheckoutService;
 import com.computerstore.payment.service.PaymentWebhookService;
@@ -90,6 +92,22 @@ class PaymentControllerSecurityTest {
 
         verify(signatures).validate("123", "request-1", "ts=1,v1=hash");
         verify(webhooks).process("123", "request-1", "{\"data\":{\"id\":\"123\"}}");
+    }
+
+    @Test
+    void acceptsAValidWebhookWhenTheSimulatorPaymentDoesNotExist() throws Exception {
+        doNothing().when(signatures).validate(anyString(), anyString(), anyString());
+        doThrow(new PaymentNotFoundException("not found", new RuntimeException()))
+                .when(webhooks).process(anyString(), anyString(), anyString());
+
+        mockMvc.perform(post("/api/payments/webhooks/mercado-pago")
+                        .queryParam("type", "payment")
+                        .queryParam("data.id", "123")
+                        .header("x-signature", "ts=1,v1=hash")
+                        .header("x-request-id", "request-1")
+                        .contentType("application/json")
+                        .content("{\"data\":{\"id\":\"123\"}}"))
+                .andExpect(status().isAccepted());
     }
 
     @Test

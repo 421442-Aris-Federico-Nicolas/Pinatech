@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
+import com.computerstore.payment.exception.PaymentNotFoundException;
 import com.computerstore.payment.exception.PaymentProviderException;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -117,8 +118,15 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
                     requiredText(response, "operation_type"),
                     requiredDecimal(response, "amount_refunded"),
                     sha256(response.toString()));
-        } catch (RestClientResponseException | ResourceAccessException exception) {
-            throw new PaymentProviderException("Mercado Pago payment lookup failed.", exception);
+        } catch (RestClientResponseException exception) {
+            int status = exception.getStatusCode().value();
+            if (status == 404) {
+                throw new PaymentNotFoundException("Mercado Pago payment lookup returned HTTP 404.", exception);
+            }
+            throw new PaymentProviderException(
+                    "Mercado Pago payment lookup returned HTTP " + status + ".", exception);
+        } catch (ResourceAccessException exception) {
+            throw new PaymentProviderException("Mercado Pago payment lookup could not reach the provider.", exception);
         }
     }
 

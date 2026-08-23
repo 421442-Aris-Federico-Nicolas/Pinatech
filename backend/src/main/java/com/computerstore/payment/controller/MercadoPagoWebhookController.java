@@ -1,12 +1,15 @@
 package com.computerstore.payment.controller;
 
 import com.computerstore.common.exception.InvalidRequestException;
+import com.computerstore.payment.exception.PaymentNotFoundException;
 import com.computerstore.payment.service.MercadoPagoSignatureValidator;
 import com.computerstore.payment.service.PaymentWebhookService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/payments/webhooks")
 public class MercadoPagoWebhookController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MercadoPagoWebhookController.class);
 
     private final ObjectMapper objectMapper;
     private final MercadoPagoSignatureValidator signatures;
@@ -61,7 +66,14 @@ public class MercadoPagoWebhookController {
             throw new InvalidRequestException("Conflicting Mercado Pago payment IDs.");
         }
         signatures.validate(paymentId, requestId, signature);
-        webhooks.process(paymentId, requestId, payload);
+        try {
+            webhooks.process(paymentId, requestId, payload);
+        } catch (PaymentNotFoundException exception) {
+            // Mercado Pago's dashboard simulator can sign events with a non-existent payment ID.
+            // Real payments remain recoverable by the scheduled preference reconciliation.
+            LOGGER.warn("Mercado Pago webhook payment was not found; accepted for reconciliation paymentId={}", paymentId);
+            return ResponseEntity.accepted().build();
+        }
         return ResponseEntity.ok().build();
     }
 
