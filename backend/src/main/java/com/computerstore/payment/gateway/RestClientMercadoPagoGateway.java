@@ -51,11 +51,11 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
         Map<String, Object> body = Map.ofEntries(
                 Map.entry("items", items),
                 Map.entry("external_reference", request.attemptId().toString()),
-                Map.entry("notification_url", properties.publicUrl("/api/payments/webhooks/mercado-pago")),
+                Map.entry("notification_url", properties.webhookUrl("/api/payments/webhooks/mercado-pago")),
                 Map.entry("back_urls", Map.of(
-                        "success", properties.publicUrl(resultPath),
-                        "pending", properties.publicUrl(resultPath),
-                        "failure", properties.publicUrl(resultPath))),
+                        "success", properties.storefrontUrl(resultPath),
+                        "pending", properties.storefrontUrl(resultPath),
+                        "failure", properties.storefrontUrl(resultPath))),
                 Map.entry("auto_return", "approved"),
                 Map.entry("binary_mode", true),
                 Map.entry("expires", true),

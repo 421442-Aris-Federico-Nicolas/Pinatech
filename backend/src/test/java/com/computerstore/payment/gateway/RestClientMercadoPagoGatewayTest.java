@@ -36,7 +36,7 @@ class RestClientMercadoPagoGatewayTest {
                 .andExpect(header("X-Idempotency-Key", attemptId.toString()))
                 .andExpect(jsonPath("$.external_reference").value(attemptId.toString()))
                 .andExpect(jsonPath("$.notification_url")
-                        .value("https://store.example/api/payments/webhooks/mercado-pago"))
+                        .value("https://api.example/api/payments/webhooks/mercado-pago"))
                 .andExpect(jsonPath("$.back_urls.success")
                         .value("https://store.example/checkout/result?orderId=42"))
                 .andExpect(jsonPath("$.binary_mode").value(true))
@@ -106,6 +106,7 @@ class RestClientMercadoPagoGatewayTest {
                 "webhook-secret",
                 "99",
                 URI.create("https://store.example/"),
+                URI.create("https://api.example/"),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(2),
                 false,

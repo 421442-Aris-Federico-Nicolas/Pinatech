@@ -25,9 +25,10 @@ Required when enabled:
 - `MP_ACCESS_TOKEN`: private server credential.
 - `MP_WEBHOOK_SECRET`: Webhooks signature secret.
 - `MP_COLLECTOR_ID`: expected seller user ID.
-- `PUBLIC_BASE_URL`: public HTTPS storefront URL; `/api` must reach the backend.
+- `MP_STOREFRONT_BASE_URL`: public HTTPS storefront URL used by browser return links.
+- `MP_WEBHOOK_BASE_URL`: public HTTPS API origin used by Mercado Pago `POST` notifications.
 
-`docker-compose.prod.yml` derives `PUBLIC_BASE_URL` and the exact CORS origin as
+`docker-compose.prod.yml` derives both Mercado Pago public URLs and the exact CORS origin as
 `https://${APP_DOMAIN}` so they cannot drift. The local Compose file reads them separately.
 
 Optional timeout and reconciliation settings are listed in `.env.example` and
@@ -78,7 +79,7 @@ Administrative cancellation of paid orders is blocked until a separate audited r
 1. Create a Mercado Pago application and select test credentials.
 2. Expose the Docker storefront through one HTTPS tunnel to local port 80.
 3. Put the test access token, Webhooks secret, test seller user ID and tunnel URL in `.env`.
-4. Register `${PUBLIC_BASE_URL}/api/payments/webhooks/mercado-pago` as the payment notification URL.
+4. Register `${MP_WEBHOOK_BASE_URL}/api/payments/webhooks/mercado-pago` as the payment notification URL.
 5. Set `CORS_ALLOWED_ORIGIN` to the same public origin and `MP_ENABLED=true`.
 6. Rebuild the stack and verify `/api/checkout/capabilities` reports Mercado Pago.
 7. Complete a purchase with a test buyer and test payment method.
