@@ -1,10 +1,12 @@
 package com.computerstore.payment.gateway;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -103,20 +105,26 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
             if (preferenceId == null || preferenceId.isBlank()) {
                 preferenceId = preferenceIdFromMerchantOrder(response);
             }
+            String status = requiredText(response, "status");
+            Instant approvedAt = instant(response, "date_approved");
+            if ("approved".equalsIgnoreCase(status) && approvedAt == null) {
+                throw new PaymentProviderException("Mercado Pago approved payment is missing date_approved.");
+            }
+            BigDecimal amount = requiredDecimal(response, "transaction_amount");
             return new ProviderPayment(
                     requiredText(response, "id"),
-                    text(response, "external_reference"),
+                    requiredText(response, "external_reference"),
                     preferenceId,
-                    text(response, "collector_id"),
-                    response.path("transaction_amount").decimalValue(),
-                    text(response, "currency_id"),
-                    requiredText(response, "status"),
+                    requiredText(response, "collector_id"),
+                    amount,
+                    requiredText(response, "currency_id"),
+                    status,
                     text(response, "status_detail"),
-                    instant(response, "date_approved"),
-                    instant(response, "date_last_updated"),
+                    approvedAt,
+                    requiredInstant(response, "date_last_updated"),
                     requiredBoolean(response, "live_mode"),
                     requiredText(response, "operation_type"),
-                    requiredDecimal(response, "amount_refunded"),
+                    refundedAmount(response, status, amount),
                     sha256(response.toString()));
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
@@ -206,10 +214,13 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
         return value.booleanValue();
     }
 
-    private java.math.BigDecimal requiredDecimal(JsonNode node, String field) {
+    private BigDecimal requiredDecimal(JsonNode node, String field) {
         JsonNode value = node.get(field);
-        if (value == null || !value.isNumber()) {
+        if (value == null || value.isNull()) {
             throw new PaymentProviderException("Mercado Pago response is missing " + field + ".");
+        }
+        if (!value.isNumber()) {
+            throw new PaymentProviderException("Mercado Pago response has an invalid " + field + ".");
         }
         return value.decimalValue();
     }
@@ -244,7 +255,56 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
 
     private Instant instant(JsonNode node, String field) {
         String value = text(node, field);
-        return value == null || value.isBlank() ? null : OffsetDateTime.parse(value).toInstant();
+        if (value == null || value.isBlank()) return null;
+        try {
+            return OffsetDateTime.parse(value).toInstant();
+        } catch (DateTimeParseException exception) {
+            throw new PaymentProviderException("Mercado Pago response has an invalid " + field + ".", exception);
+        }
+    }
+
+    private Instant requiredInstant(JsonNode node, String field) {
+        Instant value = instant(node, field);
+        if (value == null) {
+            throw new PaymentProviderException("Mercado Pago response is missing " + field + ".");
+        }
+        return value;
+    }
+
+    private BigDecimal refundedAmount(JsonNode payment, String status, BigDecimal paymentAmount) {
+        BigDecimal refunded = optionalDecimal(payment, "transaction_amount_refunded");
+        if (refunded == null) {
+            refunded = optionalDecimal(payment, "amount_refunded");
+        }
+        if (refunded == null) {
+            JsonNode refunds = payment.get("refunds");
+            if (refunds != null && !refunds.isNull()) {
+                if (!refunds.isArray()) {
+                    throw new PaymentProviderException("Mercado Pago response has an invalid refunds field.");
+                }
+                refunded = BigDecimal.ZERO;
+                for (JsonNode refund : refunds) {
+                    refunded = refunded.add(requiredDecimal(refund, "amount"));
+                }
+            } else {
+                refunded = BigDecimal.ZERO;
+            }
+        }
+
+        if ("refunded".equalsIgnoreCase(status) && refunded.compareTo(paymentAmount) != 0) {
+            throw new PaymentProviderException(
+                    "Mercado Pago refunded payment does not report the full refunded amount.");
+        }
+        return refunded;
+    }
+
+    private BigDecimal optionalDecimal(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return null;
+        if (!value.isNumber()) {
+            throw new PaymentProviderException("Mercado Pago response has an invalid " + field + ".");
+        }
+        return value.decimalValue();
     }
 
     private String sha256(String value) {
