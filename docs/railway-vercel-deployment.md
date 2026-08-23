@@ -78,9 +78,14 @@ Railway must contain exactly:
 
 ```text
 CORS_ALLOWED_ORIGIN=https://pinatech.com.ar
-PUBLIC_BASE_URL=https://pinatech.com.ar
+MP_STOREFRONT_BASE_URL=https://pinatech.com.ar
+MP_WEBHOOK_BASE_URL=https://api.pinatech.com.ar
 REFRESH_COOKIE_SECURE=true
 ```
+
+`MP_STOREFRONT_BASE_URL` is used only for the browser return after checkout. Mercado Pago sends
+`POST` notifications to `${MP_WEBHOOK_BASE_URL}/api/payments/webhooks/mercado-pago`; pointing that
+URL at Vercel returns `405 Method Not Allowed` and leaves paid orders pending in the application.
 
 The storefront and API are different origins but the same `pinatech.com.ar` site. This allows the existing secure `SameSite=Strict` refresh cookie to work with credentialed API requests without weakening it to `SameSite=None`.
 
@@ -95,5 +100,7 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version `15` in Railway logs.
+6. Flyway reports the expected schema version in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
+8. A Mercado Pago webhook test returns `200` from
+   `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.

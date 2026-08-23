@@ -68,7 +68,8 @@ app:
       access-token: ${MP_ACCESS_TOKEN:}
       webhook-secret: ${MP_WEBHOOK_SECRET:}
       collector-id: ${MP_COLLECTOR_ID:}
-      public-base-url: ${PUBLIC_BASE_URL:}
+      storefront-base-url: ${MP_STOREFRONT_BASE_URL:${PUBLIC_BASE_URL:}}
+      webhook-base-url: ${MP_WEBHOOK_BASE_URL:${PUBLIC_BASE_URL:}}
       connect-timeout: ${MP_CONNECT_TIMEOUT:PT3S}
       read-timeout: ${MP_READ_TIMEOUT:PT10S}
       production-confirmation: ${MP_PRODUCTION_CONFIRMATION:false}
