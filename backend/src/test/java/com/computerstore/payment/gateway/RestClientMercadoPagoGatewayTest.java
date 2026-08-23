@@ -19,6 +19,7 @@ import java.util.UUID;
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.payment.exception.PaymentNotFoundException;
+import com.computerstore.payment.exception.PaymentProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -98,7 +99,7 @@ class RestClientMercadoPagoGatewayTest {
                           "status_detail": "accredited",
                           "live_mode": false,
                           "operation_type": "regular_payment",
-                          "amount_refunded": 0,
+                          "transaction_amount_refunded": 0,
                           "date_approved": "2026-08-17T20:00:00Z",
                           "date_last_updated": "2026-08-17T20:00:01Z",
                           "order": {"id": "merchant-order-1", "type": "mercadopago"}
@@ -112,7 +113,120 @@ class RestClientMercadoPagoGatewayTest {
 
         assertEquals("pref-1", payment.preferenceId());
         assertEquals("99", payment.collectorId());
+        assertEquals(0, new BigDecimal("100.00").compareTo(payment.amount()));
+        assertEquals(BigDecimal.ZERO, payment.amountRefunded());
+        assertEquals(Instant.parse("2026-08-17T20:00:01Z"), payment.lastUpdatedAt());
         server.verify();
+    }
+
+    @Test
+    void defaultsTheRefundedAmountToZeroWhenANonRefundedPaymentOmitsIt() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/124"))
+                .andRespond(withSuccess(paymentJson(
+                        "approved", "100.00", "\"date_approved\": \"2026-08-17T20:00:00Z\","),
+                        MediaType.APPLICATION_JSON));
+
+        ProviderPayment payment = gateway.getPayment("124");
+
+        assertEquals(BigDecimal.ZERO, payment.amountRefunded());
+        server.verify();
+    }
+
+    @Test
+    void sumsIndividualRefundsWhenTheAggregateFieldIsAbsent() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/125"))
+                .andRespond(withSuccess(paymentJson(
+                        "refunded", "100.00", "\"refunds\": [{\"amount\": 40}, {\"amount\": 60}],"),
+                        MediaType.APPLICATION_JSON));
+
+        ProviderPayment payment = gateway.getPayment("125");
+
+        assertEquals(new BigDecimal("100"), payment.amountRefunded());
+        server.verify();
+    }
+
+    @Test
+    void acceptsTheLegacyRefundedAmountField() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/126"))
+                .andRespond(withSuccess(paymentJson(
+                        "approved", "100.00",
+                        "\"date_approved\": \"2026-08-17T20:00:00Z\", \"amount_refunded\": 25,"),
+                        MediaType.APPLICATION_JSON));
+
+        ProviderPayment payment = gateway.getPayment("126");
+
+        assertEquals(new BigDecimal("25"), payment.amountRefunded());
+        server.verify();
+    }
+
+    @Test
+    void rejectsRefundedStatusWithoutTheFullRefundedAmount() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/127"))
+                .andRespond(withSuccess(paymentJson("refunded", "100.00", "\"refunds\": [],"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThrows(PaymentProviderException.class, () -> gateway.getPayment("127"));
+        server.verify();
+    }
+
+    @Test
+    void rejectsAnApprovedPaymentWithoutApprovalDate() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/128"))
+                .andRespond(withSuccess(paymentJson(
+                        "approved", "100.00", "\"transaction_amount_refunded\": 0,"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThrows(PaymentProviderException.class, () -> gateway.getPayment("128"));
+        server.verify();
+    }
+
+    @Test
+    void rejectsANonNumericTransactionAmount() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        server.expect(requestTo("https://api.mercadopago.com/v1/payments/129"))
+                .andRespond(withSuccess(paymentJson(
+                        "approved", "\"100.00\"",
+                        "\"date_approved\": \"2026-08-17T20:00:00Z\", \"transaction_amount_refunded\": 0,"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThrows(PaymentProviderException.class, () -> gateway.getPayment("129"));
+        server.verify();
+    }
+
+    private String paymentJson(String status, String transactionAmount, String additionalFields) {
+        return """
+                {
+                  "id": 124,
+                  "external_reference": "a472fdf6-7a3d-4859-9f52-e934056e53ce",
+                  "preference_id": "pref-1",
+                  "collector_id": 99,
+                  "transaction_amount": %s,
+                  "currency_id": "ARS",
+                  "status": "%s",
+                  "status_detail": "accredited",
+                  "live_mode": false,
+                  "operation_type": "regular_payment",
+                  %s
+                  "date_last_updated": "2026-08-17T20:00:01Z"
+                }
+                """.formatted(transactionAmount, status, additionalFields);
     }
 
     private MercadoPagoProperties properties() {
