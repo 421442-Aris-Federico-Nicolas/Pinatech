@@ -4,6 +4,7 @@ import { catchError, forkJoin, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Product, ProductVariant } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
+import { PickupLocation } from '../orders/order.service';
 
 export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
 export interface CartAddResult { requested: number; added: number; quantity: number; limit: number; capped: boolean; }
@@ -15,6 +16,8 @@ export interface OrderConfirmation {
   currency: string;
   paymentMethod: string | null;
   deliveryMethod: string | null;
+  fulfillmentMethod: string | null;
+  pickupLocation: PickupLocation | null;
   total: number;
   createdAt: string;
   reservationExpiresAt: string;
@@ -23,11 +26,17 @@ export interface OrderConfirmation {
 const GUEST_CART_KEY = 'pinatech-cart-guest';
 const MAX_QUANTITY = 99;
 
+interface StoredCheckoutAttempt {
+  key: string;
+  requestHash: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CartService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private activeKey = GUEST_CART_KEY;
+  private readonly checkoutAttempts = new Map<string, string>();
   private readonly legacyCartDiscardedState = signal(false);
   private readonly itemsState = signal<CartItem[]>(this.restoreCart(GUEST_CART_KEY));
   private readonly confirmationState = signal<OrderConfirmation | null>(null);
@@ -42,7 +51,7 @@ export class CartService {
 
   constructor() {
     effect(() => {
-      const userId = this.auth.user()?.id ?? null;
+      const userId = this.auth.isAuthenticated() ? this.auth.user()?.id ?? null : null;
       const key = this.storageKey(userId);
       if (key === this.activeKey) return;
 
@@ -54,6 +63,7 @@ export class CartService {
       if (userId !== null && this.activeKey === GUEST_CART_KEY) this.remove(GUEST_CART_KEY);
 
       this.remove(this.checkoutAttemptStorageKey());
+      this.checkoutAttempts.clear();
       this.activeKey = key;
       this.remove(this.checkoutAttemptStorageKey());
       this.itemsState.set(next);
@@ -135,22 +145,29 @@ export class CartService {
     );
   }
 
-  checkout() {
-    const idempotencyKey = this.checkoutAttempt();
+  checkout(fulfillmentMethod: string, pickupLocationCode: string, pickupLocationVersion: string) {
+    const items = this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity }));
+    const requestHash = `${fulfillmentMethod}|${pickupLocationCode}|${pickupLocationVersion}|${[...items]
+      .sort((left, right) => left.variantId - right.variantId || left.quantity - right.quantity)
+      .map((item) => `${item.variantId}:${item.quantity}`).join(',')}`;
+    const idempotencyKey = this.checkoutAttempt(requestHash);
     return this.http.post<OrderConfirmation>(`${environment.apiBaseUrl}/orders`, {
-      items: this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity })),
+      items,
+      fulfillmentMethod,
+      pickupLocationCode,
+      pickupLocationVersion,
     }, { headers: { 'Idempotency-Key': idempotencyKey } });
   }
 
   completeCheckout(confirmation: OrderConfirmation): void {
     this.update([]);
     this.confirmationState.set(confirmation);
-    this.persistConfirmation(this.auth.user()?.id ?? null, confirmation);
+    this.persistConfirmation(this.auth.isAuthenticated() ? this.auth.user()?.id ?? null : null, confirmation);
   }
 
   dismissConfirmation(): void {
     this.confirmationState.set(null);
-    this.remove(this.confirmationKey(this.auth.user()?.id ?? null));
+    this.remove(this.confirmationKey(this.auth.isAuthenticated() ? this.auth.user()?.id ?? null : null));
   }
 
   stockLimit(variant: ProductVariant): number {
@@ -164,6 +181,7 @@ export class CartService {
     this.itemsState.set(items);
     this.persist(this.activeKey, items);
     this.remove(this.checkoutAttemptStorageKey());
+    this.checkoutAttempts.clear();
   }
 
   private merge(existing: CartItem[], incoming: CartItem[]): CartItem[] {
@@ -188,17 +206,33 @@ export class CartService {
     return `pinatech-checkout-${this.activeKey}`;
   }
 
-  private checkoutAttempt(): string {
+  private checkoutAttempt(requestHash: string): string {
+    const inMemory = this.checkoutAttempts.get(requestHash);
+    if (inMemory) return inMemory;
+
     const storageKey = this.checkoutAttemptStorageKey();
     try {
-      const existing = localStorage.getItem(storageKey);
-      if (existing) return existing;
+      const existing: unknown = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+      if (this.isStoredCheckoutAttempt(existing) && existing.requestHash === requestHash) {
+        this.checkoutAttempts.set(requestHash, existing.key);
+        return existing.key;
+      }
     } catch { /* Storage can be unavailable. */ }
 
-    const key = globalThis.crypto?.randomUUID?.()
-      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    try { localStorage.setItem(storageKey, key); } catch { /* The in-flight request remains idempotent. */ }
-    return key;
+    const attempt: StoredCheckoutAttempt = {
+      key: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      requestHash,
+    };
+    this.checkoutAttempts.set(requestHash, attempt.key);
+    try { localStorage.setItem(storageKey, JSON.stringify(attempt)); } catch { /* The in-flight request remains idempotent. */ }
+    return attempt.key;
+  }
+
+  private isStoredCheckoutAttempt(value: unknown): value is StoredCheckoutAttempt {
+    if (!value || typeof value !== 'object') return false;
+    const attempt = value as Record<string, unknown>;
+    return typeof attempt['key'] === 'string' && !!attempt['key']
+      && typeof attempt['requestHash'] === 'string';
   }
 
   private persist(key: string, items: CartItem[]): void {
@@ -260,6 +294,8 @@ export class CartService {
         && typeof value['currency'] === 'string'
         && (typeof value['paymentMethod'] === 'string' || value['paymentMethod'] === null)
         && (typeof value['deliveryMethod'] === 'string' || value['deliveryMethod'] === null)
+        && (typeof value['fulfillmentMethod'] === 'string' || value['fulfillmentMethod'] == null)
+        && (value['pickupLocation'] == null || this.isPickupLocation(value['pickupLocation']))
         ? {
           id: value['id'],
           status: value['status'],
@@ -268,6 +304,8 @@ export class CartService {
           currency: value['currency'],
           paymentMethod: value['paymentMethod'] as string | null,
           deliveryMethod: value['deliveryMethod'] as string | null,
+          fulfillmentMethod: typeof value['fulfillmentMethod'] === 'string' ? value['fulfillmentMethod'] : null,
+          pickupLocation: this.isPickupLocation(value['pickupLocation']) ? value['pickupLocation'] : null,
           total: value['total'],
           createdAt: value['createdAt'],
           reservationExpiresAt: value['reservationExpiresAt'] as string,
@@ -295,6 +333,21 @@ export class CartService {
       && typeof variant['inStock'] === 'boolean'
       && (variant['availableQuantity'] === undefined || typeof variant['availableQuantity'] === 'number' && Number.isInteger(variant['availableQuantity']) && variant['availableQuantity'] >= 0)
       && Number.isFinite(item['quantity']) && item['quantity'] > 0;
+  }
+
+  private isPickupLocation(value: unknown): value is PickupLocation {
+    if (!value || typeof value !== 'object') return false;
+    const location = value as Record<string, unknown>;
+    return typeof location['code'] === 'string'
+      && typeof location['version'] === 'string'
+      && typeof location['name'] === 'string'
+      && Array.isArray(location['addressLines'])
+      && location['addressLines'].every((line) => typeof line === 'string')
+      && typeof location['locality'] === 'string'
+      && typeof location['provinceCode'] === 'string'
+      && typeof location['postalCode'] === 'string'
+      && typeof location['instructions'] === 'string'
+      && typeof location['hours'] === 'string';
   }
 
   private isLegacyCartItem(value: unknown): boolean {

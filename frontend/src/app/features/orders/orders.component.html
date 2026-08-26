@@ -58,6 +58,23 @@
             <p class="payment-unavailable" role="status">{{ reason }}</p>
           }
 
+          @if (order.pickupLocation; as pickup) {
+            <section class="pickup" [attr.aria-labelledby]="'pickup-title-' + order.id">
+              <div class="pickup-heading">
+                <div><p>Retiro del pedido</p><h3 [id]="'pickup-title-' + order.id">{{ pickup.name }}</h3></div>
+                <strong>{{ methodLabel(order.fulfillmentMethod) }}</strong>
+              </div>
+              <address>
+                @for (line of pickup.addressLines; track $index) { <span>{{ line }}</span> }
+                <span>{{ pickup.locality }}, {{ pickup.provinceCode }} · CP {{ pickup.postalCode }}</span>
+              </address>
+              <dl>
+                <div><dt>Horarios</dt><dd>{{ pickup.hours }}</dd></div>
+                <div><dt>Indicaciones</dt><dd>{{ pickup.instructions }}</dd></div>
+              </dl>
+            </section>
+          }
+
           <ul class="items" aria-label="Productos del pedido">
             @for (item of order.items; track item.variantId) {
               <li><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></li>
@@ -67,9 +84,9 @@
           <footer>
             <dl>
               <div><dt>Pago</dt><dd [attr.translate]="order.paymentMethod === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(order.paymentMethod) }}</dd></div>
-              <div><dt>Entrega</dt><dd>{{ methodLabel(order.deliveryMethod) }}</dd></div>
+              <div><dt>Modalidad</dt><dd>{{ methodLabel(order.fulfillmentMethod) }}</dd></div>
             </dl>
-            <div class="total"><span>Total</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            <div class="total"><span>Total de productos · retiro sin costo</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
           </footer>
         </article></li>
       }

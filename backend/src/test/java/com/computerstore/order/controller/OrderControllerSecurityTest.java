@@ -5,14 +5,17 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.config.SecurityConfiguration;
 import com.computerstore.order.config.OrderProperties;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.security.CustomUserDetailsService;
 import com.computerstore.security.JwtAuthenticationFilter;
@@ -20,6 +23,7 @@ import com.computerstore.security.JwtService;
 import com.computerstore.security.RestAccessDeniedHandler;
 import com.computerstore.security.RestAuthenticationEntryPoint;
 import com.computerstore.user.repository.UserAccountRepository;
+import com.computerstore.user.domain.UserAccount;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,6 +47,7 @@ class OrderControllerSecurityTest {
     @MockBean private UserAccountRepository users;
     @MockBean private OrderStockService stock;
     @MockBean private OrderProperties properties;
+    @MockBean private FulfillmentPolicy fulfillmentPolicy;
     @MockBean private JwtService jwtService;
     @MockBean private CustomUserDetailsService userDetailsService;
 
@@ -54,7 +59,7 @@ class OrderControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"items\":[{\"variantId\":1,\"quantity\":1}]}"))
+                        .content(validOrderRequest()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -67,7 +72,7 @@ class OrderControllerSecurityTest {
         mockMvc.perform(post("/api/orders")
                         .with(user(admin))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"items\":[{\"variantId\":1,\"quantity\":1}]}"))
+                        .content(validOrderRequest()))
                 .andExpect(status().isForbidden());
     }
 
@@ -79,8 +84,37 @@ class OrderControllerSecurityTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void checkoutReturnsAStableProblemWhenEmailIsNotVerified() throws Exception {
+        UserAccount account = org.mockito.Mockito.mock(UserAccount.class);
+        when(account.isActive()).thenReturn(true);
+        when(account.isEmailVerified()).thenReturn(false);
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(account));
+
+        mockMvc.perform(post("/api/orders")
+                        .with(user(principal("ROLE_CUSTOMER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"variantId":1,"quantity":1}],
+                                 "fulfillmentMethod":"PICKUP","pickupLocationCode":"CORDOBA-CENTRO",
+                                 "pickupLocationVersion":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value(
+                        "https://computer-store.dev/errors/email-verification-required"))
+                .andExpect(jsonPath("$.title").value("Email verification required"));
+    }
+
     private AuthenticatedUser principal(String role) {
         return new AuthenticatedUser(
                 1L, "user@example.com", List.of(new SimpleGrantedAuthority(role)));
+    }
+
+    private String validOrderRequest() {
+        return """
+                {"items":[{"variantId":1,"quantity":1}],
+                 "fulfillmentMethod":"PICKUP","pickupLocationCode":"CORDOBA-CENTRO",
+                 "pickupLocationVersion":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                """;
     }
 }

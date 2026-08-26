@@ -16,6 +16,8 @@ public final class OrderResponseMapper {
                 order.getCurrency(),
                 order.getPaymentMethod(),
                 order.getDeliveryMethod(),
+                order.getFulfillmentMethod() == null ? null : order.getFulfillmentMethod().name(),
+                order.getPickupLocation() == null ? null : PickupLocationResponse.from(order.getPickupLocation()),
                 order.getTotal(),
                 order.getCreatedAt(),
                 order.getReservationExpiresAt(),

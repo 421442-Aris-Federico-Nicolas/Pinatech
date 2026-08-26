@@ -40,6 +40,12 @@ form > button { margin-top: var(--space-2); width: 100%; }
 .account-link { color: var(--color-text-muted); font-size: var(--text-md); margin: var(--space-3) 0 0; text-align: center; }
 .account-link a { color: var(--color-cyan); font-weight: var(--font-weight-bold); }
 .account-link a:hover { text-decoration-thickness: 2px; }
+.forgot-link { color: var(--color-cyan); font-size: var(--text-md); font-weight: var(--font-weight-bold); justify-self: end; margin-top: calc(var(--space-2) * -1); }
+.forgot-link:hover { text-decoration-thickness: 2px; }
+.auth-card > a.app-button, .auth-card > button.app-button { margin-top: var(--space-3); width: 100%; }
+.success { background: var(--color-success-bg); border-left: 3px solid var(--color-success); color: var(--color-success-text); margin-bottom: var(--space-4); padding: var(--space-4); }
+.success h2 { font-size: 1.15rem; margin: 0 0 var(--space-2); }
+.success p { line-height: var(--line-height-base); margin: 0; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }

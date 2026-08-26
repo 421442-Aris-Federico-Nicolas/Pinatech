@@ -20,7 +20,7 @@ describe('AuthService', () => {
     };
     const response: AuthResponse = {
       accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900,
-      user: { id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] },
+      user: { id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: false, roles: ['CUSTOMER'] },
     };
 
     auth.register(account).subscribe();
@@ -33,5 +33,19 @@ describe('AuthService', () => {
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.user()?.id).toBe(7);
     expect(auth.getAccessToken()).toBe('access-token');
+  });
+
+  it('uses the account lifecycle endpoints with narrow payloads', () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    auth.requestEmailVerification('ada@example.com').subscribe();
+    http.expectOne(`${environment.apiBaseUrl}/auth/email-verification/request`).flush({ message: 'accepted' });
+    auth.confirmEmailVerification('verify-token').subscribe();
+    expect(http.expectOne(`${environment.apiBaseUrl}/auth/email-verification/confirm`).request.body).toEqual({ token: 'verify-token' });
+    auth.forgotPassword('ada@example.com').subscribe();
+    expect(http.expectOne(`${environment.apiBaseUrl}/auth/forgot-password`).request.body).toEqual({ email: 'ada@example.com' });
+    auth.resetPassword('reset-token', 'Password1').subscribe();
+    expect(http.expectOne(`${environment.apiBaseUrl}/auth/reset-password`).request.body).toEqual({ token: 'reset-token', password: 'Password1' });
   });
 });

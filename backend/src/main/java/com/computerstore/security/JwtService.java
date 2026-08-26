@@ -35,6 +35,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(user.id().toString())
                 .claim("email", user.email())
+                .claim("sv", user.sessionVersion())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(accessExpirationMs)))
                 .signWith(signingKey)
@@ -42,15 +43,26 @@ public class JwtService {
     }
 
     public Long extractUserId(String token) {
+        return extractSession(token).userId();
+    }
+
+    public JwtSession extractSession(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return Long.valueOf(claims.getSubject());
+        Number sessionVersion = claims.get("sv", Number.class);
+        if (sessionVersion == null) {
+            throw new IllegalArgumentException("JWT session version is missing.");
+        }
+        return new JwtSession(Long.valueOf(claims.getSubject()), sessionVersion.longValue());
     }
 
     public long getAccessExpirationSeconds() {
         return accessExpirationMs / 1000;
+    }
+
+    public record JwtSession(Long userId, long sessionVersion) {
     }
 }

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { afterEach, vi } from 'vitest';
 import { App } from './app';
 import { routes } from './app.routes';
 import { customerGuard } from './core/guards/customer.guard';
@@ -10,6 +11,8 @@ import { NotificationService } from './core/notifications/notification.service';
 class TestCatalogPage {}
 
 describe('App', () => {
+  afterEach(() => vi.useRealTimers());
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
@@ -41,6 +44,7 @@ describe('App', () => {
   });
 
   it('renders and dismisses global interaction feedback', () => {
+    vi.useFakeTimers();
     const fixture = TestBed.createComponent(App);
     const notifications = TestBed.inject(NotificationService);
     fixture.detectChanges();
@@ -51,9 +55,67 @@ describe('App', () => {
     const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
     expect(feedback.textContent).toContain('Producto agregado al carrito.');
     expect(feedback.getAttribute('role')).toBe('status');
-    (feedback.querySelector('button') as HTMLButtonElement).click();
+    expect(feedback.getAttribute('aria-live')).toBe('polite');
+    (feedback.querySelector('.notification-close') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(feedback.classList).toContain('is-exiting');
+    vi.advanceTimersByTime(180);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.app-notification')).toBeNull();
+  });
+
+  it('keeps contextual actions separate from manual dismissal', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    const action = vi.fn();
+    fixture.detectChanges();
+
+    notifications.warning('Alcanzaste el máximo.', 'Ver carrito').onAction().subscribe(action);
+    fixture.detectChanges();
+
+    const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    expect(feedback.querySelector('.notification-action')?.textContent).toContain('Ver carrito');
+    (feedback.querySelector('.notification-close') as HTMLButtonElement).click();
+    vi.advanceTimersByTime(180);
+    fixture.detectChanges();
+
+    expect(action).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.app-notification')).toBeNull();
+  });
+
+  it('keeps an actionable notification visible while the outlet is hovered', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    fixture.detectChanges();
+    notifications.show('Pedido pendiente', { action: 'Ver pedido', duration: 1000 });
+    fixture.detectChanges();
+
+    const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    vi.advanceTimersByTime(400);
+    feedback.dispatchEvent(new MouseEvent('mouseenter'));
+    vi.advanceTimersByTime(2000);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.app-notification')).toBe(feedback);
+
+    feedback.dispatchEvent(new MouseEvent('mouseleave'));
+    vi.advanceTimersByTime(600);
+    fixture.detectChanges();
+    expect(feedback.classList).toContain('is-exiting');
+  });
+
+  it('announces errors assertively', () => {
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    fixture.detectChanges();
+
+    notifications.error('No se pudo completar la operación.');
+    fixture.detectChanges();
+
+    const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    expect(feedback.getAttribute('role')).toBe('alert');
+    expect(feedback.getAttribute('aria-live')).toBe('assertive');
   });
 
   it('protects customer order and checkout result routes', () => {

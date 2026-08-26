@@ -13,7 +13,8 @@ public record MercadoPagoProperties(
         String accessToken,
         String webhookSecret,
         String collectorId,
-        URI publicBaseUrl,
+        URI storefrontBaseUrl,
+        URI webhookBaseUrl,
         Duration connectTimeout,
         Duration readTimeout,
         boolean productionConfirmation,
@@ -38,15 +39,17 @@ public record MercadoPagoProperties(
         if (reconciliationLookback.isZero() || reconciliationLookback.isNegative()) {
             throw new IllegalArgumentException("Mercado Pago reconciliation lookback must be positive.");
         }
-        if (enabled && (blank(accessToken) || blank(webhookSecret) || blank(collectorId) || publicBaseUrl == null)) {
+        if (enabled && (blank(accessToken) || blank(webhookSecret) || blank(collectorId)
+                || storefrontBaseUrl == null || webhookBaseUrl == null)) {
             throw new IllegalArgumentException(
-                    "Enabled Mercado Pago integration requires access token, webhook secret, collector ID and public base URL.");
+                    "Enabled Mercado Pago integration requires credentials, storefront URL and webhook URL.");
         }
-        if (enabled && !publicBaseUrl.isAbsolute()) {
-            throw new IllegalArgumentException("Mercado Pago public base URL must be absolute.");
+        if (enabled && (!storefrontBaseUrl.isAbsolute() || !webhookBaseUrl.isAbsolute())) {
+            throw new IllegalArgumentException("Mercado Pago public URLs must be absolute.");
         }
-        if (enabled && !"https".equalsIgnoreCase(publicBaseUrl.getScheme())) {
-            throw new IllegalArgumentException("Enabled Mercado Pago integration requires an HTTPS public base URL.");
+        if (enabled && (!"https".equalsIgnoreCase(storefrontBaseUrl.getScheme())
+                || !"https".equalsIgnoreCase(webhookBaseUrl.getScheme()))) {
+            throw new IllegalArgumentException("Enabled Mercado Pago integration requires HTTPS public URLs.");
         }
         if (enabled && environment == MercadoPagoEnvironment.SANDBOX && !accessToken.startsWith("TEST-")) {
             throw new IllegalArgumentException("Mercado Pago sandbox requires a TEST- access token.");
@@ -64,8 +67,16 @@ public record MercadoPagoProperties(
         }
     }
 
-    public String publicUrl(String path) {
-        String base = publicBaseUrl.toString().replaceAll("/+$", "");
+    public String storefrontUrl(String path) {
+        return resolve(storefrontBaseUrl, path);
+    }
+
+    public String webhookUrl(String path) {
+        return resolve(webhookBaseUrl, path);
+    }
+
+    private String resolve(URI baseUrl, String path) {
+        String base = baseUrl.toString().replaceAll("/+$", "");
         return base + (path.startsWith("/") ? path : "/" + path);
     }
 

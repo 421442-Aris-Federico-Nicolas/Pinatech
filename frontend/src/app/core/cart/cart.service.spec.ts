@@ -10,17 +10,20 @@ import { environment } from '../../../environments/environment';
 
 describe('CartService', () => {
   const user = signal<AuthenticatedUser | null>(null);
+  const isAuthenticated = signal(false);
   const variant = { id: 11, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 99 };
   const product: Product = { id: 1, name: 'Teclado', slug: 'teclado', description: 'Mecánico', price: 1000, categoryId: 2, categoryName: 'Periféricos', brandId: 3, brandName: 'Marca', images: [], specifications: [], variants: [variant] };
+  const pickupLocation = { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' };
 
   beforeEach(() => {
     localStorage.clear();
     user.set(null);
+    isAuthenticated.set(false);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { user } },
+        { provide: AuthService, useValue: { user, isAuthenticated } },
       ],
     });
   });
@@ -55,7 +58,8 @@ describe('CartService', () => {
     localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 3 }]));
     const cart = TestBed.inject(CartService);
 
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    isAuthenticated.set(true);
     TestBed.tick();
 
     expect(cart.items()).toEqual([{ product, variant, quantity: 5 }]);
@@ -107,7 +111,8 @@ describe('CartService', () => {
   });
 
   it('does not restore an expired confirmation and removes it from storage', () => {
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    isAuthenticated.set(true);
     localStorage.setItem('pinatech-order-user-7', JSON.stringify({
       id: 42,
       status: 'PENDING_PAYMENT',
@@ -116,6 +121,8 @@ describe('CartService', () => {
       currency: 'ARS',
       paymentMethod: null,
       deliveryMethod: null,
+      fulfillmentMethod: 'PICKUP',
+      pickupLocation,
       total: 2000,
       createdAt: '1999-12-31T20:00:00Z',
       reservationExpiresAt: '2000-01-01T20:00:00Z',
@@ -129,7 +136,8 @@ describe('CartService', () => {
   });
 
   it('rejects an invalid confirmation expiration date', () => {
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    isAuthenticated.set(true);
     localStorage.setItem('pinatech-order-user-7', JSON.stringify({
       id: 42,
       status: 'PENDING_PAYMENT',
@@ -138,6 +146,8 @@ describe('CartService', () => {
       currency: 'ARS',
       paymentMethod: null,
       deliveryMethod: null,
+      fulfillmentMethod: 'PICKUP',
+      pickupLocation,
       total: 2000,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: 'not-a-date',
@@ -191,10 +201,15 @@ describe('CartService', () => {
     const cart = TestBed.inject(CartService);
     cart.add(product, variant, 2);
     let createdOrder: Parameters<typeof cart.completeCheckout>[0] | undefined;
-    cart.checkout().subscribe((order) => createdOrder = order);
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe((order) => createdOrder = order);
 
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
-    expect(request.request.body).toEqual({ items: [{ variantId: 11, quantity: 2 }] });
+    expect(request.request.body).toEqual({
+      items: [{ variantId: 11, quantity: 2 }],
+      fulfillmentMethod: 'PICKUP',
+      pickupLocationCode: pickupLocation.code,
+      pickupLocationVersion: pickupLocation.version,
+    });
     expect(request.request.headers.get('Idempotency-Key')).toBeTruthy();
     request.flush({
       id: 42,
@@ -204,6 +219,8 @@ describe('CartService', () => {
       currency: 'ARS',
       paymentMethod: null,
       deliveryMethod: null,
+      fulfillmentMethod: 'PICKUP',
+      pickupLocation,
       total: 2000,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: '2026-07-29T20:00:00Z',
@@ -225,12 +242,12 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout().subscribe({ error: () => undefined });
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout().subscribe();
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe();
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
     retry.flush({
@@ -241,9 +258,64 @@ describe('CartService', () => {
       currency: 'ARS',
       paymentMethod: null,
       deliveryMethod: null,
+      fulfillmentMethod: 'PICKUP',
+      pickupLocation,
       total: 1000,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: '2026-07-29T20:00:00Z',
     });
+  });
+
+  it('regenerates the checkout idempotency key when the pickup selection changes', () => {
+    const cart = TestBed.inject(CartService);
+    const http = TestBed.inject(HttpTestingController);
+    cart.add(product, variant);
+
+    cart.checkout('PICKUP', 'CORDOBA_CENTRO', 'v1').subscribe({ error: () => undefined });
+    const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    const firstKey = first.request.headers.get('Idempotency-Key');
+    first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
+
+    cart.checkout('PICKUP', 'CORDOBA_NORTE', 'v1').subscribe({ error: () => undefined });
+    const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
+    expect(changed.request.body.pickupLocationCode).toBe('CORDOBA_NORTE');
+    changed.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
+  });
+
+  it('reuses an in-memory idempotency key when storage throws and clears it after a cart mutation', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    const cart = TestBed.inject(CartService);
+    const http = TestBed.inject(HttpTestingController);
+    cart.add(product, variant);
+
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    const firstKey = first.request.headers.get('Idempotency-Key');
+    first.flush({}, { status: 503, statusText: 'Unavailable' });
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retry.flush({}, { status: 503, statusText: 'Unavailable' });
+
+    cart.setQuantity(variant.id, 2);
+    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
+    changed.flush({}, { status: 503, statusText: 'Unavailable' });
+    getItem.mockRestore();
+    setItem.mockRestore();
+  });
+
+  it('does not activate a residual user cart without an authenticated session', () => {
+    localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, variant, quantity: 1 }]));
+    localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 4 }]));
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+
+    const cart = TestBed.inject(CartService);
+    TestBed.tick();
+
+    expect(cart.items()[0].quantity).toBe(1);
   });
 });

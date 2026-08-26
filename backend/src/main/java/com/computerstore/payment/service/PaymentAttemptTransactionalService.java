@@ -12,11 +12,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.computerstore.common.exception.InvalidRequestException;
+import com.computerstore.common.exception.EmailVerificationRequiredException;
 import com.computerstore.common.exception.ReservationExpiredException;
 import com.computerstore.common.exception.ResourceNotFoundException;
+import com.computerstore.common.exception.BusinessRuleException;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.payment.domain.PaymentAttempt;
@@ -46,6 +49,7 @@ public class PaymentAttemptTransactionalService {
     private final CustomerOrderRepository orders;
     private final OrderStockService stock;
     private final MercadoPagoProperties properties;
+    private final FulfillmentPolicy fulfillment;
     private final Clock clock;
 
     public PaymentAttemptTransactionalService(
@@ -55,6 +59,7 @@ public class PaymentAttemptTransactionalService {
             CustomerOrderRepository orders,
             OrderStockService stock,
             MercadoPagoProperties properties,
+            FulfillmentPolicy fulfillment,
             Clock clock
     ) {
         this.attempts = attempts;
@@ -63,6 +68,7 @@ public class PaymentAttemptTransactionalService {
         this.orders = orders;
         this.stock = stock;
         this.properties = properties;
+        this.fulfillment = fulfillment;
         this.clock = clock;
     }
 
@@ -73,6 +79,11 @@ public class PaymentAttemptTransactionalService {
         var order = orders.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         Instant now = Instant.now(clock);
+
+        if (!order.getUser().isEmailVerified()) {
+            throw new EmailVerificationRequiredException();
+        }
+        fulfillment.validatePayment(order);
 
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new InvalidRequestException("Only a pending payment order can start a payment.");
@@ -214,7 +225,14 @@ public class PaymentAttemptTransactionalService {
         boolean alreadyFunded = providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId());
         boolean approvedBeforeExpiry = payment.approvedAt() != null
                 && !payment.approvedAt().isAfter(attempt.getExpiresAt());
-        if (!alreadyFunded && order.getStatus() == OrderStatus.PENDING_PAYMENT && approvedBeforeExpiry) {
+        boolean fulfillmentEligible = true;
+        try {
+            fulfillment.validatePayment(order);
+        } catch (BusinessRuleException exception) {
+            fulfillmentEligible = false;
+        }
+        if (!alreadyFunded && order.getStatus() == OrderStatus.PENDING_PAYMENT
+                && approvedBeforeExpiry && fulfillmentEligible) {
             providerPayment.fundsOrder();
             order.approveMercadoPagoPayment();
             attempt.summaryStatus(payment.status(), PaymentAttemptStatus.APPROVED);

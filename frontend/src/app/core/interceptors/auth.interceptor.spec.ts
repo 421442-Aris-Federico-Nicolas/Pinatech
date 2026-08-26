@@ -15,12 +15,16 @@ describe('authInterceptor', () => {
   let refreshFails = false;
   let navigation: { commands: string[]; options: { queryParams?: { returnUrl?: string; reason?: string } } } | null;
   const warning = vi.fn();
+  const clearSession = vi.fn();
+  const refreshSession = vi.fn(() => of(void 0));
 
   beforeEach(() => {
     token = 'initial-token';
     refreshFails = false;
     navigation = null;
     warning.mockClear();
+    clearSession.mockClear();
+    refreshSession.mockClear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -28,11 +32,12 @@ describe('authInterceptor', () => {
         { provide: AuthService, useValue: {
           getAccessToken: () => token,
           refreshSession: () => {
+            refreshSession();
             if (refreshFails) return throwError(() => new Error('Refresh failed'));
             token = 'refreshed-token';
             return of(void 0);
           },
-          clearSession: () => undefined,
+          clearSession,
         } },
         { provide: Router, useValue: { url: '/orders?page=2', navigate: (commands: string[], options: { queryParams?: { returnUrl: string } }) => {
           navigation = { commands, options };
@@ -78,5 +83,21 @@ describe('authInterceptor', () => {
 
     expect(navigation).toEqual({ commands: ['/login'], options: { queryParams: { returnUrl: '/orders?page=2', reason: 'session-expired' } } });
     expect(warning).toHaveBeenCalledWith('Tu sesión venció. Ingresá nuevamente para continuar.');
+    expect(clearSession).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear a valid refreshed session when the retried request returns 401', () => {
+    const url = `${environment.apiBaseUrl}/orders/42`;
+    http.get(url).subscribe({ error: () => undefined });
+    httpTesting.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    const retry = httpTesting.expectOne(url);
+    expect(retry.request.headers.get('Authorization')).toBe('Bearer refreshed-token');
+    retry.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(refreshSession).toHaveBeenCalledOnce();
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(warning).not.toHaveBeenCalled();
+    expect(navigation).toBeNull();
   });
 });

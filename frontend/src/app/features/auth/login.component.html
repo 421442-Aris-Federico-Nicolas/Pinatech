@@ -5,6 +5,8 @@
     <h1 id="login-title">Iniciar sesión</h1>
     @if (route.snapshot.queryParamMap.get('reason') === 'session-expired') {
       <p class="context" role="status">Tu sesión venció. Ingresá nuevamente para continuar donde estabas.</p>
+    } @else if (route.snapshot.queryParamMap.get('reason') === 'email-changed') {
+      <p class="context" role="status">Tu email se actualizó y cerramos la sesión para proteger tu cuenta. Ingresá con el email nuevo.</p>
     } @else if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') {
       <p class="context">Ingresá para continuar con tu carrito. Tus productos se conservarán.</p>
     }
@@ -28,6 +30,7 @@
         spellcheck="false"
         required
         [error]="form.controls.password.touched && form.controls.password.invalid ? 'Ingresá tu contraseña.' : ''" />
+      <a class="forgot-link" routerLink="/forgot-password">¿Olvidaste tu contraseña?</a>
       @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
       <button appButton="filled" type="submit" [disabled]="submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Iniciando sesión, esperá' : 'Iniciar sesión'">
         @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
