@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AccountLifecycleService accountLifecycleService;
     private final long refreshExpirationMs;
 
     public AuthService(
@@ -53,6 +55,7 @@ public class AuthService {
             RefreshTokenRepository refreshTokenRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
+            AccountLifecycleService accountLifecycleService,
             @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs
     ) {
         this.userAccountRepository = userAccountRepository;
@@ -60,6 +63,7 @@ public class AuthService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.accountLifecycleService = accountLifecycleService;
         this.refreshExpirationMs = refreshExpirationMs;
     }
 
@@ -80,8 +84,14 @@ public class AuthService {
                 normalizeOptional(request.phone())
         );
         user.addRole(customerRole);
-        UserAccount savedUser = userAccountRepository.save(user);
+        UserAccount savedUser;
+        try {
+            savedUser = userAccountRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            throw new DuplicateResourceException("An account already exists for this email.");
+        }
         LOGGER.info("Registered user with id={}", savedUser.getId());
+        accountLifecycleService.startEmailVerification(savedUser);
         return createSession(savedUser, UUID.randomUUID());
     }
 
@@ -89,9 +99,9 @@ public class AuthService {
     public AuthSession login(LoginRequest request) {
         String email = request.email().trim().toLowerCase();
         UserAccount user = userAccountRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> invalidCredentials(email));
+                .orElseThrow(this::invalidCredentials);
         if (!user.isActive() || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw invalidCredentials(email);
+            throw invalidCredentials();
         }
         return createSession(user, UUID.randomUUID());
     }
@@ -104,6 +114,10 @@ public class AuthService {
         lockFamily(familyId);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new AuthenticationFailureException("Refresh token is invalid or expired."));
+        if (storedToken.getUser().getId() != null) {
+            userAccountRepository.findByIdForUpdate(storedToken.getUser().getId())
+                    .orElseThrow(() -> new AuthenticationFailureException("Refresh token is invalid or expired."));
+        }
         Instant now = Instant.now();
         if (!storedToken.isUsable(now)) {
             refreshTokenRepository.revokeFamily(familyId, now);
@@ -151,8 +165,8 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException("Refresh token family is missing."));
     }
 
-    private AuthenticationFailureException invalidCredentials(String email) {
-        LOGGER.warn("Failed login attempt for email={}", email);
+    private AuthenticationFailureException invalidCredentials() {
+        LOGGER.warn("Failed local login attempt");
         return new AuthenticationFailureException("Invalid email or password.");
     }
 
@@ -174,7 +188,8 @@ public class AuthService {
     private AuthenticatedUserResponse toResponse(UserAccount user) {
         Set<String> roles = user.getRoles().stream().map(role -> role.getName().name()).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return new AuthenticatedUserResponse(
-                user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(), user.getPhone(), roles
+                user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(), user.getPhone(),
+                user.isEmailVerified(), roles
         );
     }
 

@@ -72,10 +72,25 @@ h1 {
 .fine-print, .methods, .loading { color: var(--color-text-muted); font-size: var(--text-md); line-height: 1.55; margin: .9rem 0 0; }
 .methods strong { color: var(--color-text); }
 .product-details strong, .product-details small, .notice, .fine-print, .methods, .summary-note, .submit-error, .result-lead { overflow-wrap: anywhere; }
+.pickup-field { display: grid; gap: var(--space-2); }
+.pickup-field label { font-size: var(--text-sm); font-weight: var(--font-weight-bold); }
+.pickup-field select { appearance: none; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text); font: inherit; min-height: 2.8rem; padding: .65rem 2.5rem .65rem .8rem; width: 100%; }
+.pickup-field select:focus-visible { border-color: var(--color-cyan); outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+.pickup-field small { color: var(--color-text-subtle); }
+.pickup-card { background: var(--color-surface-raised); border: 1px solid var(--color-border); border-left: 3px solid var(--color-cyan); margin-top: var(--space-4); padding: var(--space-4); }
+.pickup-kicker { color: var(--color-cyan); font-size: var(--text-xs); font-weight: var(--font-weight-black); letter-spacing: .1em; margin: 0; text-transform: uppercase; }
+.pickup-card h3 { font-size: var(--text-xl); margin: var(--space-1) 0 var(--space-3); }
+.pickup-card address { color: var(--color-text-muted); display: grid; font-style: normal; gap: .15rem; line-height: 1.5; }
+.pickup-card dl { border-top: 1px solid var(--color-border); display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: var(--space-4) 0 0; padding-top: var(--space-4); }
+.pickup-card dt { color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: var(--font-weight-bold); text-transform: uppercase; }
+.pickup-card dd { line-height: 1.45; margin: .25rem 0 0; overflow-wrap: anywhere; }
+.pickup-consent { align-items: flex-start; border: 1px solid var(--color-border); cursor: pointer; display: flex; font-weight: var(--font-weight-bold); gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); }
+.pickup-consent:focus-within { border-color: var(--color-cyan); outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+.pickup-consent input { accent-color: var(--color-cyan); flex: 0 0 auto; height: 1.15rem; margin: .1rem 0 0; width: 1.15rem; }
 
 .summary { padding: var(--space-6); position: sticky; top: 110px; }
 .summary h2 { font-size: 1.55rem; margin: .3rem 0 var(--space-5); }
-.summary > div:not(.error) { display: flex; gap: var(--space-4); justify-content: space-between; padding: var(--space-3) 0; }
+.summary > div:not(.error):not(.verification-required):not(.submit-error) { display: flex; gap: var(--space-4); justify-content: space-between; padding: var(--space-3) 0; }
 .summary .total { border-top: 1px solid var(--color-border); font-size: 1.05rem; }
 .summary-note, .payment-progress { color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-base); }
 .summary > button { margin-top: var(--space-2); width: 100%; }
@@ -86,6 +101,12 @@ h1 {
 .error, .submit-error { background: var(--color-danger-bg); border: 1px solid var(--color-danger-border); color: var(--color-danger); font-size: var(--text-md); line-height: 1.45; padding: var(--space-3); }
 .error p { margin: 0 0 .35rem; }
 .submit-error { margin-bottom: 0; }
+.submit-error p { margin: 0 0 var(--space-2); }
+.submit-error a { color: currentColor; font-weight: var(--font-weight-bold); }
+.verification-required { background: var(--color-warning-bg); border: 1px solid var(--color-warning-border); color: var(--color-warning-text); margin: var(--space-4) 0; padding: var(--space-4); }
+.verification-required p { line-height: 1.45; margin: var(--space-2) 0 var(--space-3); }
+.verification-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.verification-notice { font-size: var(--text-sm); margin-bottom: 0 !important; }
 .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 
 .empty, .result { margin: var(--space-4) auto; max-width: 780px; padding: clamp(var(--space-8), 6vw, 4.5rem); }
@@ -116,6 +137,7 @@ h1 {
   .products article { grid-template-columns: 40px minmax(0, 1fr); }
   .product-mark, .product-image { height: 40px; width: 40px; }
   .products article > span { grid-column: 2; }
+  .pickup-card dl { grid-template-columns: 1fr; }
   .result dl { grid-template-columns: 1fr; }
   .result dl div + div { border-left: 0; border-top: 1px solid var(--color-border); padding-left: 0; }
 }

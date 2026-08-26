@@ -6,6 +6,11 @@ import com.computerstore.auth.dto.AuthResponse;
 import com.computerstore.auth.dto.AuthenticatedUserResponse;
 import com.computerstore.auth.dto.LoginRequest;
 import com.computerstore.auth.dto.RegisterRequest;
+import com.computerstore.auth.dto.ActionTokenRequest;
+import com.computerstore.auth.dto.EmailRequest;
+import com.computerstore.auth.dto.GenericMessageResponse;
+import com.computerstore.auth.dto.ResetPasswordRequest;
+import com.computerstore.auth.service.AccountLifecycleService;
 import com.computerstore.auth.service.AuthService;
 import com.computerstore.auth.service.AuthSession;
 import com.computerstore.auth.service.AuthRateLimiter;
@@ -36,17 +41,20 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthRateLimiter authRateLimiter;
+    private final AccountLifecycleService accountLifecycleService;
     private final long refreshExpirationMs;
     private final boolean secureCookie;
 
     public AuthController(
             AuthService authService,
             AuthRateLimiter authRateLimiter,
+            AccountLifecycleService accountLifecycleService,
             @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs,
             @Value("${app.cookies.secure}") boolean secureCookie
     ) {
         this.authService = authService;
         this.authRateLimiter = authRateLimiter;
+        this.accountLifecycleService = accountLifecycleService;
         this.refreshExpirationMs = refreshExpirationMs;
         this.secureCookie = secureCookie;
     }
@@ -65,6 +73,50 @@ public class AuthController {
         AuthSession session = authService.login(request);
         authRateLimiter.resetLogin(servletRequest.getRemoteAddr(), request.email());
         return withSession(HttpStatus.OK, session);
+    }
+
+    @PostMapping("/email-verification/request")
+    @Operation(summary = "Request an email verification message")
+    public ResponseEntity<GenericMessageResponse> requestEmailVerification(
+            @Valid @RequestBody EmailRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkAccountAction(servletRequest.getRemoteAddr(), "verify", request.email());
+        accountLifecycleService.requestEmailVerification(request.email());
+        return genericAccepted();
+    }
+
+    @PostMapping("/email-verification/confirm")
+    @Operation(summary = "Confirm an email address")
+    public ResponseEntity<Void> confirmEmailVerification(
+            @Valid @RequestBody ActionTokenRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkAccountAction(servletRequest.getRemoteAddr(), "verify-confirm", request.token());
+        accountLifecycleService.confirmEmailVerification(request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request a password reset message")
+    public ResponseEntity<GenericMessageResponse> forgotPassword(
+            @Valid @RequestBody EmailRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkAccountAction(servletRequest.getRemoteAddr(), "forgot", request.email());
+        accountLifecycleService.requestPasswordReset(request.email());
+        return genericAccepted();
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset an account password")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkAccountAction(servletRequest.getRemoteAddr(), "reset", request.token());
+        accountLifecycleService.resetPassword(request.token(), request.password());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/refresh")
@@ -104,6 +156,11 @@ public class AuthController {
         return ResponseEntity.status(status)
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken()).toString())
                 .body(session.response());
+    }
+
+    private ResponseEntity<GenericMessageResponse> genericAccepted() {
+        return ResponseEntity.accepted().body(new GenericMessageResponse(
+                "If the account exists, an email with the next steps will be sent."));
     }
 
     private ResponseCookie refreshCookie(String refreshToken) {

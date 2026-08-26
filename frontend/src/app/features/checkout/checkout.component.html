@@ -60,25 +60,47 @@
           </ul>
         </section>
 
-        <section appCard class="panel capability" aria-labelledby="delivery-title">
+        <section appCard class="panel capability" aria-labelledby="pickup-title">
           <div class="section-heading">
             <span>02</span>
-            <div><p>Logística</p><h2 id="delivery-title">Entrega</h2></div>
+            <div><p>Logística</p><h2 id="pickup-title">Retiro en Córdoba</h2></div>
           </div>
           @if (reconciling()) {
             <p class="loading" role="status">Verificando disponibilidad del carrito…</p>
           } @else if (loadingCapabilities()) {
-            <p class="loading" role="status">Consultando opciones de entrega…</p>
+            <p class="loading" role="status">Consultando puntos de retiro…</p>
           } @else if (capabilities(); as options) {
-            @if (options.deliveryQuotesEnabled) {
-              <p class="notice available">El servicio informa que las cotizaciones de entrega están habilitadas.</p>
+            @if (!options.fulfillmentMethods.includes('PICKUP') || !options.pickupLocations.length) {
+              <p class="notice" role="alert">No hay un punto de retiro disponible. No es posible completar la compra en este momento.</p>
             } @else {
-              <p class="notice">Las cotizaciones y los proveedores de entrega todavía no están configurados.</p>
+              <div class="pickup-field">
+                <label for="pickup-location">Punto de retiro</label>
+                <select id="pickup-location" name="pickupLocation" [value]="selectedPickupCode()" (change)="selectPickup($event)" aria-describedby="pickup-help">
+                  @for (location of options.pickupLocations; track location.code) {
+                    <option [value]="location.code">{{ location.name }} · {{ location.locality }}</option>
+                  }
+                </select>
+                <small id="pickup-help">Elegí dónde vas a retirar. No usamos tu dirección personal.</small>
+              </div>
+
+              @if (selectedPickup(); as pickup) {
+                <article class="pickup-card" aria-labelledby="selected-pickup-name">
+                  <div><p class="pickup-kicker">Retiro sin costo</p><h3 id="selected-pickup-name">{{ pickup.name }}</h3></div>
+                  <address>
+                    @for (line of pickup.addressLines; track $index) { <span>{{ line }}</span> }
+                    <span>{{ pickup.locality }}, {{ pickup.provinceCode }} · CP {{ pickup.postalCode }}</span>
+                  </address>
+                  <dl>
+                    <div><dt>Horarios</dt><dd>{{ pickup.hours }}</dd></div>
+                    <div><dt>Indicaciones</dt><dd>{{ pickup.instructions }}</dd></div>
+                  </dl>
+                </article>
+                <label class="pickup-consent">
+                  <input type="checkbox" [checked]="pickupAccepted()" (change)="setPickupAccepted($event)">
+                  <span>Entiendo que debo retirar en Córdoba</span>
+                </label>
+              }
             }
-            @if (options.deliveryMethods.length) {
-              <p class="methods"><strong>Modalidades informadas:</strong> {{ options.deliveryMethods.map(methodLabel).join(', ') }}.</p>
-            }
-            <p class="fine-print">Este pedido no incluye un costo ni una modalidad de entrega. No te pediremos una dirección en este paso.</p>
           }
         </section>
 
@@ -117,8 +139,21 @@
         <p class="eyebrow">Resumen</p>
         <h2 id="summary-title">Tu pedido</h2>
         <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <div><span>Retiro en Córdoba</span><strong>Sin costo</strong></div>
         <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
         <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a <span translate="no">Mercado Pago</span>.</p>
+
+        @if (!emailVerified()) {
+          <div class="verification-required" role="alert">
+            <strong>Verificá tu email para comprar</strong>
+            <p>Por seguridad, necesitás confirmar tu email antes de crear el pedido.</p>
+            <div class="verification-actions">
+              <button appButton="outlined" type="button" (click)="resendVerification()" [disabled]="resendingVerification()" [attr.aria-busy]="resendingVerification()">{{ resendingVerification() ? 'Reenviando…' : 'Reenviar verificación' }}</button>
+              <a appButton="text" routerLink="/profile">Ir a Mi perfil</a>
+            </div>
+            @if (verificationNotice()) { <p class="verification-notice" role="status">{{ verificationNotice() }}</p> }
+          </div>
+        }
 
         @if (reconciliationError()) {
           <div class="error" [attr.aria-busy]="reconciling()">
@@ -133,17 +168,26 @@
           </div>
         } @else if (capabilities() && !mercadoPagoEnabled()) {
           <p class="error" role="alert"><span translate="no">Mercado Pago</span> no está disponible en este momento.</p>
+        } @else if (capabilities() && !pickupEnabled()) {
+          <p class="error" role="alert">No hay un punto de retiro habilitado para completar la compra.</p>
         }
 
-        @if (mercadoPagoEnabled()) {
-          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
+        @if (capabilities()) {
+          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
             @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
             <span>{{ submitting() ? 'Preparando pago…' : 'Pagar con ' }}@if (!submitting()) { <span translate="no">Mercado Pago</span> }</span>
           </button>
           @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y preparando la redirección segura.</p> }
-          <small>El pago se confirma únicamente después de que nuestro sistema lo verifique.</small>
+          <small>{{ !pickupAccepted() && pickupEnabled() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
         }
-        @if (submitError()) { <p class="submit-error" role="alert">{{ submitError() }}</p> }
+        @if (submitError()) {
+          <div class="submit-error" role="alert">
+            <p>{{ submitError() }}</p>
+            @if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> }
+            @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> }
+            @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }
+          </div>
+        }
       </aside>
     </div>
   }

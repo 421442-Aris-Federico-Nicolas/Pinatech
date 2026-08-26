@@ -22,6 +22,9 @@ decision, not an automatic claim that the application is production-ready.
 - WAF and distributed rate limits protect authentication and order creation.
 - Dependency, container and secret scanning run in CI.
 - SSH is key-only, root login is disabled and the firewall exposes only approved SSH, 80/443.
+- Resend uses a verified sending domain and account-action links point only to the canonical storefront.
+- Email verification, password reset and email change are tested without leaking account existence.
+- Password reset and email change invalidate existing sessions.
 
 ## Data and reliability
 
@@ -49,6 +52,8 @@ decision, not an automatic claim that the application is production-ready.
 - Desktop and mobile checkout tests pass.
 - Duplicate order and duplicate webhook scenarios are safe.
 - Payment rejection, expiration, cancellation and refund scenarios are verified.
+- Registration, email verification, password recovery and email change pass end-to-end.
+- Verified customers can create pickup orders and the selected pickup snapshot remains immutable.
 - A backup restore and deployment rollback have been demonstrated.
 - The exact production webhook URL and production collector ID were independently verified.
 - On-call ownership, monitoring, alerts, incident response and secret rotation were tested.

@@ -61,7 +61,11 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/checkout/capabilities").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/mercado-pago").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
+                                "/api/auth/email-verification/request", "/api/auth/email-verification/confirm",
+                                "/api/auth/forgot-password", "/api/auth/reset-password",
+                                "/api/profile/email-change/confirm").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

@@ -13,6 +13,7 @@ import java.util.List;
 
 import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.common.exception.DuplicateResourceException;
+import com.computerstore.common.exception.EmailVerificationRequiredException;
 import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.order.config.OrderProperties;
@@ -23,6 +24,7 @@ import com.computerstore.order.dto.OrderResponse;
 import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.user.repository.UserAccountRepository;
 import jakarta.validation.Valid;
@@ -48,19 +50,22 @@ public class OrderController {
     private final UserAccountRepository users;
     private final OrderStockService stock;
     private final OrderProperties properties;
+    private final FulfillmentPolicy fulfillment;
 
     public OrderController(
             CustomerOrderRepository orders,
             ProductVariantRepository variants,
             UserAccountRepository users,
             OrderStockService stock,
-            OrderProperties properties
+            OrderProperties properties,
+            FulfillmentPolicy fulfillment
     ) {
         this.orders = orders;
         this.variants = variants;
         this.users = users;
         this.stock = stock;
         this.properties = properties;
+        this.fulfillment = fulfillment;
     }
 
     @PostMapping
@@ -71,11 +76,14 @@ public class OrderController {
             @RequestHeader(name = "Idempotency-Key", required = false) String suppliedIdempotencyKey,
             @AuthenticationPrincipal AuthenticatedUser auth
     ) {
-        String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
-        String requestHash = idempotencyKey == null ? null : requestHash(request);
         var user = users.findByIdForUpdate(auth.id())
                 .filter(userCandidate -> userCandidate.isActive())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        if (!user.isEmailVerified()) {
+            throw new EmailVerificationRequiredException();
+        }
+        String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
+        String requestHash = idempotencyKey == null ? null : requestHash(request);
 
         if (idempotencyKey != null) {
             var existing = orders.findByUserIdAndIdempotencyKey(auth.id(), idempotencyKey);
@@ -86,6 +94,9 @@ public class OrderController {
                 return ResponseEntity.ok(OrderResponseMapper.toResponse(existing.get()));
             }
         }
+
+        var pickupLocation = fulfillment.select(
+                request.fulfillmentMethod(), request.pickupLocationCode(), request.pickupLocationVersion());
 
         var sortedInputs = request.items().stream()
                 .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId))
@@ -108,7 +119,9 @@ public class OrderController {
                 total,
                 Instant.now().plus(properties.reservationTtl()),
                 idempotencyKey,
-                requestHash));
+                requestHash,
+                request.fulfillmentMethod(),
+                pickupLocation));
         stock.reserve(order);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponseMapper.toResponse(order));
     }
@@ -144,12 +157,15 @@ public class OrderController {
     }
 
     private String requestHash(CreateOrderRequest request) {
-        String canonicalRequest = request.items().stream()
+        String items = request.items().stream()
                 .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId)
                         .thenComparing(CreateOrderRequest.Item::quantity))
                 .map(item -> item.variantId() + ":" + item.quantity())
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
+        String canonicalRequest = request.fulfillmentMethod().name()
+                + "|" + request.pickupLocationCode().trim()
+                + "|" + request.pickupLocationVersion().trim() + "|" + items;
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonicalRequest.getBytes(StandardCharsets.UTF_8)));

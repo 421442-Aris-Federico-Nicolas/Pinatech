@@ -53,9 +53,14 @@ export class App {
   logout(): void {
     if (this.loggingOut()) return;
     this.loggingOut.set(true);
-    this.auth.logout().pipe(finalize(() => this.loggingOut.set(false))).subscribe(() => {
+    this.auth.logout().pipe(finalize(() => this.loggingOut.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.notifications.success('Sesión cerrada correctamente.');
       void this.router.navigateByUrl('/login');
     });
+  }
+
+  notificationFocusOut(event: FocusEvent): void {
+    const outlet = event.currentTarget as HTMLElement | null;
+    if (!outlet?.contains(event.relatedTarget as Node | null)) this.notifications.resume('focus');
   }
 }

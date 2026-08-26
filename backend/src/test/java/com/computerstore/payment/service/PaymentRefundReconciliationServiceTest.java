@@ -61,7 +61,8 @@ class PaymentRefundReconciliationServiceTest {
     private MercadoPagoProperties properties() {
         return new MercadoPagoProperties(
                 true, MercadoPagoEnvironment.SANDBOX, "TEST-access-token", "webhook-secret", "99",
-                URI.create("https://store.example"), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                URI.create("https://store.example"), URI.create("https://api.example"),
+                Duration.ofSeconds(1), Duration.ofSeconds(2),
                 false, Duration.ofMinutes(5), Duration.ofDays(30));
     }
 }

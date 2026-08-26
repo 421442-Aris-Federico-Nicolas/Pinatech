@@ -22,6 +22,8 @@ Deploy Railway first. The Vercel build embeds the final API origin.
 
 Keep `MP_ENABLED=false` until all Mercado Pago production values are ready. Never combine a production `APP_USR-` token with `MP_ENVIRONMENT=sandbox`.
 
+Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM` and `STOREFRONT_BASE_URL` are correct and the sender domain is verified. Enable pickup only after every `PICKUP_*` public field has been reviewed.
+
 ### Attach persistent storage
 
 1. Attach one Railway Volume to the backend service.
@@ -78,9 +80,14 @@ Railway must contain exactly:
 
 ```text
 CORS_ALLOWED_ORIGIN=https://pinatech.com.ar
-PUBLIC_BASE_URL=https://pinatech.com.ar
+MP_STOREFRONT_BASE_URL=https://pinatech.com.ar
+MP_WEBHOOK_BASE_URL=https://api.pinatech.com.ar
 REFRESH_COOKIE_SECURE=true
 ```
+
+`MP_STOREFRONT_BASE_URL` is used only for the browser return after checkout. Mercado Pago sends
+`POST` notifications to `${MP_WEBHOOK_BASE_URL}/api/payments/webhooks/mercado-pago`; pointing that
+URL at Vercel returns `405 Method Not Allowed` and leaves paid orders pending in the application.
 
 The storefront and API are different origins but the same `pinatech.com.ar` site. This allows the existing secure `SameSite=Strict` refresh cookie to work with credentialed API requests without weakening it to `SameSite=None`.
 
@@ -95,5 +102,10 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version `15` in Railway logs.
+6. Flyway reports schema version 19 in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
+8. A Mercado Pago webhook test returns `200` from
+   `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.
+9. Registration sends a verification email whose link returns to `https://pinatech.com.ar/verify-email`.
+10. Password recovery and email change complete successfully and invalidate prior sessions.
+11. `GET https://api.pinatech.com.ar/api/checkout/capabilities` exposes only the reviewed pickup location.

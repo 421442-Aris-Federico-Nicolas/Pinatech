@@ -33,13 +33,36 @@
 </mat-toolbar>
 </header>
 <div id="main-content" tabindex="-1"><router-outlet /></div>
-@if (notifications.notification(); as notification) {
-  <aside class="app-notification" [attr.data-tone]="notification.tone" role="status" aria-live="polite" aria-atomic="true">
-    <span class="notification-mark" aria-hidden="true"></span>
-    <p>{{ notification.message }}</p>
-    <button type="button" (click)="notifications.activate()">{{ notification.action }}</button>
-  </aside>
-}
+<div class="notification-region">
+  @if (notifications.notification(); as notification) {
+    <aside
+      class="app-notification"
+      [class.is-exiting]="notification.exiting"
+      [attr.data-tone]="notification.tone"
+      [attr.role]="notification.tone === 'error' ? 'alert' : 'status'"
+      [attr.aria-live]="notification.tone === 'error' ? 'assertive' : 'polite'"
+      aria-atomic="true"
+      (mouseenter)="notifications.pause('pointer')"
+      (mouseleave)="notifications.resume('pointer')"
+      (focusin)="notifications.pause('focus')"
+      (focusout)="notificationFocusOut($event)"
+    >
+      <span class="notification-mark" aria-hidden="true"></span>
+      <p>{{ notification.message }}</p>
+      <div class="notification-actions">
+        @if (notification.hasAction) {
+          <button class="notification-action" type="button" (click)="notifications.activate()">{{ notification.action }}</button>
+        }
+        <button
+          class="notification-close"
+          type="button"
+          aria-label="Cerrar notificación"
+          (click)="notification.hasAction ? notifications.dismiss(notification.id) : notifications.activate()"
+        ><iconify-icon icon="line-md:close" aria-hidden="true"></iconify-icon></button>
+      </div>
+    </aside>
+  }
+</div>
 <footer class="site-footer">
   <div class="footer-content">
     <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">

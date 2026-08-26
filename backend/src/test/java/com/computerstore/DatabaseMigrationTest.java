@@ -33,6 +33,31 @@ class DatabaseMigrationTest {
                 """, Integer.class);
 
         assertEquals(8, columns);
+        assertEquals(9, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'customer_orders'
+                  AND column_name IN (
+                      'fulfillment_method', 'pickup_location_code', 'pickup_location_name',
+                      'pickup_address_lines', 'pickup_locality', 'pickup_province_code',
+                      'pickup_postal_code', 'pickup_instructions', 'pickup_hours'
+                  )
+                """, Integer.class));
+        assertEquals(8, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'customer_orders'
+                  AND column_name LIKE 'pickup_%'
+                  AND is_nullable = 'YES'
+                """, Integer.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'customer_orders'
+                  AND indexname = 'idx_customer_orders_fulfillment_method_location'
+                """, Integer.class));
         assertEquals("ARS", jdbc.queryForObject("""
                 SELECT column_default
                 FROM information_schema.columns
@@ -121,7 +146,26 @@ class DatabaseMigrationTest {
                   AND tablename = 'provider_payments'
                   AND indexname = 'uq_provider_payments_provider_payment_id'
                 """, Integer.class));
-        assertEquals("15", jdbc.queryForObject(
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('user_addresses', 'account_action_tokens')
+                """, Integer.class));
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('user_external_identities', 'google_auth_nonces')
+                """, Integer.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public' AND tablename = 'users'
+                  AND indexname = 'uq_users_email_lower'
+                """, Integer.class));
+        assertEquals("NO", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'password_hash'
+                """, String.class));
+        assertEquals("19", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

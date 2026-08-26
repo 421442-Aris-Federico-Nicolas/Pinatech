@@ -15,6 +15,7 @@ public class AuthRateLimiter {
     private final int maxLoginAttempts;
     private final int maxRegistrationAttempts;
     private final int maxRefreshAttempts;
+    private final int maxAccountActionAttempts;
     private final long windowMs;
     private final Clock clock;
 
@@ -23,19 +24,27 @@ public class AuthRateLimiter {
             @Value("${app.auth-rate-limit.max-login-attempts}") int maxLoginAttempts,
             @Value("${app.auth-rate-limit.max-registration-attempts}") int maxRegistrationAttempts,
             @Value("${app.auth-rate-limit.max-refresh-attempts}") int maxRefreshAttempts,
+            @Value("${app.auth-rate-limit.max-account-action-attempts:5}") int maxAccountActionAttempts,
             @Value("${app.auth-rate-limit.window-ms}") long windowMs
     ) {
-        this(maxLoginAttempts, maxRegistrationAttempts, maxRefreshAttempts, windowMs, Clock.systemUTC());
+        this(maxLoginAttempts, maxRegistrationAttempts, maxRefreshAttempts,
+                maxAccountActionAttempts, windowMs, Clock.systemUTC());
     }
 
     AuthRateLimiter(int maxLoginAttempts, int maxRefreshAttempts, long windowMs, Clock clock) {
-        this(maxLoginAttempts, 3, maxRefreshAttempts, windowMs, clock);
+        this(maxLoginAttempts, 3, maxRefreshAttempts, 5, windowMs, clock);
     }
 
     AuthRateLimiter(int maxLoginAttempts, int maxRegistrationAttempts, int maxRefreshAttempts, long windowMs, Clock clock) {
+        this(maxLoginAttempts, maxRegistrationAttempts, maxRefreshAttempts, 5, windowMs, clock);
+    }
+
+    AuthRateLimiter(int maxLoginAttempts, int maxRegistrationAttempts, int maxRefreshAttempts,
+                    int maxAccountActionAttempts, long windowMs, Clock clock) {
         this.maxLoginAttempts = maxLoginAttempts;
         this.maxRegistrationAttempts = maxRegistrationAttempts;
         this.maxRefreshAttempts = maxRefreshAttempts;
+        this.maxAccountActionAttempts = maxAccountActionAttempts;
         this.windowMs = windowMs;
         this.clock = clock;
     }
@@ -50,6 +59,11 @@ public class AuthRateLimiter {
 
     public void checkRegistration(String clientAddress) {
         check("register:" + clientAddress, maxRegistrationAttempts);
+    }
+
+    public void checkAccountAction(String clientAddress, String action, String subject) {
+        check("account:" + action + ':' + clientAddress + ':' + Integer.toHexString(subject.hashCode()),
+                maxAccountActionAttempts);
     }
 
     public void resetLogin(String clientAddress, String email) {

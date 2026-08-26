@@ -18,6 +18,7 @@ class MercadoPagoPropertiesTest {
                 "",
                 "",
                 URI.create(""),
+                URI.create(""),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(2),
                 false,
@@ -34,6 +35,7 @@ class MercadoPagoPropertiesTest {
                 "secret",
                 "99",
                 URI.create("checkout"),
+                URI.create("https://api.example"),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(2),
                 true,
@@ -45,7 +47,8 @@ class MercadoPagoPropertiesTest {
     void productionRequiresExplicitConfirmationAndProductionCredentials() {
         assertThrows(IllegalArgumentException.class, () -> new MercadoPagoProperties(
                 true, MercadoPagoEnvironment.PRODUCTION, "TEST-token", "secret", "99",
-                URI.create("https://store.example"), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                URI.create("https://store.example"), URI.create("https://api.example"),
+                Duration.ofSeconds(1), Duration.ofSeconds(2),
                 false, Duration.ofMinutes(5), Duration.ofDays(30)));
     }
 }

@@ -13,6 +13,8 @@ describe('CheckoutResultComponent', () => {
     currency: 'ARS',
     paymentMethod: 'MERCADO_PAGO',
     deliveryMethod: null,
+    fulfillmentMethod: 'PICKUP',
+    pickupLocation: { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' },
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',

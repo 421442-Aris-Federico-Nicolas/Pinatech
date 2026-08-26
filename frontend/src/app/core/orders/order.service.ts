@@ -13,6 +13,18 @@ export interface OrderItem {
   subtotal: number;
 }
 
+export interface PickupLocation {
+  code: string;
+  version: string;
+  name: string;
+  addressLines: string[];
+  locality: string;
+  provinceCode: string;
+  postalCode: string;
+  instructions: string;
+  hours: string;
+}
+
 export interface Order {
   id: number;
   status: string;
@@ -21,6 +33,8 @@ export interface Order {
   currency: string;
   paymentMethod: string | null;
   deliveryMethod: string | null;
+  fulfillmentMethod: string | null;
+  pickupLocation: PickupLocation | null;
   total: number;
   createdAt: string;
   reservationExpiresAt: string;

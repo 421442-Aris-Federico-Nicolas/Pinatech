@@ -1,0 +1,15 @@
+<main>
+  <a class="back" appButton="text" routerLink="/">← Volver a <span translate="no">Pinatech</span></a>
+  <section appCard class="auth-card" aria-labelledby="email-change-title">
+    <p class="eyebrow">Seguridad de la cuenta</p>
+    <h1 id="email-change-title">Confirmar email nuevo</h1>
+    @if (!token) {
+      <p class="error" role="alert">El enlace está incompleto. Abrí el enlace completo que recibiste por email.</p>
+      <a appButton="outlined" routerLink="/profile">Volver a Mi perfil</a>
+    } @else {
+      <p class="intro">Al confirmar, el email de acceso cambiará y cerraremos tu sesión en todos los dispositivos. Después deberás ingresar con el email nuevo.</p>
+      @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
+      <button appButton="filled" type="button" (click)="confirm()" [disabled]="submitting()" [attr.aria-busy]="submitting()">{{ submitting() ? 'Confirmando…' : 'Confirmar cambio de email' }}</button>
+    }
+  </section>
+</main>
