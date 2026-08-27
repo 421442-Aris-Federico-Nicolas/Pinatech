@@ -526,8 +526,14 @@ export class AdminComponent {
   filterOrders(status: string): void { this.orderFilter.set(status); this.syncUrl({ orderStatus: status }); }
   openOrder(orderId: number): void { this.expandedOrder.set(orderId); this.navigate('sales'); this.syncUrl({ order: orderId }); }
   toggleOrder(orderId: number): void {
-    const expanded = this.expandedOrder() === orderId ? null : orderId;
+    const previous = this.expandedOrder();
+    const expanded = previous === orderId ? null : orderId;
     this.expandedOrder.set(expanded);
+    if (previous !== null && previous !== expanded) {
+      const leavingDetail = this.host.nativeElement.querySelector<HTMLElement>(`#order-detail-${previous}`);
+      leavingDetail?.setAttribute('aria-hidden', 'true');
+      leavingDetail?.setAttribute('inert', '');
+    }
     this.syncUrl({ order: expanded });
   }
   stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }

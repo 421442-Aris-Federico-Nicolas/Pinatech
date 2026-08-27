@@ -24,10 +24,10 @@ describe('HomeComponent', () => {
     specifications: [],
     variants: [{ id: id * 10, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 4 }],
   });
+  const mouse = product(1, 'Mouse Pro', 5, 'Periféricos');
+  const processor = product(2, 'Ryzen Pro', 1, 'Procesadores');
 
-  it('keeps the hero, product categories and technical service as separate sections', async () => {
-    const mouse = product(1, 'Mouse Pro', 5, 'Periféricos');
-    const processor = product(2, 'Ryzen Pro', 1, 'Procesadores');
+  async function createHome() {
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
@@ -43,6 +43,11 @@ describe('HomeComponent', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
+    return fixture;
+  }
+
+  it('keeps the hero, product categories and technical service as separate sections', async () => {
+    const fixture = await createHome();
 
     const carousels = fixture.debugElement.queryAll(By.directive(BannerCarouselComponent));
     const productSections = fixture.nativeElement.querySelectorAll('.product-showcase') as NodeListOf<HTMLElement>;
@@ -53,20 +58,52 @@ describe('HomeComponent', () => {
     expect(productSections[0].textContent).not.toContain('Ryzen Pro');
     expect(productSections[1].textContent).toContain('Ryzen Pro');
     expect(productSections[1].textContent).not.toContain('Mouse Pro');
-
-    const hero = fixture.nativeElement.querySelector('.hero') as HTMLElement;
-    hero.dispatchEvent(new MouseEvent('mouseenter'));
-    fixture.detectChanges();
-    expect(carousels[0].componentInstance.paused()).toBe(true);
-    hero.dispatchEvent(new MouseEvent('mouseleave'));
-    fixture.detectChanges();
-    expect(carousels[0].componentInstance.paused()).toBe(false);
+    const firstHeroCopy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
+    expect(firstHeroCopy.textContent).toContain('Elevá tu setup.');
 
     (carousels[0].componentInstance as BannerCarouselComponent).next();
     fixture.detectChanges();
 
+    const replacementHeroCopy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
+    expect(replacementHeroCopy).not.toBe(firstHeroCopy);
+    expect(replacementHeroCopy.textContent).toContain('No dejes que tu carrito');
     expect(fixture.nativeElement.querySelector('.hero-actions a').textContent).toContain('Ver mi carrito');
     expect(fixture.nativeElement.querySelector('.hero-actions a').getAttribute('href')).toBe('/cart');
     expect(fixture.nativeElement.querySelector('.service a').getAttribute('href')).toBe('/tickets');
+  });
+
+  it('keeps autoplay paused after focus leaves the hero until explicit resume', async () => {
+    const fixture = await createHome();
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+    const hero = fixture.nativeElement.querySelector('.hero') as HTMLElement;
+    const outsideAction = fixture.nativeElement.querySelector('.paths a') as HTMLElement;
+
+    hero.dispatchEvent(new Event('pointerenter'));
+    hero.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    fixture.detectChanges();
+    expect(carousel.paused()).toBe(true);
+    expect(carousel.userPaused()).toBe(true);
+
+    hero.dispatchEvent(new Event('pointerleave'));
+    fixture.detectChanges();
+    expect(carousel.paused()).toBe(false);
+    expect(carousel.autoplayPaused()).toBe(true);
+
+    hero.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outsideAction }));
+    fixture.detectChanges();
+    expect(carousel.userPaused()).toBe(true);
+    expect(carousel.autoplayPaused()).toBe(true);
+
+    const autoplayButton = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
+    autoplayButton.click();
+    fixture.detectChanges();
+    expect(carousel.userPaused()).toBe(false);
+    expect(carousel.autoplayPaused()).toBe(false);
+
+    const nextControl = fixture.nativeElement.querySelector('.banner-carousel__control.next') as HTMLButtonElement;
+    nextControl.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: autoplayButton }));
+    fixture.detectChanges();
+    expect(carousel.userPaused()).toBe(false);
+    expect(carousel.autoplayPaused()).toBe(false);
   });
 });

@@ -1,0 +1,129 @@
+:host { display: block; }
+
+.empty-state {
+  color: var(--color-text);
+  display: grid;
+  justify-items: center;
+  min-height: 390px;
+  overflow: hidden;
+  padding: clamp(var(--space-8), 6vw, var(--space-16)) var(--space-4);
+  place-content: center;
+  text-align: center;
+}
+
+.mascot-stage {
+  aspect-ratio: 272 / 286;
+  margin-bottom: var(--space-3);
+  position: relative;
+  width: clamp(10.5rem, 30vw, 16rem);
+}
+
+.sprite-preload { height: 1px; opacity: 0; pointer-events: none; position: absolute; width: 1px; }
+.mascot-stage.is-ready { animation: mascot-float 3.6s var(--ease-in-out) 1 forwards; }
+
+.mascot {
+  background-image: url('/pinatech-not-found-sprite.png');
+  background-position: 0% 0%;
+  background-repeat: no-repeat;
+  background-size: 800% 100%;
+  inset: 0;
+  position: absolute;
+  z-index: 2;
+}
+.mascot-stage.is-ready .mascot { animation: pinatech-story 3.6s steps(1, end) 1 forwards; }
+
+.mascot-shadow {
+  background: color-mix(in srgb, var(--color-bg-chrome) 68%, transparent);
+  border-radius: 50%;
+  bottom: 7%;
+  filter: blur(9px);
+  height: 8%;
+  left: 23%;
+  position: absolute;
+  right: 23%;
+}
+.mascot-stage.is-ready .mascot-shadow { animation: shadow-breathe 3.6s var(--ease-in-out) 1 forwards; }
+
+.drop {
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, var(--color-cyan), var(--color-cyan-strong));
+  border-radius: 70% 30% 65% 35%;
+  opacity: 0;
+  position: absolute;
+  width: .55rem;
+  z-index: 3;
+}
+
+.drop--one {
+  right: 18%;
+  top: 35%;
+}
+.mascot-stage.is-ready .drop--one { animation: drop-fall 3.6s var(--ease-in-out) 1 both; }
+
+.drop--two {
+  --drop-scale: .65;
+  left: 17%;
+  top: 42%;
+}
+.mascot-stage.is-ready .drop--two { animation: drop-fall 3.6s 1.2s var(--ease-in-out) 1 both; }
+
+.copy { animation: copy-enter 500ms 120ms var(--ease-out) both; }
+
+h2 {
+  font-size: clamp(var(--text-xl), 3vw, var(--text-2xl));
+  line-height: 1.2;
+  margin: 0;
+}
+
+p {
+  color: var(--color-text-muted);
+  line-height: var(--line-height-base);
+  margin: var(--space-3) 0 var(--space-5);
+  max-width: 34rem;
+}
+
+@keyframes pinatech-story {
+  0%, 11% { background-position: 0% 0%; }
+  12%, 22% { background-position: 14.2857% 0%; }
+  23%, 33% { background-position: 28.5714% 0%; }
+  34%, 45% { background-position: 42.8571% 0%; }
+  46%, 57% { background-position: 57.1428% 0%; }
+  58%, 69% { background-position: 71.4285% 0%; }
+  70%, 81% { background-position: 85.7142% 0%; }
+  82%, 100% { background-position: 100% 0%; }
+}
+
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0) rotate(-.4deg); }
+  50% { transform: translateY(-.45rem) rotate(.4deg); }
+}
+
+@keyframes shadow-breathe {
+  0%, 100% { opacity: .7; transform: scale(1); }
+  50% { opacity: .4; transform: scale(.84); }
+}
+
+@keyframes drop-fall {
+  0%, 44% { opacity: 0; transform: translateY(-.35rem) scale(var(--drop-scale, 1)); }
+  50% { opacity: .8; }
+  68% { opacity: 0; transform: translateY(1.7rem) scale(var(--drop-scale, 1)); }
+  100% { opacity: 0; transform: translateY(1.7rem) scale(var(--drop-scale, 1)); }
+}
+
+@keyframes copy-enter {
+  from { opacity: 0; transform: translateY(.65rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 520px) {
+  .empty-state { min-height: 340px; }
+  .mascot-stage { width: clamp(9.5rem, 55vw, 12rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-stage.is-ready,
+  .mascot-stage.is-ready .mascot-shadow,
+  .copy { animation: none; }
+
+  .drop { display: none; }
+}

@@ -7,6 +7,7 @@ import { Order, OrderService } from '../../core/orders/order.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
+import { PinatechSaleSuccessComponent } from '../../shared/ui/pinatech-sale-success/pinatech-sale-success.component';
 
 type PaymentResult = 'approved' | 'pending' | 'rejected' | 'refund-pending' | 'refunded';
 
@@ -16,7 +17,7 @@ const POLL_INTERVAL_MS = 2000;
 
 @Component({
   selector: 'app-checkout-result',
-  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, PinatechSaleSuccessComponent, RouterLink],
   templateUrl: './checkout-result.component.html',
   styleUrl: './checkout-result.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -12,7 +12,6 @@
   display: grid;
   grid-template-columns: 245px minmax(0, 1fr);
   min-height: calc(100dvh - 100px);
-  transition: grid-template-columns 0.2s;
 }
 .admin-shell.sidebar-collapsed {
   grid-template-columns: 78px minmax(0, 1fr);
@@ -146,6 +145,14 @@
 }
 .sidebar-collapsed .collapse {
   margin-left: 0;
+}
+:is(.collapse, .admin-sidebar nav button, .status-list button, .table-row, .filter-tabs button, .order-summary, .product-list > header button, .product-row, .inventory-products > button, .specification-actions button, .product-image-grid button, .taxonomy-list button) {
+  transition-duration: var(--duration-press);
+  transition-property: background-color, border-color, color, opacity, transform;
+  transition-timing-function: var(--ease-out);
+}
+:is(.collapse, .admin-sidebar nav button, .status-list button, .table-row, .filter-tabs button, .order-summary, .product-list > header button, .product-row, .inventory-products > button, .specification-actions button, .product-image-grid button, .taxonomy-list button):active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(.97);
 }
 main {
   min-width: 0;
@@ -537,7 +544,7 @@ main {
   text-align: right;
 }
 .chevron {
-  transition: transform 0.2s;
+  transition: transform 200ms var(--ease-out);
 }
 .expanded .chevron {
   transform: rotate(180deg);
@@ -548,7 +555,16 @@ main {
   display: grid;
   gap: 2rem;
   grid-template-columns: 1fr 320px;
+  opacity: 1;
   padding: 1.25rem;
+  transform: scale(1);
+  transform-origin: top;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.order-detail-enter,
+.order-detail-leave {
+  opacity: 0;
+  transform: scale(.97);
 }
 .order-detail h3 {
   font-size: 0.8rem;
@@ -1072,6 +1088,17 @@ main {
 .stock-indicator {
   border: 1px solid rgba(255, 255, 255, 0.22);
   width: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-state span { animation: none; }
+  :is(.collapse, .admin-sidebar nav button, .status-list button, .table-row, .filter-tabs button, .order-summary, .product-list > header button, .product-row, .inventory-products > button, .specification-actions button, .product-image-grid button, .taxonomy-list button):active:not(:disabled):not([aria-disabled="true"]) {
+    opacity: .8;
+    transform: none !important;
+  }
+  .chevron { transition: none; }
+  .order-detail { transform: none; transition: opacity 200ms var(--ease-out) !important; }
+  .order-detail-enter,
+  .order-detail-leave { transform: none; }
 }
 @media (max-width: 760px) {
   .section-label {

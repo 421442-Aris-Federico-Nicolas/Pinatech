@@ -1,15 +1,18 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, computed, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { Component, computed, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, afterRenderEffect, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { NavigationCancel, NavigationEnd, NavigationError, NavigationSkipped, NavigationStart, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, map } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { CartService } from './core/cart/cart.service';
 import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { NotificationService, NotificationTone } from './core/notifications/notification.service';
 import { AppFeedbackComponent } from './shared/ui/feedback/app-feedback.component';
+
+const mobileNavBreakpoint = '(max-width: 960px)';
 
 @Component({
   selector: 'app-root',
@@ -22,6 +25,11 @@ export class App {
   readonly auth = inject(AuthService);
   readonly cart = inject(CartService);
   readonly menuOpen = signal(false);
+  readonly mobileNav = toSignal(
+    inject(BreakpointObserver).observe(mobileNavBreakpoint).pipe(map((state) => state.matches)),
+    { initialValue: false },
+  );
+  readonly closedMobileNav = computed(() => this.mobileNav() && !this.menuOpen());
   readonly catalogActive = signal(false);
   readonly currentYear = new Date().getFullYear();
   readonly navigating = signal(false);
@@ -29,6 +37,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notificationShell = viewChild<ElementRef<HTMLElement>>('notificationShell');
   readonly notifications = inject(NotificationService);
   readonly deploymentVersion = inject(DeploymentVersionService);
   readonly notificationItems = computed(() => {
@@ -52,7 +61,7 @@ export class App {
       const previousPath = this.currentPath;
       this.currentPath = path;
       this.catalogActive.set(path === '/catalog' || path.startsWith('/products/'));
-      this.menuOpen.set(false);
+      this.closeMenu();
       if (previousPath === null || previousPath === path) return;
       queueMicrotask(() => {
         const content = this.document.getElementById('main-content');
@@ -60,6 +69,14 @@ export class App {
         if (heading) heading.tabIndex = -1;
         (heading ?? content)?.focus();
       });
+    });
+
+    afterRenderEffect(() => {
+      const notification = this.notifications.notification();
+      const shell = this.notificationShell()?.nativeElement;
+      if (notification && shell && !shell.contains(this.document.activeElement)) {
+        this.notifications.resume(notification.id, 'focus');
+      }
     });
   }
 
@@ -70,6 +87,28 @@ export class App {
       this.notifications.success('Sesión cerrada correctamente.');
       void this.router.navigateByUrl('/login');
     });
+  }
+
+  toggleMenu(): void {
+    this.menuOpen.update((open) => !open);
+  }
+
+  closeMenu(): void {
+    this.menuOpen.set(false);
+  }
+
+  closeMenuFromNav(event: Event): void {
+    const nav = event.currentTarget as HTMLElement | null;
+    const restoreFocus = this.mobileNav() && !!nav?.contains(this.document.activeElement);
+    this.closeMenu();
+    if (restoreFocus) this.document.getElementById('main-nav-toggle')?.focus();
+  }
+
+  closeMenuFromEscape(event: Event): void {
+    if (!this.menuOpen()) return;
+    event.preventDefault();
+    this.closeMenu();
+    this.document.getElementById('main-nav-toggle')?.focus();
   }
 
   notificationFocusOut(event: FocusEvent, id: number): void {

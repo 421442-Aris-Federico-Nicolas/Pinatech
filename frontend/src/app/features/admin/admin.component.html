@@ -77,7 +77,7 @@
               <iconify-icon aria-hidden="true" class="chevron" icon="line-md:chevron-small-down"></iconify-icon>
             </button>
             @if(expandedOrder() === order.id){
-              <div class="order-detail" [id]="'order-detail-' + order.id">
+              <div class="order-detail" [id]="'order-detail-' + order.id" animate.enter="order-detail-enter" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
                 <div class="order-items"><h3>Detalle del pedido</h3>@for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}</div>
                 <div class="order-actions"><p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT'){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
               </div>

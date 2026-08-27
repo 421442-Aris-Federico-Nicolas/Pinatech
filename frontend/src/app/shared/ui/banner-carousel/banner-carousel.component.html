@@ -3,30 +3,42 @@
   role="region"
   aria-roledescription="carrusel"
   [attr.aria-label]="ariaLabel()"
+  [class.has-drift]="slides().length > 1 && autoplayDelay() > 0 && !reducedMotion()"
+  [class.is-paused]="autoplayPaused()"
+  [style.--carousel-drift-duration]="driftDuration()"
   tabindex="0"
   (keydown.arrowleft)="$event.preventDefault(); previous()"
   (keydown.arrowright)="$event.preventDefault(); next()">
   <div class="banner-carousel__stage">
-    <div class="banner-carousel__deck" [class.reverse]="direction() === -1">
+    <div class="banner-carousel__deck">
       @for (slide of slides(); track slide.src; let index = $index; let first = $first) {
         <img
           [class.active]="index === activeIndex()"
-          [class.entering]="index === enteringIndex()"
-          [class.leaving]="index === leavingIndex()"
           [src]="slide.src"
           [alt]="slide.alt"
           [width]="slide.width"
           [height]="slide.height"
           [attr.aria-hidden]="index === activeIndex() ? null : 'true'"
           [attr.loading]="imagePriority() && first ? 'eager' : 'lazy'"
-          [attr.fetchpriority]="imagePriority() && first ? 'high' : null"
-          (animationend)="finishTransition(index)">
+          [attr.fetchpriority]="imagePriority() && first ? 'high' : null">
       }
     </div>
 
     @if (slides().length > 1) {
       <button class="banner-carousel__control previous" type="button" (click)="previous()" aria-label="Ver banner anterior"><span aria-hidden="true">‹</span></button>
       <button class="banner-carousel__control next" type="button" (click)="next()" aria-label="Ver banner siguiente"><span aria-hidden="true">›</span></button>
+    }
+
+    @if (slides().length > 1 && autoplayDelay() > 0 && !reducedMotion()) {
+      <button
+        class="banner-carousel__autoplay"
+        type="button"
+        [attr.aria-label]="userPaused() ? 'Reanudar rotación automática' : 'Pausar rotación automática'"
+        [attr.aria-pressed]="userPaused()"
+        (pointerdown)="prepareAutoplayToggle()"
+        (click)="toggleAutoplay($event)">
+        <span aria-hidden="true">{{ userPaused() ? '&#9654;' : '&#10074;&#10074;' }}</span>
+      </button>
     }
   </div>
 
