@@ -8,10 +8,11 @@ import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
 
 @Component({
-  imports: [AppButtonDirective, CurrencyPipe, RouterLink],
+  imports: [AppButtonDirective, AppFeedbackComponent, CurrencyPipe, RouterLink],
   templateUrl: './product.component.html',
   styleUrl: './product.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

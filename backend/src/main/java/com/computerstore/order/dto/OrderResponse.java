@@ -12,6 +12,8 @@ public record OrderResponse(
         String currency,
         String paymentMethod,
         String deliveryMethod,
+        String fulfillmentMethod,
+        PickupLocationResponse pickupLocation,
         BigDecimal total,
         Instant createdAt,
         Instant reservationExpiresAt,

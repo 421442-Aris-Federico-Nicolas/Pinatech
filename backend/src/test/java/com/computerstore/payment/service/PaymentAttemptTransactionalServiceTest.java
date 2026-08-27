@@ -23,12 +23,18 @@ import java.util.Optional;
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.common.exception.InvalidRequestException;
+import com.computerstore.common.exception.BusinessRuleException;
+import com.computerstore.common.exception.EmailVerificationRequiredException;
+import com.computerstore.order.config.FulfillmentProperties;
 import com.computerstore.order.domain.CustomerOrder;
+import com.computerstore.order.domain.FulfillmentMethod;
 import com.computerstore.order.domain.OrderItem;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.domain.PaymentStatus;
+import com.computerstore.order.domain.PickupLocationSnapshot;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.payment.domain.PaymentAttempt;
@@ -54,8 +60,9 @@ class PaymentAttemptTransactionalServiceTest {
     private final CustomerOrderRepository orders = Mockito.mock(CustomerOrderRepository.class);
     private final OrderStockService stock = Mockito.mock(OrderStockService.class);
     private final Map<String, ProviderPaymentRecord> records = new HashMap<>();
+    private final FulfillmentPolicy fulfillment = new FulfillmentPolicy(fulfillmentProperties());
     private final PaymentAttemptTransactionalService service = new PaymentAttemptTransactionalService(
-            attempts, providerPayments, events, orders, stock, properties(),
+            attempts, providerPayments, events, orders, stock, properties(), fulfillment,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     @BeforeEach
@@ -174,6 +181,70 @@ class PaymentAttemptTransactionalServiceTest {
     }
 
     @Test
+    void requiresEmailToRemainVerifiedBeforeReusingOrCreatingAPreference() {
+        CustomerOrder order = order(NOW.plusSeconds(300), false, true);
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+
+        assertThrows(EmailVerificationRequiredException.class,
+                () -> service.prepare(42L, 7L, "payment-key"));
+
+        verify(attempts, never()).findActiveByOrderId(any(), any());
+        verify(attempts, never()).save(any());
+    }
+
+    @Test
+    void rejectsLegacyOrdersWithoutFulfillmentSnapshot() {
+        CustomerOrder order = order(NOW.plusSeconds(300), true, false);
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessRuleException.class,
+                () -> service.prepare(42L, 7L, "payment-key"));
+
+        verify(attempts, never()).findActiveByOrderId(any(), any());
+        verify(attempts, never()).save(any());
+    }
+
+    @Test
+    void rejectsAnOrderWhosePickupCodeIsNoLongerActiveBeforeRetryingAPreference() {
+        CustomerOrder order = order(NOW.plusSeconds(300), true, true, "CORDOBA-NORTE");
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessRuleException.class,
+                () -> service.prepare(42L, 7L, "payment-key"));
+
+        verify(attempts, never()).findActiveByOrderId(any(), any());
+        verify(attempts, never()).save(any());
+    }
+
+    @Test
+    void rejectsPickupWhosePublicSnapshotHasChangedBeforePayment() {
+        CustomerOrder order = orderWithChangedPickupSnapshot(NOW.plusSeconds(300));
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessRuleException.class,
+                () -> service.prepare(42L, 7L, "payment-key"));
+
+        verify(attempts, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void approvedWebhookForChangedPickupIsCancelledAndQueuedForRefund() {
+        CustomerOrder order = orderWithChangedPickupSnapshot(NOW.plusSeconds(300));
+        PaymentAttempt attempt = readyAttempt(order, "pref-1");
+        lock(attempt, order);
+
+        Optional<RefundInstruction> refund = service.processWebhook(
+                payment(attempt, "pref-1", "123", "approved", NOW, false),
+                "123", "request-1", "{}");
+
+        assertTrue(refund.isPresent());
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(PaymentStatus.REFUND_PENDING, order.getPaymentStatus());
+        assertFalse(records.get("123").isFundsOrder());
+        verify(stock).release(order);
+    }
+
+    @Test
     void staleProviderSnapshotDoesNotOverwriteNewerPaymentState() {
         CustomerOrder order = order(NOW.plusSeconds(300));
         PaymentAttempt attempt = readyAttempt(order, "pref-1");
@@ -248,6 +319,24 @@ class PaymentAttemptTransactionalServiceTest {
     }
 
     private CustomerOrder order(Instant expiry) {
+        return order(expiry, true, true);
+    }
+
+    private CustomerOrder order(Instant expiry, boolean emailVerified, boolean withFulfillment) {
+        return order(expiry, emailVerified, withFulfillment, "CORDOBA-CENTRO");
+    }
+
+    private CustomerOrder orderWithChangedPickupSnapshot(Instant expiry) {
+        return order(expiry, true, true, "CORDOBA-CENTRO", "Previous pickup name");
+    }
+
+    private CustomerOrder order(
+            Instant expiry, boolean emailVerified, boolean withFulfillment, String pickupCode) {
+        return order(expiry, emailVerified, withFulfillment, pickupCode, "Current pickup name");
+    }
+
+    private CustomerOrder order(
+            Instant expiry, boolean emailVerified, boolean withFulfillment, String pickupCode, String pickupName) {
         Product product = Mockito.mock(Product.class);
         when(product.getName()).thenReturn("Keyboard");
         when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
@@ -255,9 +344,22 @@ class PaymentAttemptTransactionalServiceTest {
         when(variant.getId()).thenReturn(1L);
         when(variant.getProduct()).thenReturn(product);
         when(variant.getColorName()).thenReturn("Black");
+        UserAccount user = Mockito.mock(UserAccount.class);
+        when(user.isEmailVerified()).thenReturn(emailVerified);
+        PickupLocationSnapshot pickup = withFulfillment
+                ? new PickupLocationSnapshot(
+                        pickupCode, pickupName, List.of("Current address", "Local 4"),
+                        "Cordoba", "X", "5000", "Current instructions", "Current hours")
+                : null;
         return new CustomerOrder(
-                new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
-                List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"), expiry, null, null);
+                user, List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"), expiry, null, null,
+                withFulfillment ? FulfillmentMethod.PICKUP : null, pickup);
+    }
+
+    private static FulfillmentProperties fulfillmentProperties() {
+        return new FulfillmentProperties(new FulfillmentProperties.Pickup(
+                true, "CORDOBA-CENTRO", "Current pickup name", List.of("Current address", "Local 4"),
+                "Cordoba", "X", "5000", "Current instructions", "Current hours"));
     }
 
     private MercadoPagoProperties properties() {

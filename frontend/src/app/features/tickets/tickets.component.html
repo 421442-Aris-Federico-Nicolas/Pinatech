@@ -5,8 +5,8 @@
     <p class="lead">Contanos qué equipo necesitás revisar. Las imágenes son opcionales y privadas.</p>
     <form (ngSubmit)="create()">
       <app-select label="Equipo" [(ngModel)]="form.deviceType" (ngModelChange)="form.brand = ''; form.model = ''" name="deviceType" [options]="deviceTypeOptions" [disabled]="creating()" required />
-      @if (form.deviceType === 'Notebook') {<app-input label="Marca" [(ngModel)]="form.brand" name="deviceBrand" autocomplete="organization" spellcheck="false" placeholder="Ej. Lenovo…" [disabled]="creating()" required />}
-      @if (form.deviceType !== 'PC de escritorio') {<app-input label="Modelo" [(ngModel)]="form.model" name="deviceModel" autocomplete="off" spellcheck="false" placeholder="Ej. IdeaPad 3 15ALC6…" [disabled]="creating()" required />}
+      @if (requiresBrand(form.deviceType)) {<app-input label="Marca" [(ngModel)]="form.brand" name="deviceBrand" autocomplete="organization" spellcheck="false" placeholder="Ej. Sony, Lenovo o HP…" [disabled]="creating()" required />}
+      @if (form.deviceType !== 'PC de escritorio') {<app-input label="Modelo" [(ngModel)]="form.model" name="deviceModel" autocomplete="off" spellcheck="false" placeholder="Ej. Series S o IdeaPad 3…" [disabled]="creating()" required />}
       <app-textarea class="wide" label="Problema informado" [rows]="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" autocomplete="off" spellcheck="true" placeholder="Ej. No enciende desde una actualización…" [disabled]="creating()" required />
       <div class="upload-field wide">
         <div><strong>Imágenes del equipo</strong><small>{{ createLimitReached() ? 'Límite de 10 imágenes alcanzado' : 'Opcional · JPEG o PNG · 5 MiB por archivo · máximo 10' }}</small></div>
@@ -17,14 +17,14 @@
       }
        <button appButton="filled" class="wide" type="submit" [disabled]="creating()">{{ creating() ? (createImages().length ? 'Creando y subiendo imágenes…' : 'Creando solicitud…') : 'Enviar solicitud' }}</button>
     </form>
-    @if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
-    @if (success()) { <p class="message" [class.success]="successTone() === 'success'" [class.warning]="successTone() === 'warning'" role="status">{{ success() }}</p> }
+    @if (error()) { <app-feedback class="request-feedback" tone="error" announce="assertive">{{ error() }}</app-feedback> }
+    @if (success()) { <app-feedback class="request-feedback" [tone]="successTone()" announce="polite">{{ success() }}</app-feedback> }
   </section>
 
   <section appCard class="tickets-panel" [attr.aria-busy]="loading()">
     <header><div><p class="eyebrow">Seguimiento privado</p><h2>Mis solicitudes</h2></div><button appButton="text" type="button" (click)="load()" [disabled]="loading()">Actualizar</button></header>
     @if (loading()) { <p class="empty" role="status">Cargando solicitudes…</p> }
-    @else if (listError()) { <div class="list-error" role="alert"><p>{{ listError() }}</p><button appButton="outlined" type="button" (click)="load()">Reintentar</button></div> }
+    @else if (listError()) { <app-feedback class="list-error" tone="error" announce="assertive">{{ listError() }}<button feedback-actions appButton="outlined" type="button" (click)="load()">Reintentar</button></app-feedback> }
     @else {
       @for (ticket of tickets(); track ticket.id) {
         <article appCard class="ticket-card">
@@ -42,7 +42,7 @@
               <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
             }
            </section>
-            @if(ticketMessages()[ticket.id]; as message){<p class="ticket-message" [class.success]="message.tone === 'success'" [class.warning]="message.tone === 'warning'" [class.error]="message.tone === 'error'" [attr.role]="message.tone === 'error' ? 'alert' : 'status'">{{ message.text }}</p>}
+            @if(ticketMessages()[ticket.id]; as message){<app-feedback class="ticket-message" [tone]="message.tone" [announce]="message.tone === 'error' ? 'assertive' : 'polite'">{{ message.text }}</app-feedback>}
         </article>
       } @empty { <p class="empty">Aún no registraste solicitudes.</p> }
     }

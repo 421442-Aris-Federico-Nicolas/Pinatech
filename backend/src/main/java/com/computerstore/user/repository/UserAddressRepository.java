@@ -1,0 +1,7 @@
+package com.computerstore.user.repository;
+
+import com.computerstore.user.domain.UserAddress;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface UserAddressRepository extends JpaRepository<UserAddress, Long> {
+}

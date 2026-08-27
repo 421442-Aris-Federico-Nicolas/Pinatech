@@ -45,12 +45,14 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokens;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
+    @Mock private AccountLifecycleService accountLifecycleService;
 
     private AuthService service;
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(users, roles, refreshTokens, passwordEncoder, jwtService, 60_000);
+        service = new AuthService(users, roles, refreshTokens, passwordEncoder, jwtService,
+                accountLifecycleService, 60_000);
     }
 
     private void stubJwt() {
@@ -85,7 +87,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("Password1", loginUser.getPasswordHash())).thenReturn(true);
         when(passwordEncoder.encode("Password1")).thenReturn("encoded");
         when(roles.findByName(RoleName.CUSTOMER)).thenReturn(Optional.of(new Role(RoleName.CUSTOMER)));
-        when(users.save(any(UserAccount.class))).thenReturn(registeredUser);
+        when(users.saveAndFlush(any(UserAccount.class))).thenReturn(registeredUser);
 
         service.login(new LoginRequest("customer@example.com", "Password1"));
         service.register(new RegisterRequest(
@@ -135,6 +137,23 @@ class AuthServiceTest {
         RefreshToken storedToken = new RefreshToken(
                 customer(), sha256(rawToken), familyId, Instant.now().plusSeconds(60));
         storedToken.revoke();
+        when(refreshTokens.findFamilyIdByTokenHash(eq(sha256(rawToken)))).thenReturn(Optional.of(familyId));
+        when(refreshTokens.lockFamily(familyId)).thenReturn(Optional.of(storedToken));
+        when(refreshTokens.findByTokenHash(eq(sha256(rawToken)))).thenReturn(Optional.of(storedToken));
+
+        assertThrows(AuthenticationFailureException.class, () -> service.refresh(rawToken));
+
+        verify(refreshTokens).revokeFamily(eq(familyId), any(Instant.class));
+    }
+
+    @Test
+    void refreshTokenFromAnOlderSessionVersionIsRejected() throws Exception {
+        String rawToken = "old-session-refresh-token";
+        UUID familyId = UUID.randomUUID();
+        UserAccount user = customer();
+        RefreshToken storedToken = new RefreshToken(
+                user, sha256(rawToken), familyId, Instant.now().plusSeconds(60));
+        user.incrementSessionVersion();
         when(refreshTokens.findFamilyIdByTokenHash(eq(sha256(rawToken)))).thenReturn(Optional.of(familyId));
         when(refreshTokens.lockFamily(familyId)).thenReturn(Optional.of(storedToken));
         when(refreshTokens.findByTokenHash(eq(sha256(rawToken)))).thenReturn(Optional.of(storedToken));

@@ -35,6 +35,9 @@ public class RefreshToken {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Column(name = "session_version", nullable = false)
+    private long sessionVersion;
+
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
@@ -49,6 +52,7 @@ public class RefreshToken {
         this.tokenHash = tokenHash;
         this.familyId = familyId;
         this.expiresAt = expiresAt;
+        this.sessionVersion = user.getSessionVersion();
     }
 
     @jakarta.persistence.PrePersist
@@ -57,7 +61,8 @@ public class RefreshToken {
     }
 
     public boolean isUsable(Instant now) {
-        return revokedAt == null && expiresAt.isAfter(now) && user.isActive();
+        return revokedAt == null && expiresAt.isAfter(now) && user.isActive()
+                && sessionVersion == user.getSessionVersion();
     }
 
     public void revoke() {
@@ -73,5 +78,6 @@ public class RefreshToken {
     public UserAccount getUser() { return user; }
     public String getTokenHash() { return tokenHash; }
     public UUID getFamilyId() { return familyId; }
+    public long getSessionVersion() { return sessionVersion; }
     public boolean isRevoked() { return revokedAt != null; }
 }

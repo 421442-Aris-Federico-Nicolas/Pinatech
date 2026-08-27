@@ -35,7 +35,7 @@ let inputId = 0;
         (input)="handleInput($event)"
         (blur)="markTouched()">
       @if (hint()) { <small class="app-field__hint" [id]="hintId">{{ hint() }}</small> }
-      @if (error()) { <small class="app-field__error" [id]="errorId" role="alert">{{ error() }}</small> }
+      @if (error()) { <small class="app-field__error" [id]="errorId">{{ error() }}</small> }
     </label>
   `,
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => AppInputComponent), multi: true }],

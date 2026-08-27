@@ -1,9 +1,9 @@
 <main>
   <header><p class="eyebrow">Tu selección</p><h1 id="cart-title" tabindex="-1">Carrito</h1></header>
-  @if (cart.legacyCartDiscarded()) { <p class="cart-warning" role="status">Quitamos los productos guardados antes de incorporar colores porque no era posible asignarles una variante con seguridad. <button appButton="text" type="button" aria-label="Cerrar aviso sobre productos guardados" (click)="cart.dismissLegacyCartWarning()">Cerrar</button></p> }
-  @if (cart.notice()) { <p class="cart-warning" role="status">{{ cart.notice() }} <button appButton="text" type="button" aria-label="Cerrar aviso de disponibilidad del carrito" (click)="cart.dismissNotice()">Cerrar</button></p> }
-  @if (pendingUndo(); as pending) { <div class="undo"><p role="status">{{ pending.message }}</p><button appButton="text" type="button" (click)="undo()">Deshacer</button></div> }
-  @if (reconcileError()) { <div class="cart-warning" role="alert"><span>No pudimos verificar la disponibilidad. Reintentá antes de continuar.</span><button appButton="outlined" type="button" (click)="reconcile()">Reintentar</button></div> }
+  @if (cart.legacyCartDiscarded()) { <app-feedback class="cart-feedback" tone="warning" announce="polite">Quitamos los productos guardados antes de incorporar colores porque no era posible asignarles una variante con seguridad. <button feedback-actions appButton="text" type="button" aria-label="Cerrar aviso sobre productos guardados" (click)="cart.dismissLegacyCartWarning()">Cerrar</button></app-feedback> }
+  @if (cart.notice()) { <app-feedback class="cart-feedback" tone="warning" announce="polite">{{ cart.notice() }} <button feedback-actions appButton="text" type="button" aria-label="Cerrar aviso de disponibilidad del carrito" (click)="cart.dismissNotice()">Cerrar</button></app-feedback> }
+  @if (pendingUndo(); as pending) { <app-feedback class="cart-feedback undo" announce="polite">{{ pending.message }}<button feedback-actions appButton="text" type="button" (click)="undo()">Deshacer</button></app-feedback> }
+  @if (reconcileError()) { <app-feedback class="cart-feedback" tone="error" announce="assertive"><span>No pudimos verificar la disponibilidad. Reintentá antes de continuar.</span><button feedback-actions appButton="outlined" type="button" (click)="reconcile()">Reintentar</button></app-feedback> }
   <p class="sr-only" aria-live="polite" aria-atomic="true">{{ feedback() }}</p>
 
   @if (cart.items().length) {

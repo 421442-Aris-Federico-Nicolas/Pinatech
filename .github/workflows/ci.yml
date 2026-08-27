@@ -84,6 +84,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run test -- --watch=false
+      - run: npm run test:deployment-version-script
       - run: npm run build
 
   containers:
@@ -103,6 +104,36 @@ jobs:
           --tmpfs /var/run:uid=101,gid=101,mode=0750
           --tmpfs /tmp:uid=101,gid=101,mode=0700
           pinatech-frontend:ci nginx -t
+      - name: Validate frontend HTTP caching and routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name pinatech-frontend-http-ci \
+            --user 101:101 --read-only --security-opt no-new-privileges=true \
+            --cap-drop ALL --cap-add NET_BIND_SERVICE \
+            --tmpfs /var/cache/nginx:uid=101,gid=101,mode=0750 \
+            --tmpfs /var/run:uid=101,gid=101,mode=0750 \
+            --tmpfs /tmp:uid=101,gid=101,mode=0700 \
+            -p 127.0.0.1:4210:80 pinatech-frontend:ci
+          trap 'docker stop pinatech-frontend-http-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            curl --fail --silent http://127.0.0.1:4210/ >/dev/null && break
+            sleep 1
+          done
+
+          curl --fail --silent --show-error --head http://127.0.0.1:4210/ | grep -qi 'cache-control: no-store'
+          curl --fail --silent --show-error --head http://127.0.0.1:4210/verify-email | grep -qi 'cache-control: no-store'
+          curl --fail --silent --show-error --head http://127.0.0.1:4210/version.json | grep -qi 'cache-control: no-store'
+
+          html="$(curl --fail --silent --show-error http://127.0.0.1:4210/)"
+          printf '%s' "$html" | grep -q 'name="pinatech-deployment-version"'
+          main_bundle="$(printf '%s' "$html" | grep -oEm1 'main-[A-Z0-9]+\.js')"
+          test -n "$main_bundle"
+          curl --fail --silent --show-error --head "http://127.0.0.1:4210/$main_bundle" | grep -qi 'cache-control: public, max-age=31536000, immutable'
+
+          missing_status="$(curl --silent --output /tmp/missing-body --write-out '%{http_code}' http://127.0.0.1:4210/removed-old-ABCDEFGH.js)"
+          test "$missing_status" = '404'
+          ! grep -qi '<!doctype html' /tmp/missing-body
       - uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: pinatech-backend:ci

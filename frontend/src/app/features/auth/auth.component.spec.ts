@@ -19,11 +19,14 @@ describe('authentication screens', () => {
     fixture.detectChanges();
     fixture.componentInstance.submit();
     fixture.detectChanges();
+    await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelectorAll('app-input').length).toBe(2);
     expect(fixture.nativeElement.querySelector('.auth-card')?.classList).toContain('app-card');
     expect(fixture.nativeElement.querySelector('button[type="submit"]')?.classList).toContain('app-button');
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('app-input input'));
+    expect(fixture.nativeElement.querySelectorAll('[role="alert"]').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('.app-field__error').length).toBe(2);
   });
 
   it('renders registration with shared controls and focuses a mismatched confirmation', async () => {
@@ -48,10 +51,12 @@ describe('authentication screens', () => {
     fixture.detectChanges();
     fixture.componentInstance.submit();
     fixture.detectChanges();
+    await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelectorAll('app-input').length).toBe(6);
     expect(fixture.nativeElement.querySelector('.auth-card')?.classList).toContain('app-card');
     expect(register).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[formControlName="confirmPassword"] input'));
+    expect(fixture.nativeElement.querySelectorAll('[role="alert"]').length).toBe(0);
   });
 });

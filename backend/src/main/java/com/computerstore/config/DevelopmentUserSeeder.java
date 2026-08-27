@@ -39,12 +39,15 @@ public class DevelopmentUserSeeder implements ApplicationRunner {
     }
 
     private void createUserIfMissing(String firstName, String lastName, String email, String password, RoleName roleName) {
-        if (userAccountRepository.findByEmailIgnoreCase(email).isPresent()) {
+        var existing = userAccountRepository.findByEmailIgnoreCase(email);
+        if (existing.isPresent()) {
+            if (!existing.get().isEmailVerified()) existing.get().markEmailVerified();
             return;
         }
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new IllegalStateException("Development role is missing: " + roleName));
         UserAccount user = new UserAccount(firstName, lastName, email, passwordEncoder.encode(password), null);
+        user.markEmailVerified();
         user.addRole(role);
         userAccountRepository.save(user);
     }

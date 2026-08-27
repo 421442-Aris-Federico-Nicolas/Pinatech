@@ -20,7 +20,7 @@ describe('AdminComponent payments', () => {
     const component = fixture.componentInstance;
     const base: Order = {
       id: 1, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
-      paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, total: 100, createdAt: '2026-08-17T10:00:00Z',
+      paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, total: 100, createdAt: '2026-08-17T10:00:00Z',
       reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada', customerEmail: 'ada@example.com', items: [],
     };
 

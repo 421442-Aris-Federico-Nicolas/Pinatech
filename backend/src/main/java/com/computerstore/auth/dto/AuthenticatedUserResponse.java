@@ -8,6 +8,7 @@ public record AuthenticatedUserResponse(
         String lastName,
         String email,
         String phone,
+        boolean emailVerified,
         Set<String> roles
 ) {
 }

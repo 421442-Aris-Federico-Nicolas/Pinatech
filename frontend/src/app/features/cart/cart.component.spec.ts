@@ -13,6 +13,8 @@ describe('CartComponent', () => {
     quantity: 2,
   };
 
+  afterEach(() => vi.useRealTimers());
+
   it('offers authenticated customers a link to checkout without creating an order', async () => {
     const cart = {
       items: signal([item]),
@@ -76,11 +78,58 @@ describe('CartComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(CartComponent);
+    fixture.detectChanges();
     fixture.componentInstance.removeItem(item);
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    const undoFeedback = fixture.nativeElement.querySelector('.undo') as HTMLElement;
+    const undoButton = undoFeedback.querySelector('button') as HTMLButtonElement;
+    expect(undoFeedback.querySelector('.app-feedback__body')?.getAttribute('role')).toBe('status');
+    expect(undoFeedback.querySelector('.app-feedback__body')?.getAttribute('aria-live')).toBeNull();
+    expect(document.activeElement).toBe(undoButton);
+
     fixture.componentInstance.undo();
+    await Promise.resolve();
+    fixture.detectChanges();
 
     expect(cart.removeItem).toHaveBeenCalledWith(item.variant.id);
     expect(cart.add).toHaveBeenCalledWith(item.product, item.variant, item.quantity);
+    expect(fixture.nativeElement.querySelector('.undo')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.sr-only')?.textContent).toContain('Producto restaurado');
+  });
+
+  it('expires the undo action after five seconds and returns focus to the heading', async () => {
+    vi.useFakeTimers();
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
+      setQuantity: vi.fn(), add: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
+      reconcile: vi.fn(() => of(true)), legacyCartDiscarded: signal(false), dismissLegacyCartWarning: vi.fn(),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CartComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CartComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.removeItem(item);
+    fixture.detectChanges();
+    await Promise.resolve();
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.undo button'));
+
+    vi.advanceTimersByTime(5000);
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    expect(fixture.nativeElement.querySelector('.undo')).toBeNull();
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('#cart-title'));
   });
 
   it('keeps consecutive removals in the same undo window', async () => {

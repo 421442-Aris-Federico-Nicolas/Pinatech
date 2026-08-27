@@ -34,7 +34,7 @@ let selectId = 0;
         }
       </select>
       @if (hint()) { <small class="app-field__hint" [id]="hintId">{{ hint() }}</small> }
-      @if (error()) { <small class="app-field__error" [id]="errorId" role="alert">{{ error() }}</small> }
+      @if (error()) { <small class="app-field__error" [id]="errorId">{{ error() }}</small> }
     </label>
   `,
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => AppSelectComponent), multi: true }],

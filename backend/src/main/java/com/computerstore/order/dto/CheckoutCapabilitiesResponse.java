@@ -8,6 +8,8 @@ public record CheckoutCapabilitiesResponse(
         boolean onlinePaymentsEnabled,
         boolean deliveryQuotesEnabled,
         List<String> paymentMethods,
-        List<String> deliveryMethods
+        List<String> deliveryMethods,
+        List<String> fulfillmentMethods,
+        List<PickupLocationResponse> pickupLocations
 ) {
 }
