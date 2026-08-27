@@ -1,0 +1,53 @@
+:host {
+  --feedback-accent: var(--color-info);
+  --feedback-background: var(--color-info-bg);
+  --feedback-border: var(--color-info-border);
+  --feedback-text: var(--color-info-text);
+  align-items: start;
+  animation: feedback-in 180ms cubic-bezier(.2, .8, .3, 1) both;
+  background: var(--feedback-background);
+  border: 1px solid var(--feedback-border);
+  border-left: 3px solid var(--feedback-accent);
+  border-radius: var(--radius-md);
+  color: var(--feedback-text);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  line-height: var(--line-height-base);
+  overflow-wrap: anywhere;
+  padding: var(--space-3) var(--space-4);
+}
+
+:host([data-tone="success"]) { --feedback-accent: var(--color-success); --feedback-background: var(--color-success-bg); --feedback-border: var(--color-success-border); --feedback-text: var(--color-success-text); }
+:host([data-tone="warning"]) { --feedback-accent: var(--color-warning); --feedback-background: var(--color-warning-bg); --feedback-border: var(--color-warning-border); --feedback-text: var(--color-warning-text); }
+:host([data-tone="error"]) { --feedback-accent: var(--color-danger); --feedback-background: var(--color-danger-bg); --feedback-border: var(--color-danger-border); --feedback-text: var(--color-danger); }
+
+.app-feedback__icon {
+  align-items: center;
+  background: color-mix(in srgb, var(--feedback-accent) 14%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--feedback-accent);
+  display: inline-flex;
+  font-size: 1.25rem;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.app-feedback__body { align-self: center; min-width: 0; }
+.app-feedback__body ::ng-deep > :first-child { margin-top: 0; }
+.app-feedback__body ::ng-deep > :last-child { margin-bottom: 0; }
+.app-feedback__actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.app-feedback__actions:empty { display: none; }
+
+@keyframes feedback-in { from { opacity: 0; transform: translateY(-.3rem); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 520px) {
+  :host { grid-template-columns: 2rem minmax(0, 1fr); }
+  .app-feedback__actions { grid-column: 1 / -1; }
+  .app-feedback__actions ::ng-deep > * { flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host { animation-duration: .01ms; transform: none; }
+}

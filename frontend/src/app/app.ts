@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -7,11 +7,13 @@ import { NavigationCancel, NavigationEnd, NavigationError, NavigationSkipped, Na
 import { finalize } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { CartService } from './core/cart/cart.service';
-import { NotificationService } from './core/notifications/notification.service';
+import { DeploymentVersionService } from './core/deployment/deployment-version.service';
+import { NotificationService, NotificationTone } from './core/notifications/notification.service';
+import { AppFeedbackComponent } from './shared/ui/feedback/app-feedback.component';
 
 @Component({
   selector: 'app-root',
-  imports: [MatButtonModule, MatToolbarModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [AppFeedbackComponent, MatButtonModule, MatToolbarModule, RouterLink, RouterLinkActive, RouterOutlet],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
   styleUrl: './app.scss'
@@ -28,6 +30,17 @@ export class App {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   readonly notifications = inject(NotificationService);
+  readonly deploymentVersion = inject(DeploymentVersionService);
+  readonly notificationItems = computed(() => {
+    const notification = this.notifications.notification();
+    return notification ? [notification] : [];
+  });
+  readonly notificationPresentation: Record<NotificationTone, { title: string; icon: string }> = {
+    info: { title: 'Información', icon: 'line-md:bell' },
+    success: { title: 'Listo', icon: 'line-md:confirm-circle' },
+    warning: { title: 'Atención', icon: 'line-md:alert-circle' },
+    error: { title: 'Algo salió mal', icon: 'line-md:close-circle' },
+  };
   private currentPath: string | null = null;
 
   constructor() {
@@ -59,8 +72,8 @@ export class App {
     });
   }
 
-  notificationFocusOut(event: FocusEvent): void {
+  notificationFocusOut(event: FocusEvent, id: number): void {
     const outlet = event.currentTarget as HTMLElement | null;
-    if (!outlet?.contains(event.relatedTarget as Node | null)) this.notifications.resume('focus');
+    if (!outlet?.contains(event.relatedTarget as Node | null)) this.notifications.resume(id, 'focus');
   }
 }

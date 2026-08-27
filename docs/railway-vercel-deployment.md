@@ -7,7 +7,12 @@ The production topology uses these public origins:
 - PostgreSQL: Supabase Session Pooler over TLS.
 - Uploaded images: a Railway Volume mounted at `/app/uploads`.
 
-Deploy Railway first. The Vercel build embeds the final API origin.
+For additive API changes, deploy Railway first because the Vercel build embeds the final API
+origin. For removed or incompatible API behavior, deploy a frontend that no longer depends on
+the old contract first and keep the deprecated backend contract during a bounded compatibility
+window. The version-update notice helps users refresh open tabs, but it is not proof that every
+old client has been retired. Contract the backend only in a later release after the compatibility
+window and server-side usage checks are complete.
 
 ## Stage 1: Railway backend
 
@@ -22,7 +27,7 @@ Deploy Railway first. The Vercel build embeds the final API origin.
 
 Keep `MP_ENABLED=false` until all Mercado Pago production values are ready. Never combine a production `APP_USR-` token with `MP_ENVIRONMENT=sandbox`.
 
-Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM` and `STOREFRONT_BASE_URL` are correct and the sender domain is verified. Enable pickup only after every `PICKUP_*` public field has been reviewed.
+Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_BASE_URL` and `EMAIL_LOGO_URL` are correct and the sender domain is verified. `EMAIL_LOGO_URL` must be a public HTTPS image URL without credentials, query parameters or a fragment; it is independent of the storefront URL and is loaded directly by email clients rather than attached as CID content. Enable pickup only after every `PICKUP_*` public field has been reviewed.
 
 ### Attach persistent storage
 
@@ -102,10 +107,15 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version 19 in Railway logs.
+6. Flyway reports schema version 20 in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
 8. A Mercado Pago webhook test returns `200` from
    `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.
 9. Registration sends a verification email whose link returns to `https://pinatech.com.ar/verify-email`.
-10. Password recovery and email change complete successfully and invalidate prior sessions.
-11. `GET https://api.pinatech.com.ar/api/checkout/capabilities` exposes only the reviewed pickup location.
+10. `GET https://pinatech.com.ar/pinatech-favicon.png` returns `200` with an image content type, and the verification email displays that public logo.
+11. Password recovery and email change complete successfully and invalidate prior sessions.
+12. `GET https://api.pinatech.com.ar/api/checkout/capabilities` exposes only the reviewed pickup location.
+13. `GET https://pinatech.com.ar/version.json` returns a nonempty version with `Cache-Control: no-store`.
+14. `index.html` and application routes are not cached, while generated JS/CSS bundles with a content hash are immutable.
+15. A nonexistent old chunk returns `404` instead of the Angular HTML shell.
+16. An open tab detects a later frontend deployment and keeps the `Actualizar` action visible until the user activates it.

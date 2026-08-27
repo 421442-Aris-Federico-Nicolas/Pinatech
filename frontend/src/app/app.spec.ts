@@ -1,25 +1,31 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, vi } from 'vitest';
 import { App } from './app';
 import { routes } from './app.routes';
 import { customerGuard } from './core/guards/customer.guard';
+import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { NotificationService } from './core/notifications/notification.service';
 
 @Component({ template: '<h1>Catálogo</h1><input aria-label="Buscar">' })
 class TestCatalogPage {}
 
 describe('App', () => {
+  const updateAvailable = signal(false);
+  const reload = vi.fn();
+
   afterEach(() => vi.useRealTimers());
 
   beforeEach(async () => {
+    updateAvailable.set(false);
+    reload.mockReset();
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideRouter([
         { path: 'catalog', component: TestCatalogPage },
         { path: 'products/:id', component: TestCatalogPage },
-      ])],
+      ]), { provide: DeploymentVersionService, useValue: { updateAvailable, reload } }],
     }).compileComponents();
   });
 
@@ -54,8 +60,8 @@ describe('App', () => {
 
     const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
     expect(feedback.textContent).toContain('Producto agregado al carrito.');
-    expect(feedback.getAttribute('role')).toBe('status');
-    expect(feedback.getAttribute('aria-live')).toBe('polite');
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('role')).toBe('status');
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('aria-live')).toBeNull();
     (feedback.querySelector('.notification-close') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(feedback.classList).toContain('is-exiting');
@@ -82,6 +88,37 @@ describe('App', () => {
 
     expect(action).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('.app-notification')).toBeNull();
+  });
+
+  it('keeps a deployment update visible until its explicit action reloads the page', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.deployment-update')).toBeNull();
+
+    updateAvailable.set(true);
+    fixture.detectChanges();
+
+    const update = fixture.nativeElement.querySelector('.deployment-update') as HTMLElement;
+    expect(update.textContent).toContain('Nueva versión disponible');
+    expect(update.querySelector('.app-feedback__body')?.getAttribute('role')).toBe('status');
+    (update.querySelector('button') as HTMLButtonElement).click();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('runs a contextual action only from its explicit button', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    const action = vi.fn();
+    fixture.detectChanges();
+
+    notifications.warning('Alcanzaste el máximo.', 'Ver carrito').onAction().subscribe(action);
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.notification-action') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(action).toHaveBeenCalledOnce();
+    expect(fixture.nativeElement.querySelector('.app-notification').classList).toContain('is-exiting');
   });
 
   it('keeps an actionable notification visible while the outlet is hovered', () => {
@@ -114,8 +151,71 @@ describe('App', () => {
     fixture.detectChanges();
 
     const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
-    expect(feedback.getAttribute('role')).toBe('alert');
-    expect(feedback.getAttribute('aria-live')).toBe('assertive');
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('role')).toBe('alert');
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('aria-live')).toBeNull();
+  });
+
+  it.each([
+    ['info', 'Información', 'line-md:bell', 'status'],
+    ['success', 'Listo', 'line-md:confirm-circle', 'status'],
+    ['warning', 'Atención', 'line-md:alert-circle', 'status'],
+    ['error', 'Algo salió mal', 'line-md:close-circle', 'alert'],
+  ] as const)('renders %s tone semantics and presentation', (tone, title, icon, role) => {
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    fixture.detectChanges();
+
+    notifications.show('Mensaje de prueba', { tone });
+    fixture.detectChanges();
+
+    const feedback = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    expect(feedback.dataset['tone']).toBe(tone);
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('role')).toBe(role);
+    expect(feedback.querySelector('.notification-announcement')?.getAttribute('aria-live')).toBeNull();
+    expect(feedback.querySelector('.notification-title')?.textContent).toContain(title);
+    expect((feedback.querySelector('.notification-icon iconify-icon') as HTMLElement & { icon: string }).icon).toBe(icon);
+  });
+
+  it('renders timer progress, pauses it on focus, and replays entry for a replacement', () => {
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    fixture.detectChanges();
+    notifications.show('Primera', { action: 'Abrir', duration: 2400 });
+    fixture.detectChanges();
+
+    const first = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+    const action = first.querySelector('.notification-action') as HTMLButtonElement;
+    expect(first.style.getPropertyValue('--notification-duration')).toBe('2400ms');
+    expect(first.querySelector('.notification-progress')).not.toBeNull();
+    action.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    fixture.detectChanges();
+    expect(first.classList).toContain('is-paused');
+
+    notifications.show('Segunda', { duration: 900 });
+    fixture.detectChanges();
+    const replacement = fixture.nativeElement.querySelector('.app-notification') as HTMLElement;
+
+    expect(replacement).not.toBe(first);
+    expect(replacement.textContent).toContain('Segunda');
+    expect(replacement.style.getPropertyValue('--notification-duration')).toBe('900ms');
+    expect(replacement.classList).not.toContain('is-paused');
+
+    first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    fixture.detectChanges();
+    expect(replacement.classList).not.toContain('is-paused');
+  });
+
+  it('stacks a deployment update above a toast without covering either action', () => {
+    const fixture = TestBed.createComponent(App);
+    const notifications = TestBed.inject(NotificationService);
+    updateAvailable.set(true);
+    notifications.warning('Hay cambios pendientes.', 'Revisar');
+    fixture.detectChanges();
+
+    const overlays = fixture.nativeElement.querySelector('.app-overlays') as HTMLElement;
+    expect(overlays.querySelector('.deployment-update button')).not.toBeNull();
+    expect(overlays.querySelector('.notification-action')).not.toBeNull();
+    expect(overlays.children.length).toBe(2);
   });
 
   it('protects customer order and checkout result routes', () => {

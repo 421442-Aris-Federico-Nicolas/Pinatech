@@ -7,14 +7,14 @@ import { finalize } from 'rxjs';
 import { requestErrorMessage } from '../../core/api/problem-detail';
 import { AuthService } from '../../core/auth/auth.service';
 import { safeReturnUrl } from '../../core/auth/safe-return-url';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 
 @Component({
   selector: 'app-login',
-  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, ReactiveFormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, ReactiveFormsModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,7 +24,6 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
   readonly route = inject(ActivatedRoute);
   readonly error = signal<string | null>(null);
@@ -39,9 +38,8 @@ export class LoginComponent {
     if (this.submitting()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notifications.error('Revisá los campos marcados antes de iniciar sesión.');
       const firstInvalid = Object.entries(this.form.controls).find(([, control]) => control.invalid)?.[0];
-      if (firstInvalid) this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${firstInvalid}"]`)?.focus();
+      if (firstInvalid) queueMicrotask(() => this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${firstInvalid}"]`)?.focus());
       return;
     }
     this.error.set(null);

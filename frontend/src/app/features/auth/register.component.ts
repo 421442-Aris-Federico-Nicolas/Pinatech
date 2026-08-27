@@ -10,6 +10,7 @@ import { safeReturnUrl } from '../../core/auth/safe-return-url';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 
 const passwordsMatch: ValidatorFn = (control: AbstractControl): ValidationErrors | null =>
@@ -17,7 +18,7 @@ const passwordsMatch: ValidatorFn = (control: AbstractControl): ValidationErrors
 
 @Component({
   selector: 'app-register',
-  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, ReactiveFormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, ReactiveFormsModule, RouterLink],
   templateUrl: './register.component.html',
   styleUrl: './auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,10 +50,9 @@ export class RegisterComponent {
     if (this.submitting()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notifications.error('Revisá los campos marcados antes de crear la cuenta.');
       const firstInvalid = Object.entries(this.form.controls).find(([, control]) => control.invalid)?.[0]
         ?? (this.form.hasError('passwordsMismatch') ? 'confirmPassword' : null);
-      if (firstInvalid) this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${firstInvalid}"]`)?.focus();
+      if (firstInvalid) queueMicrotask(() => this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${firstInvalid}"]`)?.focus());
       return;
     }
     this.error.set(null);

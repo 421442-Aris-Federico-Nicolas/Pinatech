@@ -4,7 +4,7 @@
   @if (loading()) {
     <section appCard class="loading-card" aria-live="polite"><span class="spinner" aria-hidden="true"></span><p>Cargando tu perfil…</p></section>
   } @else if (loadError()) {
-    <section appCard class="load-error" role="alert"><h2>No pudimos cargar tu perfil</h2><p>{{ loadError() }}</p><button appButton="outlined" type="button" (click)="load()">Reintentar</button></section>
+    <app-feedback class="load-error" tone="error" announce="assertive"><div><h2>No pudimos cargar tu perfil</h2><p>{{ loadError() }}</p></div><button feedback-actions appButton="outlined" type="button" (click)="load()">Reintentar</button></app-feedback>
   } @else if (profile(); as account) {
     <section appCard class="identity" aria-labelledby="identity-title">
       <span class="monogram" aria-hidden="true">{{ account.firstName.charAt(0) }}{{ account.lastName.charAt(0) }}</span>
@@ -12,7 +12,7 @@
       <span class="verification" [class.verified]="account.emailVerified">{{ account.emailVerified ? 'Email verificado' : 'Verificación pendiente' }}</span>
     </section>
 
-    @if (actionError()) { <p class="page-error" role="alert">{{ actionError() }}</p> }
+    @if (actionError()) { <app-feedback class="page-error" tone="error" announce="assertive">{{ actionError() }}</app-feedback> }
 
     <div class="profile-grid" [class.with-sidebar]="account.roles.includes('CUSTOMER')">
       <section appCard aria-labelledby="personal-title">
@@ -31,14 +31,14 @@
         <div class="section-heading"><p>Acceso y seguridad</p><h2 id="email-title">Email</h2></div>
         <div class="current-email"><span>Email actual</span><strong>{{ account.email }}</strong></div>
         @if (!account.emailVerified) {
-          <div class="notice warning"><strong>Tu email todavía no está verificado.</strong><span>Verificalo para acceder a todas las funciones protegidas.</span><button appButton="outlined" type="button" (click)="resendVerification()" [disabled]="pending() !== null">{{ pending() === 'verification' ? 'Enviando…' : 'Reenviar verificación' }}</button></div>
+          <app-feedback class="email-warning" tone="warning"><div><strong>Tu email todavía no está verificado.</strong><p>Verificalo para acceder a todas las funciones protegidas.</p></div><button feedback-actions appButton="outlined" type="button" (click)="resendVerification()" [disabled]="pending() !== null">{{ pending() === 'verification' ? 'Enviando…' : 'Reenviar verificación' }}</button></app-feedback>
         }
         <form id="email-form" [formGroup]="emailForm" (ngSubmit)="requestEmailChange()" novalidate>
           <app-input label="Email nuevo" type="email" name="email" formControlName="email" autocomplete="email" inputMode="email" spellcheck="false" [maxLength]="254" required hint="Te enviaremos un enlace al email nuevo antes de aplicar el cambio." [error]="fieldError(emailForm.controls.email, 'Email')" />
           <app-input label="Contraseña actual" type="password" name="currentPassword" formControlName="currentPassword" autocomplete="current-password" [maxLength]="72" required [error]="fieldError(emailForm.controls.currentPassword, 'Contraseña actual')" />
           <button appButton="outlined" type="submit" [disabled]="pending() !== null" [attr.aria-busy]="pending() === 'email'">{{ pending() === 'email' ? 'Enviando…' : 'Solicitar cambio' }}</button>
         </form>
-        @if (emailStatus()) { <p class="inline-status" role="status">{{ emailStatus() }}</p> }
+        @if (emailStatus()) { <app-feedback class="inline-status" tone="success" announce="polite">{{ emailStatus() }}</app-feedback> }
       </section>
 
       <section appCard class="address-card" aria-labelledby="address-title">
@@ -54,7 +54,7 @@
             @if (account.address.reference) { <small>Referencia: {{ account.address.reference }}</small> }
           </address>
           @if (confirmingDelete()) {
-            <div class="delete-confirm" role="alert"><p>¿Querés eliminar esta dirección?</p><div><button appButton="filled" tone="danger" type="button" (click)="deleteAddress()" [disabled]="pending() !== null">{{ pending() === 'delete-address' ? 'Eliminando…' : 'Sí, eliminar' }}</button><button appButton="text" type="button" (click)="confirmingDelete.set(false)" [disabled]="pending() !== null">Cancelar</button></div></div>
+            <app-feedback class="delete-confirm" tone="warning"><p>¿Querés eliminar esta dirección?</p><div feedback-actions><button appButton="filled" tone="danger" type="button" (click)="deleteAddress()" [disabled]="pending() !== null">{{ pending() === 'delete-address' ? 'Eliminando…' : 'Sí, eliminar' }}</button><button appButton="text" type="button" (click)="confirmingDelete.set(false)" [disabled]="pending() !== null">Cancelar</button></div></app-feedback>
           } @else {
             <button class="delete-link" appButton="text" type="button" (click)="confirmingDelete.set(true)">Eliminar dirección</button>
           }

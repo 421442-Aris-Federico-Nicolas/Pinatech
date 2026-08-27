@@ -109,8 +109,13 @@ unset REGISTRY_TOKEN
 
 ## 4. Validar y desplegar por digest
 
-Definir `APP_DOMAIN` sin esquema ni ruta. Con `MP_ENABLED=false`, dejar vacias las
-credenciales MP. Validar sin imprimir la configuracion resuelta:
+Definir `APP_DOMAIN` sin esquema ni ruta. Si se habilita Resend, definir
+`EMAIL_LOGO_URL` como una URL HTTPS publica y absoluta, con host y sin credenciales,
+query ni fragmento. Esta URL es independiente de los enlaces de cuenta y el cliente de
+correo carga la imagen publica directamente, sin un adjunto CID. Antes de habilitar
+Resend, comprobar que responde `200` con un tipo de contenido de imagen. Con
+`MP_ENABLED=false`, dejar vacias las credenciales MP. Validar sin imprimir la
+configuracion resuelta:
 
 ```bash
 cd /opt/pinatech
@@ -137,15 +142,24 @@ sudo docker compose --env-file /etc/pinatech/production.env \
 ```
 
 No ejecutar dos backends de versiones incompatibles durante una migracion destructiva.
-Preferir cambios de esquema expand/contract compatibles. Confirmar desde una red externa:
+Preferir cambios de esquema expand/contract compatibles. Los cambios aditivos pueden desplegar
+el backend primero. Si se elimina o cambia un contrato consumido por el frontend, desplegar
+primero una version compatible del frontend y mantener el contrato deprecado durante una ventana
+de compatibilidad acotada. El aviso de actualizacion ayuda a renovar pestañas abiertas, pero no
+demuestra que todos los clientes antiguos hayan desaparecido. Retirar el contrato backend en una
+release posterior, despues de esa ventana y de revisar su uso del lado servidor. Confirmar desde
+una red externa:
 
 ```bash
 curl --fail --silent --show-error --location http://store.example.com/api/health
 curl --fail --silent --show-error https://store.example.com/api/health
+curl --fail --silent --show-error https://store.example.com/version.json
 ```
 
 Revisar certificado, redireccion, HSTS, pagina Angular, login, lectura/escritura autorizada
-y carga/descarga de archivos. `docker compose ps` debe mostrar todos los servicios healthy.
+y carga/descarga de archivos. `index.html` y `version.json` deben responder con `no-store`, los
+bundles JS/CSS con hash deben ser inmutables y un chunk inexistente debe responder `404` sin HTML.
+`docker compose ps` debe mostrar todos los servicios healthy.
 
 ## 5. Mercado Pago en produccion
 

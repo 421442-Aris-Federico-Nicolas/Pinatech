@@ -70,6 +70,8 @@ describe('ProfileComponent', () => {
     const fixture = TestBed.createComponent(ProfileComponent);
     fixture.detectChanges();
     fixture.componentInstance.saveAddress();
+    fixture.detectChanges();
+    await fixture.whenStable();
     expect(profiles.putAddress).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('#address-form .ng-invalid input')).toBe(document.activeElement);
   });

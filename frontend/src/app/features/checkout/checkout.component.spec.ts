@@ -214,7 +214,7 @@ describe('CheckoutComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.error [role="status"]')?.textContent).toContain('Volviendo a consultar');
+    expect(fixture.nativeElement.querySelector('.error .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a consultar');
   });
 
   it('retries cart availability instead of bypassing a failed reconciliation', async () => {
@@ -422,7 +422,7 @@ describe('CheckoutComponent', () => {
       .find((button: HTMLButtonElement) => button.textContent?.includes('Cerrar confirmación')) as HTMLButtonElement;
     expect(dismissButton).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.result')?.getAttribute('role')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.result-status')?.getAttribute('role')).toBe('status');
+    expect(fixture.nativeElement.querySelector('.result-status .app-feedback__body')?.getAttribute('role')).toBe('status');
 
     dismissButton.click();
     fixture.detectChanges();

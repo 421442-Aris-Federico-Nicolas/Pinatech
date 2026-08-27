@@ -19,7 +19,7 @@
     @if (isLoading()) {
       <div class="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><p>Cargando productos…</p></div>
     } @else if (error()) {
-      <div class="status" role="alert"><p>No pudimos cargar los productos.</p><button appButton="text" type="button" (click)="loadFeatured()">Reintentar</button></div>
+      <app-feedback class="status" tone="error" announce="assertive">No pudimos cargar los productos.<button feedback-actions appButton="text" type="button" (click)="loadFeatured()">Reintentar</button></app-feedback>
     } @else {
       <div class="product-sections">
         @for (group of productGroups(); track group.eyebrow; let index = $index) {

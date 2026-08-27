@@ -6,6 +6,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
@@ -31,7 +32,7 @@ interface HeroPanel {
 
 @Component({
   selector: 'app-home',
-  imports: [AppButtonDirective, AppProductCardComponent, BannerCarouselComponent, RouterLink],
+  imports: [AppButtonDirective, AppFeedbackComponent, AppProductCardComponent, BannerCarouselComponent, RouterLink],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',

@@ -77,7 +77,7 @@ describe('OrdersComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.state [role="status"]')?.textContent).toContain('Volviendo a cargar');
+    expect(fixture.nativeElement.querySelector('.state .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a cargar');
   });
 
   it('explains when an expired reservation can no longer be paid', async () => {
@@ -125,7 +125,7 @@ describe('OrdersComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.capability-error [role="status"]')?.textContent).toContain('Volviendo a consultar');
+    expect(fixture.nativeElement.querySelector('.capability-error .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a consultar');
 
     retry.next({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] });
     retry.complete();

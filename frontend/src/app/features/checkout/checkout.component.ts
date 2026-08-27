@@ -6,16 +6,16 @@ import { RouterLink } from '@angular/router';
 import { finalize, map, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartService, OrderConfirmation } from '../../core/cart/cart.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel } from '../../core/utils/estado-label';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService } from './checkout.service';
 
 @Component({
   selector: 'app-checkout',
-  imports: [AppButtonDirective, AppCardDirective, CurrencyPipe, DatePipe, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './checkout.component.html',
   styleUrl: './checkout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,7 +26,6 @@ export class CheckoutComponent {
   private readonly checkoutService = inject(CheckoutService);
   private readonly browserWindow = inject(CHECKOUT_WINDOW);
   private readonly auth = inject(AuthService);
-  private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly capabilities = signal<CheckoutCapabilities | null>(null);
@@ -143,12 +142,10 @@ export class CheckoutComponent {
       next: () => {
         const message = 'Si el email está pendiente, te enviamos un nuevo enlace de verificación.';
         this.verificationNotice.set(message);
-        this.notifications.success(message);
       },
       error: () => {
         const message = 'No pudimos reenviar el email de verificación. Intentá nuevamente desde Mi perfil.';
         this.verificationNotice.set(message);
-        this.notifications.error(message);
       },
     });
   }
@@ -210,7 +207,5 @@ export class CheckoutComponent {
 
     this.submitErrorKind.set(kind);
     this.submitError.set(message);
-    if (kind === 'verification' || kind === 'conflict') this.notifications.warning(message);
-    else this.notifications.error(message);
   }
 }

@@ -3,53 +3,45 @@
     <p class="eyebrow">Estado del pedido</p>
 
     @if (error()) {
-      <div class="state rejected" role="alert">
-        <span aria-hidden="true">!</span>
+      <app-feedback class="state rejected" tone="error" [announce]="polling() ? 'polite' : 'assertive'">
         <h1>No pudimos verificar el pago</h1>
-        <p>{{ error() }}</p>
-      </div>
-      @if (orderId !== null) {
-        <button appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago nuevamente' : 'Reintentar verificación del pago'">{{ polling() ? 'Verificando pago…' : 'Reintentar verificación del pago' }}</button>
-        @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a verificar el pago.</p> }
-      }
+        <p>{{ polling() ? 'Volviendo a verificar el pago con nuestro servidor.' : error() }}</p>
+        @if (orderId !== null) {
+          <button feedback-actions appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago nuevamente' : 'Reintentar verificación del pago'">{{ polling() ? 'Verificando pago…' : 'Reintentar verificación del pago' }}</button>
+        }
+      </app-feedback>
     } @else if (order(); as currentOrder) {
       @switch (result(currentOrder)) {
         @case ('approved') {
-          <div class="state approved" role="status">
-            <span aria-hidden="true">OK</span>
+          <app-feedback class="state approved" tone="success" announce="polite">
             <h1>Pago aprobado</h1>
             <p>Nuestro servidor confirmó la acreditación del pedido #{{ currentOrder.id }}.</p>
-          </div>
+          </app-feedback>
         }
         @case ('refunded') {
-          <div class="state refunded" role="status">
-            <span aria-hidden="true">↩</span>
+          <app-feedback class="state refunded" tone="info" announce="polite">
             <h1>Pago reintegrado</h1>
             <p>Nuestro servidor informa que el pago del pedido #{{ currentOrder.id }} fue reintegrado.</p>
-          </div>
+          </app-feedback>
         }
         @case ('refund-pending') {
-          <div class="state pending" role="status">
-            <span class="loader" aria-hidden="true"></span>
+          <app-feedback class="state pending" tone="info" announce="polite">
             <h1>Reintegro en proceso</h1>
             <p>El pago llegó después del vencimiento del pedido. Iniciamos la devolución automáticamente.</p>
-          </div>
+          </app-feedback>
         }
         @case ('rejected') {
-          <div class="state rejected" role="status">
-            <span aria-hidden="true">!</span>
+          <app-feedback class="state rejected" tone="error" announce="polite">
             <h1>Pago rechazado</h1>
             <p>El estado confirmado por nuestro servidor es rechazado, cancelado o vencido. Podés revisar si el pedido admite un nuevo intento.</p>
-          </div>
+          </app-feedback>
         }
         @default {
-          <div class="state pending" role="status">
-            <span class="loader" aria-hidden="true"></span>
+          <app-feedback class="state pending" tone="info" announce="polite">
             <h1>Pago pendiente</h1>
             <p>{{ polling() ? 'Estamos consultando la confirmación del pedido con nuestro servidor.' : 'Todavía no recibimos una confirmación definitiva del pago.' }}</p>
-          </div>
-          <button appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago' : 'Volver a verificar el pago'">{{ polling() ? 'Verificando pago…' : 'Volver a verificar el pago' }}</button>
-          @if (polling()) { <p class="visually-hidden" role="status" aria-live="polite">Verificando nuevamente el estado del pago.</p> }
+            <button feedback-actions appButton="outlined" type="button" (click)="load()" [disabled]="polling()" [attr.aria-busy]="polling()" [attr.aria-label]="polling() ? 'Verificando el pago' : 'Volver a verificar el pago'">{{ polling() ? 'Verificando pago…' : 'Volver a verificar el pago' }}</button>
+          </app-feedback>
         }
       }
 

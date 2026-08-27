@@ -4,8 +4,9 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
-    "build:vercel": "ng build --configuration production,vercel",
+    "build": "ng build && node scripts/write-deployment-version.mjs",
+    "build:vercel": "ng build --configuration production,vercel && node scripts/write-deployment-version.mjs",
+    "test:deployment-version-script": "node --test scripts/write-deployment-version.test.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

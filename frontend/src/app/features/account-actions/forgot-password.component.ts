@@ -6,14 +6,14 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { requestErrorMessage } from '../../core/api/problem-detail';
 import { AuthService } from '../../core/auth/auth.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 
 @Component({
   selector: 'app-forgot-password',
-  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, ReactiveFormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, ReactiveFormsModule, RouterLink],
   templateUrl: './forgot-password.component.html',
   styleUrl: '../auth/auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,7 +22,6 @@ export class ForgotPasswordComponent {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
   readonly form = this.fb.group({ email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]] });
   readonly submitting = signal(false);
@@ -33,8 +32,7 @@ export class ForgotPasswordComponent {
     if (this.submitting()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notifications.error('Ingresá un email válido para continuar.');
-      this.host.nativeElement.querySelector<HTMLInputElement>('input')?.focus();
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLInputElement>('input')?.focus());
       return;
     }
     this.error.set('');
@@ -45,7 +43,6 @@ export class ForgotPasswordComponent {
     ).subscribe({
       next: () => {
         this.sent.set(true);
-        this.notifications.success('Si existe una cuenta con ese email, enviamos las instrucciones.');
       },
       error: (response: HttpErrorResponse) => this.error.set(requestErrorMessage(response, 'No pudimos enviar las instrucciones. Intentá nuevamente.')),
     });

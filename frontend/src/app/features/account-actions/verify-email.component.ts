@@ -6,20 +6,19 @@ import { catchError, finalize, of, switchMap } from 'rxjs';
 import { requestErrorMessage } from '../../core/api/problem-detail';
 import { consumeActionToken } from '../../core/auth/action-token';
 import { AuthService } from '../../core/auth/auth.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 
 @Component({
   selector: 'app-verify-email',
-  imports: [AppButtonDirective, AppCardDirective, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, RouterLink],
   templateUrl: './verify-email.component.html',
   styleUrl: '../auth/auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VerifyEmailComponent {
   private readonly auth = inject(AuthService);
-  private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
   readonly token = consumeActionToken();
   readonly submitting = signal(false);
@@ -40,7 +39,6 @@ export class VerifyEmailComponent {
     ).subscribe({
       next: () => {
         this.confirmed.set(true);
-        this.notifications.success('Tu email quedó verificado.');
       },
       error: (response: HttpErrorResponse) => this.error.set(requestErrorMessage(response, 'El enlace no es válido o venció. Solicitá uno nuevo desde tu perfil.')),
     });

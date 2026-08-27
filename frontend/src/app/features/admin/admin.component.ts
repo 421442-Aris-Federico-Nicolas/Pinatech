@@ -11,6 +11,7 @@ import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-re
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
@@ -26,7 +27,7 @@ interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
 @Component({
   selector: 'app-admin',
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, CurrencyPipe, DatePipe, DecimalPipe, FormsModule],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, CurrencyPipe, DatePipe, DecimalPipe, FormsModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',

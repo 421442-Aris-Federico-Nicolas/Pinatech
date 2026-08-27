@@ -9,10 +9,19 @@ export interface NotificationOptions {
   duration?: number;
 }
 
-export interface AppNotification { id: number; message: string; tone: NotificationTone; action: string; hasAction: boolean; exiting: boolean; }
+export interface AppNotification {
+  id: number;
+  message: string;
+  tone: NotificationTone;
+  action: string;
+  hasAction: boolean;
+  duration: number;
+  paused: boolean;
+  exiting: boolean;
+}
 export interface NotificationRef { onAction(): Observable<void>; }
 
-interface QueuedNotification {
+interface ActiveNotification {
   notification: AppNotification;
   action: Subject<void>;
   duration: number;
@@ -22,8 +31,7 @@ interface QueuedNotification {
 export class NotificationService implements OnDestroy {
   private static readonly exitDuration = 180;
   private readonly notificationState = signal<AppNotification | null>(null);
-  private readonly queue: QueuedNotification[] = [];
-  private active: QueuedNotification | null = null;
+  private active: ActiveNotification | null = null;
   private autoCloseTimeout: ReturnType<typeof setTimeout> | null = null;
   private exitTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly pauseReasons = new Set<string>();
@@ -36,14 +44,23 @@ export class NotificationService implements OnDestroy {
     const tone = options.tone ?? 'info';
     const id = ++this.nextId;
     const action = new Subject<void>();
-    const queued: QueuedNotification = {
-      notification: { id, message, tone, action: options.action ?? 'Cerrar', hasAction: options.action !== undefined, exiting: false },
+    const duration = Math.max(0, options.duration ?? 6500);
+    const next: ActiveNotification = {
+      notification: {
+        id,
+        message,
+        tone,
+        action: options.action ?? '',
+        hasAction: options.action !== undefined,
+        duration,
+        paused: false,
+        exiting: false,
+      },
       action,
-      duration: options.duration ?? 6500,
+      duration,
     };
 
-    if (this.active) this.queue.push(queued);
-    else this.present(queued);
+    this.present(next);
 
     return { onAction: () => action.asObservable() };
   }
@@ -60,65 +77,76 @@ export class NotificationService implements OnDestroy {
     return this.show(message, { tone: 'error', action, duration: 9000 });
   }
 
-  activate(): void {
-    if (!this.active || this.active.notification.exiting) return;
-    const id = this.active.notification.id;
+  activate(id: number): void {
+    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
     this.active.action.next();
     this.dismiss(id);
   }
 
-  pause(reason = 'interaction'): void {
-    if (!this.active || this.active.notification.exiting) return;
+  pause(id: number, reason = 'interaction'): void {
+    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
     const wasPaused = this.pauseReasons.size > 0;
     this.pauseReasons.add(reason);
     if (wasPaused) return;
     this.remainingDuration = Math.max(0, this.remainingDuration - (Date.now() - this.autoCloseStartedAt));
     this.clearAutoClose();
+    this.active.notification = { ...this.active.notification, paused: true };
+    this.notificationState.set(this.active.notification);
   }
 
-  resume(reason = 'interaction'): void {
+  resume(id: number, reason = 'interaction'): void {
+    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
     this.pauseReasons.delete(reason);
-    if (this.pauseReasons.size || !this.active || this.active.notification.exiting || this.autoCloseTimeout !== null) return;
+    if (this.pauseReasons.size || this.autoCloseTimeout !== null) return;
+    this.active.notification = { ...this.active.notification, paused: false };
+    this.notificationState.set(this.active.notification);
     this.scheduleAutoClose();
   }
 
-  dismiss(id = this.notificationState()?.id): void {
-    if (id === undefined || this.active?.notification.id !== id || this.active.notification.exiting) return;
+  dismiss(id: number): void {
+    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
     this.clearAutoClose();
     this.pauseReasons.clear();
-    this.active.notification = { ...this.active.notification, exiting: true };
+    this.active.notification = { ...this.active.notification, paused: true, exiting: true };
     this.notificationState.set(this.active.notification);
     this.exitTimeout = setTimeout(() => this.finishDismissal(id), NotificationService.exitDuration);
   }
 
   ngOnDestroy(): void {
     this.clearAutoClose();
-    if (this.exitTimeout !== null) clearTimeout(this.exitTimeout);
+    this.clearExit();
     this.active?.action.complete();
-    for (const queued of this.queue) queued.action.complete();
   }
 
-  private present(queued: QueuedNotification): void {
-    this.active = queued;
-    this.notificationState.set(queued.notification);
-    this.remainingDuration = queued.duration;
+  private present(next: ActiveNotification): void {
+    this.clearAutoClose();
+    this.clearExit();
+    const previous = this.active;
+    this.active = next;
+    this.notificationState.set(next.notification);
+    this.remainingDuration = next.duration;
     this.pauseReasons.clear();
     this.scheduleAutoClose();
+    previous?.action.complete();
   }
 
   private finishDismissal(id: number): void {
     if (this.active?.notification.id !== id) return;
     this.exitTimeout = null;
-    this.active.action.complete();
+    const dismissed = this.active;
     this.active = null;
     this.notificationState.set(null);
-    const next = this.queue.shift();
-    if (next) this.present(next);
+    dismissed.action.complete();
   }
 
   private clearAutoClose(): void {
     if (this.autoCloseTimeout !== null) clearTimeout(this.autoCloseTimeout);
     this.autoCloseTimeout = null;
+  }
+
+  private clearExit(): void {
+    if (this.exitTimeout !== null) clearTimeout(this.exitTimeout);
+    this.exitTimeout = null;
   }
 
   private scheduleAutoClose(): void {

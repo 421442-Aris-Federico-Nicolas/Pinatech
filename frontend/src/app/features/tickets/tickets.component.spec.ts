@@ -7,9 +7,9 @@ import { TicketsComponent } from './tickets.component';
 describe('TicketsComponent attachment gallery', () => {
   const ticket: Ticket = {
     id: 7,
-    deviceType: 'Notebook',
-    brand: 'Pina',
-    model: 'Pro',
+    deviceType: 'Consola',
+    brand: 'Sony',
+    model: 'Modelo 5',
     reportedProblem: 'No enciende',
     status: 'RECEIVED',
     createdAt: '2026-07-29T12:00:00Z',
@@ -39,6 +39,7 @@ describe('TicketsComponent attachment gallery', () => {
 
     expect(fixture.nativeElement.querySelector('app-ticket-attachment-gallery')).toBeNull();
     expect(content).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.ticket-card h3')?.textContent).toContain('Consola Sony Modelo 5');
 
     const toggle = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button'))
       .find((button) => button.textContent?.trim() === 'Ver imágenes')!;
@@ -56,6 +57,39 @@ describe('TicketsComponent attachment gallery', () => {
     toggle.click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-ticket-attachment-gallery')).toBeNull();
+  });
+
+  it('offers Consola and submits its brand and model', async () => {
+    const create = vi.fn(() => of({ ...ticket, attachments: [] }));
+    await TestBed.configureTestingModule({
+      imports: [TicketsComponent],
+      providers: [
+        { provide: TicketsService, useValue: { tickets: () => of([]), create } },
+        { provide: TicketAttachmentService, useValue: { upload: vi.fn() } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TicketsComponent);
+    const component = fixture.componentInstance;
+    Object.assign(component.form, {
+      deviceType: 'Consola',
+      brand: '  Microsoft  ',
+      model: '  Series S  ',
+      reportedProblem: '  No enciende  ',
+    });
+    fixture.detectChanges();
+
+    expect(component.deviceTypes).toEqual(['Consola', 'Notebook', 'PC de escritorio']);
+    expect(fixture.nativeElement.querySelector('[name="deviceBrand"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[name="deviceModel"]')).not.toBeNull();
+
+    component.create();
+
+    expect(create).toHaveBeenCalledWith({
+      deviceType: 'Consola',
+      brand: 'Microsoft',
+      model: 'Series S',
+      reportedProblem: 'No enciende',
+    });
   });
 
   it('protects unfinished requests and disables request controls while creating', async () => {
@@ -117,8 +151,8 @@ describe('TicketsComponent attachment gallery', () => {
     component.uploadToTicket(ticket);
     fixture.detectChanges();
 
-    const message = fixture.nativeElement.querySelector('.ticket-message.error') as HTMLElement;
-    expect(message.getAttribute('role')).toBe('alert');
+    const message = fixture.nativeElement.querySelector('.ticket-message') as HTMLElement;
+    expect(message.querySelector('.app-feedback__body')?.getAttribute('role')).toBe('alert');
     expect(message.textContent).toContain('No se pudo agregar ninguna');
     expect(component.pendingFor(7)).toHaveLength(1);
   });

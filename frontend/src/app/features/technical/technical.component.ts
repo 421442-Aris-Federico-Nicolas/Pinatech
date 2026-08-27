@@ -11,6 +11,7 @@ import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
@@ -26,7 +27,7 @@ const PRIORITY_FILTERS = ['ALL', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
 
 @Component({
   selector: 'app-technical',
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './technical.component.html',
   styleUrl: './technical.component.scss',

@@ -7,9 +7,10 @@ import { CartItem, CartService } from '../../core/cart/cart.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 
 @Component({
-  imports: [AppButtonDirective, AppCardDirective, CurrencyPipe, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, RouterLink],
   templateUrl: './cart.component.html',
   styleUrl: './cart.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
