@@ -4,7 +4,6 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
-import { NotificationService } from '../notifications/notification.service';
 import { environment } from '../../../environments/environment';
 import { authInterceptor } from './auth.interceptor';
 
@@ -14,7 +13,6 @@ describe('authInterceptor', () => {
   let token = 'initial-token';
   let refreshFails = false;
   let navigation: { commands: string[]; options: { queryParams?: { returnUrl?: string; reason?: string } } } | null;
-  const warning = vi.fn();
   const clearSession = vi.fn();
   const refreshSession = vi.fn(() => of(void 0));
 
@@ -22,7 +20,6 @@ describe('authInterceptor', () => {
     token = 'initial-token';
     refreshFails = false;
     navigation = null;
-    warning.mockClear();
     clearSession.mockClear();
     refreshSession.mockClear();
     TestBed.configureTestingModule({
@@ -43,7 +40,6 @@ describe('authInterceptor', () => {
           navigation = { commands, options };
           return Promise.resolve(true);
         } } },
-        { provide: NotificationService, useValue: { warning } },
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -82,7 +78,6 @@ describe('authInterceptor', () => {
     httpTesting.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(navigation).toEqual({ commands: ['/login'], options: { queryParams: { returnUrl: '/orders?page=2', reason: 'session-expired' } } });
-    expect(warning).toHaveBeenCalledWith('Tu sesión venció. Ingresá nuevamente para continuar.');
     expect(clearSession).toHaveBeenCalledOnce();
   });
 
@@ -97,7 +92,6 @@ describe('authInterceptor', () => {
 
     expect(refreshSession).toHaveBeenCalledOnce();
     expect(clearSession).not.toHaveBeenCalled();
-    expect(warning).not.toHaveBeenCalled();
     expect(navigation).toBeNull();
   });
 });

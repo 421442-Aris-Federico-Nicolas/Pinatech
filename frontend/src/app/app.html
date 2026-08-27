@@ -1,5 +1,56 @@
 <a class="skip-link" href="#main-content">Saltar al contenido</a>
 <div class="route-progress" [class.active]="navigating()" aria-hidden="true"></div>
+<div class="app-overlays">
+  @if (deploymentVersion.updateAvailable()) {
+    <div class="deployment-update">
+      <app-feedback tone="info" announce="polite">
+        <div><strong>Nueva versión disponible</strong><p>Actualizá la página para cargar las últimas mejoras de Pinatech.</p></div>
+        <button feedback-actions type="button" (click)="deploymentVersion.reload()">Actualizar</button>
+      </app-feedback>
+    </div>
+  }
+  <div class="notification-region" aria-label="Notificaciones">
+    @for (notification of notificationItems(); track notification.id) {
+      <aside
+        class="app-notification"
+        [class.is-exiting]="notification.exiting"
+        [class.is-paused]="notification.paused"
+        [attr.data-tone]="notification.tone"
+        [style.--notification-duration]="notification.duration + 'ms'"
+        (mouseenter)="notifications.pause(notification.id, 'pointer')"
+        (mouseleave)="notifications.resume(notification.id, 'pointer')"
+        (focusin)="notifications.pause(notification.id, 'focus')"
+        (focusout)="notificationFocusOut($event, notification.id)"
+      >
+        <span class="notification-icon" aria-hidden="true">
+          <iconify-icon [icon]="notificationPresentation[notification.tone].icon"></iconify-icon>
+        </span>
+        <div class="notification-body">
+          <div
+            class="notification-announcement"
+            [attr.role]="notification.tone === 'error' ? 'alert' : 'status'"
+            [attr.aria-labelledby]="'notification-title-' + notification.id"
+            [attr.aria-describedby]="'notification-message-' + notification.id"
+            aria-atomic="true"
+          >
+            <strong class="notification-title" [id]="'notification-title-' + notification.id">{{ notificationPresentation[notification.tone].title }}</strong>
+            <p [id]="'notification-message-' + notification.id">{{ notification.message }}</p>
+          </div>
+          @if (notification.hasAction) {
+            <button class="notification-action" type="button" (click)="notifications.activate(notification.id)">{{ notification.action }}</button>
+          }
+        </div>
+        <button
+          class="notification-close"
+          type="button"
+          aria-label="Cerrar notificación"
+          (click)="notifications.dismiss(notification.id)"
+        ><iconify-icon icon="line-md:close" aria-hidden="true"></iconify-icon></button>
+        <span class="notification-progress" aria-hidden="true"><span></span></span>
+      </aside>
+    }
+  </div>
+</div>
 <div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
 <header>
 <mat-toolbar aria-label="Navegación principal">
@@ -33,36 +84,6 @@
 </mat-toolbar>
 </header>
 <div id="main-content" tabindex="-1"><router-outlet /></div>
-<div class="notification-region">
-  @if (notifications.notification(); as notification) {
-    <aside
-      class="app-notification"
-      [class.is-exiting]="notification.exiting"
-      [attr.data-tone]="notification.tone"
-      [attr.role]="notification.tone === 'error' ? 'alert' : 'status'"
-      [attr.aria-live]="notification.tone === 'error' ? 'assertive' : 'polite'"
-      aria-atomic="true"
-      (mouseenter)="notifications.pause('pointer')"
-      (mouseleave)="notifications.resume('pointer')"
-      (focusin)="notifications.pause('focus')"
-      (focusout)="notificationFocusOut($event)"
-    >
-      <span class="notification-mark" aria-hidden="true"></span>
-      <p>{{ notification.message }}</p>
-      <div class="notification-actions">
-        @if (notification.hasAction) {
-          <button class="notification-action" type="button" (click)="notifications.activate()">{{ notification.action }}</button>
-        }
-        <button
-          class="notification-close"
-          type="button"
-          aria-label="Cerrar notificación"
-          (click)="notification.hasAction ? notifications.dismiss(notification.id) : notifications.activate()"
-        ><iconify-icon icon="line-md:close" aria-hidden="true"></iconify-icon></button>
-      </div>
-    </aside>
-  }
-</div>
 <footer class="site-footer">
   <div class="footer-content">
     <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">

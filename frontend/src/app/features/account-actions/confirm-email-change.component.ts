@@ -6,14 +6,14 @@ import { finalize } from 'rxjs';
 import { requestErrorMessage } from '../../core/api/problem-detail';
 import { consumeActionToken } from '../../core/auth/action-token';
 import { AuthService } from '../../core/auth/auth.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { ProfileService } from '../../core/profile/profile.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 
 @Component({
   selector: 'app-confirm-email-change',
-  imports: [AppButtonDirective, AppCardDirective, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, RouterLink],
   templateUrl: './confirm-email-change.component.html',
   styleUrl: '../auth/auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,7 +21,6 @@ import { AppCardDirective } from '../../shared/ui/app-card.directive';
 export class ConfirmEmailChangeComponent {
   private readonly auth = inject(AuthService);
   private readonly profiles = inject(ProfileService);
-  private readonly notifications = inject(NotificationService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   readonly token = consumeActionToken();
@@ -38,7 +37,6 @@ export class ConfirmEmailChangeComponent {
     ).subscribe({
       next: () => {
         this.auth.clearSession();
-        this.notifications.success('Tu email se actualizó. Iniciá sesión con la dirección nueva.');
         void this.router.navigate(['/login'], { queryParams: { reason: 'email-changed' } });
       },
       error: (response: HttpErrorResponse) => this.error.set(requestErrorMessage(response, 'El enlace no es válido o venció. Volvé a solicitar el cambio desde tu perfil.')),

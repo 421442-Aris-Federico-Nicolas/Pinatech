@@ -11,6 +11,7 @@ import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
@@ -20,7 +21,7 @@ interface PendingImage { file: File; previewUrl: string; }
 interface TicketMessage { text: string; tone: 'success' | 'warning' | 'error'; }
 
 @Component({
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
   templateUrl: './tickets.component.html',
   styleUrl: './tickets.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,7 +45,7 @@ export class TicketsComponent {
   readonly createImages = signal<PendingImage[]>([]);
   readonly ticketImages = signal<Record<number, PendingImage[]>>({});
   readonly expandedTickets = signal<Set<number>>(new Set());
-  readonly deviceTypes = ['PlayStation', 'Notebook', 'PC de escritorio'];
+  readonly deviceTypes = ['Consola', 'Notebook', 'PC de escritorio'];
   readonly deviceTypeOptions: readonly AppSelectOption[] = [
     { value: '', label: 'Seleccioná un equipo', disabled: true },
     ...this.deviceTypes.map((deviceType) => ({ value: deviceType, label: deviceType })),
@@ -73,14 +74,15 @@ export class TicketsComponent {
 
   create(): void {
     if (this.creating()) return;
+    const requiresBrand = this.requiresBrand(this.form.deviceType);
     const payload: CreateTicketPayload = {
       deviceType: this.form.deviceType.trim(),
-      brand: this.form.deviceType === 'Notebook' ? this.form.brand.trim() : '',
+      brand: requiresBrand ? this.form.brand.trim() : '',
       model: this.form.deviceType === 'PC de escritorio' ? '' : this.form.model.trim(),
       reportedProblem: this.form.reportedProblem.trim(),
     };
     if (!payload.deviceType || !payload.reportedProblem) return this.invalid('Completá equipo y problema informado.');
-    if (payload.deviceType === 'Notebook' && !payload.brand) return this.invalid('Completá la marca de la notebook.');
+    if (requiresBrand && !payload.brand) return this.invalid('Completá la marca del equipo.');
     if (payload.deviceType !== 'PC de escritorio' && !payload.model) return this.invalid('Completá el modelo del equipo.');
 
     this.clearMessages();
@@ -151,6 +153,7 @@ export class TicketsComponent {
   }
 
   pendingFor(ticketId: number): PendingImage[] { return this.ticketImages()[ticketId] ?? []; }
+  requiresBrand(deviceType: string): boolean { return deviceType === 'Consola' || deviceType === 'Notebook'; }
 
   imagesExpanded(ticketId: number): boolean { return this.expandedTickets().has(ticketId); }
 

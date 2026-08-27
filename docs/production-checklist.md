@@ -23,6 +23,7 @@ decision, not an automatic claim that the application is production-ready.
 - Dependency, container and secret scanning run in CI.
 - SSH is key-only, root login is disabled and the firewall exposes only approved SSH, 80/443.
 - Resend uses a verified sending domain and account-action links point only to the canonical storefront.
+- `EMAIL_LOGO_URL` is a public HTTPS image without credentials, query parameters or fragments, and returns `200` with an image content type.
 - Email verification, password reset and email change are tested without leaking account existence.
 - Password reset and email change invalidate existing sessions.
 
@@ -42,6 +43,9 @@ decision, not an automatic claim that the application is production-ready.
 - Staging deploys the same image digests that production will receive.
 - Production requires approval, smoke tests and a documented rollback.
 - Backend readiness and liveness probes control traffic.
+- The application shell and deployment marker are not cached; hashed bundles remain immutable.
+- Missing asset paths return `404` instead of the Angular shell.
+- Incompatible frontend/backend changes use a frontend-first expand/contract rollout.
 - Logs, metrics, traces and alerts cover latency, errors, database saturation and order failures.
 
 ## Release gate
@@ -53,6 +57,7 @@ decision, not an automatic claim that the application is production-ready.
 - Duplicate order and duplicate webhook scenarios are safe.
 - Payment rejection, expiration, cancellation and refund scenarios are verified.
 - Registration, email verification, password recovery and email change pass end-to-end.
+- An open tab detects a new frontend version and offers an explicit update without discarding unsaved work automatically.
 - Verified customers can create pickup orders and the selected pickup snapshot remains immutable.
 - A backup restore and deployment rollback have been demonstrated.
 - The exact production webhook URL and production collector ID were independently verified.

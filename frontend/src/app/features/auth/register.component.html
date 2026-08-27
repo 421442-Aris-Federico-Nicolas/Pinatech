@@ -22,7 +22,7 @@
         [maxLength]="72"
         required
         [error]="form.controls.confirmPassword.touched && form.controls.confirmPassword.hasError('required') ? 'Repetí tu contraseña.' : form.controls.confirmPassword.touched && form.hasError('passwordsMismatch') ? 'Las contraseñas no coinciden.' : ''" />
-      @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
+      @if (error()) { <app-feedback tone="error" announce="assertive">{{ error() }}</app-feedback> }
       <button appButton="filled" type="submit" [disabled]="submitting()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Creando tu cuenta, esperá' : 'Crear cuenta'">
         @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
         <span>{{ submitting() ? 'Creando cuenta…' : 'Crear cuenta' }}</span>

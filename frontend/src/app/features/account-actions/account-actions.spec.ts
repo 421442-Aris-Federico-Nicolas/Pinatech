@@ -26,6 +26,10 @@ describe('account action screens', () => {
     expect(confirmEmailVerification).not.toHaveBeenCalled();
     fixture.componentInstance.confirm();
     expect(confirmEmailVerification).toHaveBeenCalledWith('action-token');
+    fixture.detectChanges();
+    const destination = fixture.nativeElement.querySelector('a[appButton="filled"]') as HTMLAnchorElement;
+    expect(destination.getAttribute('href')).toBe('/login');
+    expect(destination.getAttribute('ng-reflect-router-link')).toBeNull();
   });
 
   it('submits only token and password when resetting a password', async () => {

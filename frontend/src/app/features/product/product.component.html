@@ -70,7 +70,11 @@
       @if (item.description) { <p>{{ item.description }}</p> } @else { <p>Este producto no tiene una descripción publicada.</p> }
     </section>
   } @else if(error(); as errorType) {
-    <section class="not-found" role="alert"><div class="code">{{ errorType === 'not-found' ? '404' : '!' }}</div><h1>{{ errorType === 'not-found' ? 'Producto no encontrado' : 'No pudimos cargar el producto' }}</h1><p>{{ errorType === 'not-found' ? 'El producto no existe o ya no está publicado.' : 'Revisá tu conexión e intentá nuevamente.' }}</p>@if(errorType === 'request'){<button appButton="filled" type="button" (click)="load()">Reintentar</button>}@else{<a appButton="filled" routerLink="/catalog">Volver al catálogo</a>}</section>
+    @if (errorType === 'request') {
+      <section class="not-found"><app-feedback tone="error" announce="assertive"><div><h1>No pudimos cargar el producto</h1><p>Revisá tu conexión e intentá nuevamente.</p></div><button feedback-actions appButton="filled" type="button" (click)="load()">Reintentar</button></app-feedback></section>
+    } @else {
+      <section class="not-found"><div class="code">404</div><h1>Producto no encontrado</h1><p>El producto no existe o ya no está publicado.</p><a appButton="filled" routerLink="/catalog">Volver al catálogo</a></section>
+    }
   } @else {
     <section class="loading" aria-live="polite"><span aria-hidden="true"></span><p>Cargando producto…</p></section>
   }

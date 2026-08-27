@@ -14,9 +14,9 @@ describe('TechnicalComponent filters', () => {
     customerEmail: `cliente${id}@example.com`,
     technicianId: 5,
     technicianName: 'Técnica',
-    deviceType: 'Notebook',
-    brand: 'Pina',
-    model: `P${id}`,
+    deviceType: 'Consola',
+    brand: 'Sony',
+    model: `Modelo ${id}`,
     reportedProblem: 'No enciende',
     diagnosis: null,
     estimatedPrice: null,
@@ -42,6 +42,10 @@ describe('TechnicalComponent filters', () => {
 
     const component = TestBed.createComponent(TechnicalComponent).componentInstance;
     expect(component.selected()?.id).toBe(1);
+
+    component.search.set('consola');
+    expect(component.filteredTickets().map((item) => item.id)).toEqual([1, 2]);
+    component.search.set('');
 
     component.setStatusFilter('READY_FOR_PICKUP');
 
@@ -71,6 +75,7 @@ describe('TechnicalComponent filters', () => {
     expect(fixture.nativeElement.querySelector('.technical-form app-textarea')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.technical-form app-input')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('mat-form-field')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Consola');
     expect(updateDetails).not.toHaveBeenCalled();
     expect(fixture.componentInstance.error()).toContain('iguales o mayores que cero');
   });

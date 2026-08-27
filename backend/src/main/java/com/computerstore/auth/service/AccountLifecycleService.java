@@ -40,7 +40,7 @@ public class AccountLifecycleService {
     public void startEmailVerification(UserAccount user) {
         if (user.isActive() && !user.isEmailVerified()) {
             String token = tokenService.issue(user, AccountActionPurpose.EMAIL_VERIFICATION, null);
-            emailService.sendAccountAction(user.getEmail(), AccountActionPurpose.EMAIL_VERIFICATION, token);
+            emailService.sendEmailVerification(user.getEmail(), user.getFirstName(), token);
         }
     }
 

@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, 
 import { Subscription } from 'rxjs';
 import { TicketAttachment } from '../../core/tickets/ticket-attachment.model';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
+import { AppFeedbackComponent } from '../ui/feedback/app-feedback.component';
 
 interface AttachmentPreview {
   attachment: TicketAttachment;
@@ -13,7 +14,7 @@ interface AttachmentPreview {
 
 @Component({
   selector: 'app-ticket-attachment-gallery',
-  imports: [DatePipe, DecimalPipe],
+  imports: [AppFeedbackComponent, DatePipe, DecimalPipe],
   templateUrl: './ticket-attachment-gallery.component.html',
   styleUrl: './ticket-attachment-gallery.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -12,6 +12,7 @@ import { ProfileService } from '../../core/profile/profile.service';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 
@@ -20,7 +21,7 @@ type PendingAction = 'profile' | 'email' | 'verification' | 'address' | 'delete-
 @Component({
   selector: 'app-profile',
   imports: [
-    AppBadgeDirective, AppButtonDirective, AppCardDirective, AppInputComponent, AppTextareaComponent,
+    AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppTextareaComponent,
     ReactiveFormsModule, RouterLink,
   ],
   templateUrl: './profile.component.html',
@@ -76,7 +77,7 @@ export class ProfileComponent implements OnInit {
   }
 
   savePersonal(): void {
-    if (!this.prepareForm(this.personalForm, '#personal-form', 'Revisá los datos personales marcados.')) return;
+    if (!this.prepareForm(this.personalForm, '#personal-form')) return;
     const value = this.personalForm.getRawValue();
     this.start('profile');
     this.profiles.update({
@@ -95,13 +96,12 @@ export class ProfileComponent implements OnInit {
   }
 
   requestEmailChange(): void {
-    if (!this.prepareForm(this.emailForm, '#email-form', 'Ingresá un email válido para solicitar el cambio.')) return;
+    if (!this.prepareForm(this.emailForm, '#email-form')) return;
     const email = this.emailForm.controls.email.value.trim().toLowerCase();
     if (email === this.profile()?.email.toLowerCase()) {
       this.emailForm.controls.email.setErrors({ sameEmail: true });
       this.emailForm.controls.email.markAsTouched();
-      this.notifications.error('Ingresá un email diferente del actual.');
-      this.focusFirstInvalid('#email-form');
+      queueMicrotask(() => this.focusFirstInvalid('#email-form'));
       return;
     }
     this.start('email');
@@ -112,14 +112,12 @@ export class ProfileComponent implements OnInit {
       next: () => {
         this.emailForm.reset({ email: '', currentPassword: '' });
         this.emailStatus.set('Enviamos un enlace al email nuevo. El cambio se aplicará solamente cuando lo confirmes.');
-        this.notifications.success('Revisá el email nuevo para confirmar el cambio.');
       },
       error: (response: HttpErrorResponse) => {
         if (response.status === 409) {
           const message = 'Ese email ya está asociado a otra cuenta.';
           this.emailForm.controls.email.setErrors({ ...this.emailForm.controls.email.errors, server: message });
           this.emailForm.controls.email.markAsTouched();
-          this.actionError.set(message);
           queueMicrotask(() => this.focusFirstInvalid('#email-form'));
           return;
         }
@@ -135,7 +133,6 @@ export class ProfileComponent implements OnInit {
     this.auth.requestEmailVerification(profile.email).pipe(finalize(() => this.pending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.emailStatus.set('Si la cuenta sigue pendiente, enviamos un nuevo enlace de verificación.');
-        this.notifications.success('Revisá tu email para completar la verificación.');
       },
       error: (response: HttpErrorResponse) => this.actionError.set(requestErrorMessage(response, 'No pudimos reenviar la verificación. Intentá nuevamente.')),
     });
@@ -153,7 +150,7 @@ export class ProfileComponent implements OnInit {
   }
 
   saveAddress(): void {
-    if (!this.prepareForm(this.addressForm, '#address-form', 'Revisá los campos marcados de la dirección.')) return;
+    if (!this.prepareForm(this.addressForm, '#address-form')) return;
     const value = this.addressForm.getRawValue();
     this.start('address');
     this.profiles.putAddress({
@@ -242,18 +239,17 @@ export class ProfileComponent implements OnInit {
     });
   }
 
-  private prepareForm(form: typeof this.personalForm | typeof this.emailForm | typeof this.addressForm, selector: string, message: string): boolean {
+  private prepareForm(form: typeof this.personalForm | typeof this.emailForm | typeof this.addressForm, selector: string): boolean {
     if (this.pending()) return false;
     if (form.valid) return true;
     form.markAllAsTouched();
-    this.notifications.error(message);
-    this.focusFirstInvalid(selector);
+    queueMicrotask(() => this.focusFirstInvalid(selector));
     return false;
   }
 
   private handleFormError(form: typeof this.personalForm | typeof this.emailForm | typeof this.addressForm, selector: string, response: HttpErrorResponse, fallback: string): void {
     const hasFieldErrors = applyFieldErrors(form, response);
-    this.actionError.set(requestErrorMessage(response, hasFieldErrors ? 'Revisá los campos marcados.' : fallback));
+    this.actionError.set(hasFieldErrors ? '' : requestErrorMessage(response, fallback));
     if (hasFieldErrors) queueMicrotask(() => this.focusFirstInvalid(selector));
   }
 

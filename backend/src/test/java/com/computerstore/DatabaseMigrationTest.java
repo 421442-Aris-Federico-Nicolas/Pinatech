@@ -3,11 +3,14 @@ package com.computerstore;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
@@ -165,9 +168,36 @@ class DatabaseMigrationTest {
                 SELECT is_nullable FROM information_schema.columns
                 WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'password_hash'
                 """, String.class));
-        assertEquals("19", jdbc.queryForObject(
+        assertEquals("20", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
+    }
+
+    @Test
+    void migratesLegacyPlayStationTicketsToConsola() throws IOException {
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash)
+                VALUES ('Migration', 'Test', ?, 'hash') RETURNING id
+                """, Long.class, "ticket-migration-" + UUID.randomUUID() + "@example.com");
+        Long ticketId = jdbc.queryForObject("""
+                INSERT INTO technical_service_tickets (
+                    customer_id, device_type, brand, model, reported_problem, status
+                ) VALUES (?, 'PlayStation', 'Legacy brand', 'Legacy model', 'No enciende', 'RECEIVED')
+                RETURNING id
+                """, Long.class, userId);
+        try {
+            String migration = new ClassPathResource(
+                    "db/migration/V20__rename_playstation_device_type_to_consola.sql")
+                    .getContentAsString(StandardCharsets.UTF_8);
+            jdbc.execute(migration);
+
+            assertEquals("Consola", jdbc.queryForObject(
+                    "SELECT device_type FROM technical_service_tickets WHERE id = ?",
+                    String.class, ticketId));
+        } finally {
+            jdbc.update("DELETE FROM technical_service_tickets WHERE id = ?", ticketId);
+            jdbc.update("DELETE FROM users WHERE id = ?", userId);
+        }
     }
 
     @Test

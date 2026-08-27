@@ -8,11 +8,12 @@ import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 
 @Component({
   selector: 'app-orders',
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, CurrencyPipe, DatePipe, RouterLink],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './orders.component.html',
   styleUrl: './orders.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,7 +30,7 @@ export class OrdersComponent {
   readonly loadingCapabilities = signal(false);
   readonly capabilitiesError = signal('');
   readonly payingOrder = signal<number | null>(null);
-  readonly paymentError = signal('');
+  readonly paymentError = signal<{ orderId: number; message: string } | null>(null);
   readonly estadoTono = estadoTono;
 
   constructor() {
@@ -57,18 +58,18 @@ export class OrdersComponent {
   pay(order: Order): void {
     if (!this.canPay(order) || this.payingOrder() !== null) return;
     this.payingOrder.set(order.id);
-    this.paymentError.set('');
+    this.paymentError.set(null);
     this.checkoutService.mercadoPago(order.id, order.paymentStatus).pipe(
       finalize(() => this.payingOrder.set(null)),
     ).subscribe({
       next: (payment) => {
         if (!payment.checkoutUrl.trim()) {
-          this.paymentError.set('Mercado Pago no devolvió un enlace válido. Intentá nuevamente.');
+          this.paymentError.set({ orderId: order.id, message: 'Mercado Pago no devolvió un enlace válido. Intentá nuevamente.' });
           return;
         }
         this.browserWindow.location.assign(payment.checkoutUrl);
       },
-      error: () => this.paymentError.set('No pudimos iniciar el pago. Podés reintentarlo sin duplicar el intento.'),
+      error: () => this.paymentError.set({ orderId: order.id, message: 'No pudimos iniciar el pago. Podés reintentarlo sin duplicar el intento.' }),
     });
   }
 

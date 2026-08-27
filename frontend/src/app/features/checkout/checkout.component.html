@@ -1,15 +1,15 @@
 <main>
-  @if (cart.notice()) { <p class="reconciliation-warning"><span role="status">{{ cart.notice() }}</span> <button appButton="text" type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></p> }
+  @if (cart.notice()) { <app-feedback class="reconciliation-warning" tone="warning" announce="polite">{{ cart.notice() }}<button feedback-actions appButton="text" type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></app-feedback> }
   @if (created(); as order) {
     <section appCard class="result" aria-labelledby="request-title">
       <span class="result-mark" aria-hidden="true">#{{ order.id }}</span>
-      <div class="result-status" role="status" aria-live="polite">
+      <app-feedback class="result-status" tone="success" announce="polite">
         <p class="eyebrow">Pedido registrado</p>
         <h1 id="request-title">Tu pedido #{{ order.id }} está registrado</h1>
         <p class="result-lead">El pedido se registró y se inició el proceso de pago en <span translate="no">Mercado Pago</span>. Esta pantalla no confirma un pago: consultá el estado informado por nuestro sistema.</p>
-      </div>
+      </app-feedback>
       @if (isReservationExpired(order)) {
-        <p class="expiration-warning" role="alert">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</p>
+        <app-feedback class="expiration-warning" tone="warning">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</app-feedback>
       } @else {
         <p class="reservation-status">La reserva fue informada con vigencia hasta la fecha indicada.</p>
       }
@@ -71,7 +71,7 @@
             <p class="loading" role="status">Consultando puntos de retiro…</p>
           } @else if (capabilities(); as options) {
             @if (!options.fulfillmentMethods.includes('PICKUP') || !options.pickupLocations.length) {
-              <p class="notice" role="alert">No hay un punto de retiro disponible. No es posible completar la compra en este momento.</p>
+              <app-feedback class="notice" tone="warning">No hay un punto de retiro disponible. No es posible completar la compra en este momento.</app-feedback>
             } @else {
               <div class="pickup-field">
                 <label for="pickup-location">Punto de retiro</label>
@@ -109,21 +109,17 @@
             <span>03</span>
             <div><p>Condiciones comerciales</p><h2 id="payment-title">Pago</h2></div>
           </div>
-          @if (reconciling()) {
-            <p class="loading" role="status">Verificando disponibilidad antes del pago…</p>
-          } @else if (loadingCapabilities()) {
-            <p class="loading" role="status">Consultando opciones de pago…</p>
-          } @else if (capabilities(); as options) {
+          @if (!reconciling() && !loadingCapabilities()) { @if (capabilities(); as options) {
             @if (!options.orderRequestsEnabled) {
-              <p class="notice">No se pueden iniciar pedidos en este momento.</p>
+              <app-feedback class="notice" tone="warning">No se pueden iniciar pedidos en este momento.</app-feedback>
             } @else if (options.onlinePaymentsEnabled) {
               @if (options.paymentMethods.includes('MERCADO_PAGO')) {
-                <p class="notice available">Podés pagar online de forma segura en <span translate="no">Mercado Pago</span>.</p>
+                <app-feedback class="notice available" tone="success">Podés pagar online de forma segura en <span translate="no">Mercado Pago</span>.</app-feedback>
               } @else {
-                <p class="notice"><span translate="no">Mercado Pago</span> no está disponible en este momento.</p>
+                <app-feedback class="notice" tone="warning"><span translate="no">Mercado Pago</span> no está disponible en este momento.</app-feedback>
               }
             } @else {
-              <p class="notice">Los pagos online no están disponibles en este momento.</p>
+              <app-feedback class="notice" tone="warning">Los pagos online no están disponibles en este momento.</app-feedback>
             }
             @if (options.paymentMethods.length) {
               <p class="methods"><strong>Métodos informados:</strong>
@@ -131,7 +127,7 @@
               </p>
             }
             <p class="fine-print">Ingresarás los datos de pago únicamente en <span translate="no">Mercado Pago</span>. La redirección no acredita el pago por sí sola.</p>
-          }
+          } }
         </section>
       </div>
 
@@ -144,32 +140,25 @@
         <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a <span translate="no">Mercado Pago</span>.</p>
 
         @if (!emailVerified()) {
-          <div class="verification-required" role="alert">
+          <app-feedback class="verification-required" tone="warning">
             <strong>Verificá tu email para comprar</strong>
             <p>Por seguridad, necesitás confirmar tu email antes de crear el pedido.</p>
-            <div class="verification-actions">
+            <div feedback-actions class="verification-actions">
               <button appButton="outlined" type="button" (click)="resendVerification()" [disabled]="resendingVerification()" [attr.aria-busy]="resendingVerification()">{{ resendingVerification() ? 'Reenviando…' : 'Reenviar verificación' }}</button>
               <a appButton="text" routerLink="/profile">Ir a Mi perfil</a>
             </div>
-            @if (verificationNotice()) { <p class="verification-notice" role="status">{{ verificationNotice() }}</p> }
-          </div>
+            @if (verificationNotice()) { <app-feedback class="verification-notice" tone="info" announce="polite">{{ verificationNotice() }}</app-feedback> }
+          </app-feedback>
         }
 
         @if (reconciliationError()) {
-          <div class="error" [attr.aria-busy]="reconciling()">
-            <p role="alert">{{ reconciliationError() }}</p>
-            <button appButton="outlined" type="button" (click)="reconcileCheckout()" [disabled]="reconciling()">{{ reconciling() ? 'Verificando…' : 'Reintentar verificación' }}</button>
-          </div>
+          <app-feedback class="error" tone="error" [announce]="reconciling() ? 'polite' : 'assertive'" [attr.aria-busy]="reconciling()">{{ reconciling() ? 'Volviendo a verificar la disponibilidad del carrito.' : reconciliationError() }}<button feedback-actions appButton="outlined" type="button" (click)="reconcileCheckout()" [disabled]="reconciling()">{{ reconciling() ? 'Verificando…' : 'Reintentar verificación' }}</button></app-feedback>
         } @else if (capabilitiesError()) {
-          <div class="error" [attr.aria-busy]="loadingCapabilities()">
-            <p role="alert">{{ capabilitiesError() }}</p>
-            <button appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button>
-            @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar las opciones disponibles.</p> }
-          </div>
+          <app-feedback class="error" tone="error" [announce]="loadingCapabilities() ? 'polite' : 'assertive'" [attr.aria-busy]="loadingCapabilities()">{{ loadingCapabilities() ? 'Volviendo a consultar las opciones disponibles.' : capabilitiesError() }}<button feedback-actions appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button></app-feedback>
         } @else if (capabilities() && !mercadoPagoEnabled()) {
-          <p class="error" role="alert"><span translate="no">Mercado Pago</span> no está disponible en este momento.</p>
+          <app-feedback class="error" tone="warning"><span translate="no">Mercado Pago</span> no está disponible en este momento.</app-feedback>
         } @else if (capabilities() && !pickupEnabled()) {
-          <p class="error" role="alert">No hay un punto de retiro habilitado para completar la compra.</p>
+          <app-feedback class="error" tone="warning">No hay un punto de retiro habilitado para completar la compra.</app-feedback>
         }
 
         @if (capabilities()) {
@@ -181,12 +170,10 @@
           <small>{{ !pickupAccepted() && pickupEnabled() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
         }
         @if (submitError()) {
-          <div class="submit-error" role="alert">
+          <app-feedback class="submit-error" tone="error" announce="assertive">
             <p>{{ submitError() }}</p>
-            @if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> }
-            @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> }
-            @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }
-          </div>
+             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
+          </app-feedback>
         }
       </aside>
     </div>

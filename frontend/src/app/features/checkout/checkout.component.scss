@@ -38,18 +38,8 @@ h1 {
 .page-header > a { flex: 0 0 auto; }
 
 .reconciliation-warning {
-  align-items: center;
-  background: var(--color-warning-bg);
-  border: 1px solid var(--color-warning-border);
-  border-radius: var(--radius-md);
-  color: var(--color-warning-text);
-  display: flex;
-  gap: var(--space-4);
-  justify-content: space-between;
   margin: 0 0 var(--space-5);
-  padding: .65rem var(--space-4);
 }
-.reconciliation-warning button { flex: 0 0 auto; }
 
 .checkout-layout { align-items: start; display: grid; gap: var(--space-5); grid-template-columns: minmax(0, 1fr) 340px; }
 .details { display: grid; gap: var(--space-4); }
@@ -67,8 +57,7 @@ h1 {
 .products small { color: var(--color-text-subtle); }
 .products article > span { color: var(--color-text-strong); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); white-space: nowrap; }
 
-.notice { background: var(--color-warning-bg); border-left: 3px solid var(--color-warning); color: var(--color-warning-text); line-height: 1.55; margin: 0; padding: .8rem var(--space-4); }
-.notice.available { background: var(--color-success-bg); border-color: var(--color-success); color: var(--color-success-text); }
+.notice { margin: 0; }
 .fine-print, .methods, .loading { color: var(--color-text-muted); font-size: var(--text-md); line-height: 1.55; margin: .9rem 0 0; }
 .methods strong { color: var(--color-text); }
 .product-details strong, .product-details small, .notice, .fine-print, .methods, .summary-note, .submit-error, .result-lead { overflow-wrap: anywhere; }
@@ -98,12 +87,12 @@ h1 {
 .button-spinner { animation: spin .8s linear infinite; border: 2px solid color-mix(in srgb, currentColor 45%, transparent); border-radius: 50%; border-top-color: currentColor; display: inline-block; height: 1rem; margin-right: .45rem; vertical-align: -.15rem; width: 1rem; }
 .payment-progress { margin: .7rem 0 0; }
 
-.error, .submit-error { background: var(--color-danger-bg); border: 1px solid var(--color-danger-border); color: var(--color-danger); font-size: var(--text-md); line-height: 1.45; padding: var(--space-3); }
+.error, .submit-error { font-size: var(--text-md); }
 .error p { margin: 0 0 .35rem; }
 .submit-error { margin-bottom: 0; }
 .submit-error p { margin: 0 0 var(--space-2); }
 .submit-error a { color: currentColor; font-weight: var(--font-weight-bold); }
-.verification-required { background: var(--color-warning-bg); border: 1px solid var(--color-warning-border); color: var(--color-warning-text); margin: var(--space-4) 0; padding: var(--space-4); }
+.verification-required { margin: var(--space-4) 0; }
 .verification-required p { line-height: 1.45; margin: var(--space-2) 0 var(--space-3); }
 .verification-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .verification-notice { font-size: var(--text-sm); margin-bottom: 0 !important; }
@@ -112,9 +101,8 @@ h1 {
 .empty, .result { margin: var(--space-4) auto; max-width: 780px; padding: clamp(var(--space-8), 6vw, 4.5rem); }
 .empty { text-align: center; }
 .empty p:not(.eyebrow), .result-lead { color: var(--color-text-muted); line-height: 1.6; }
-.reservation-status, .expiration-warning { font-size: .9rem; line-height: 1.55; padding: .8rem var(--space-4); }
+.reservation-status, .expiration-warning { font-size: .9rem; line-height: 1.55; }
 .reservation-status { background: var(--color-success-bg); border-left: 3px solid var(--color-success); color: var(--color-success-text); }
-.expiration-warning { background: var(--color-danger-bg); border-left: 3px solid var(--color-danger); color: var(--color-danger); }
 .result { border-top: 5px solid var(--color-cyan); position: relative; }
 .result-mark { color: var(--color-border); font-size: 8rem; font-variant-numeric: tabular-nums; font-weight: var(--font-weight-black); letter-spacing: -.08em; position: absolute; right: var(--space-4); top: -2rem; z-index: 0; }
 .result > *:not(.result-mark) { position: relative; z-index: 1; }
@@ -133,7 +121,7 @@ h1 {
 
 @media (max-width: 540px) {
   :host { min-height: calc(100dvh - 72px); }
-  .page-header, .reconciliation-warning { align-items: stretch; flex-direction: column; gap: var(--space-4); }
+  .page-header { align-items: stretch; flex-direction: column; gap: var(--space-4); }
   .products article { grid-template-columns: 40px minmax(0, 1fr); }
   .product-mark, .product-image { height: 40px; width: 40px; }
   .products article > span { grid-column: 2; }

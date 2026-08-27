@@ -81,6 +81,21 @@ class AccountLifecycleServiceTest {
     }
 
     @Test
+    void emailVerificationUsesTheUsersFirstNameAndDedicatedEmailFlow() {
+        when(user.isActive()).thenReturn(true);
+        when(user.isEmailVerified()).thenReturn(false);
+        when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getFirstName()).thenReturn("Ana");
+        when(tokens.issue(user, AccountActionPurpose.EMAIL_VERIFICATION, null)).thenReturn("raw-token");
+
+        service.startEmailVerification(user);
+
+        verify(emails).sendEmailVerification("user@example.com", "Ana", "raw-token");
+        verify(emails, never()).sendAccountAction(
+                "user@example.com", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token");
+    }
+
+    @Test
     void emailVerificationMarksTheLockedAccountAsVerified() {
         when(tokens.consume("raw-token", AccountActionPurpose.EMAIL_VERIFICATION)).thenReturn(actionToken);
         when(actionToken.getUser()).thenReturn(user);

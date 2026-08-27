@@ -11,29 +11,30 @@ class CreateTicketRequestValidationTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
-    void acceptsBrandOnlyForNotebooks() {
+    void acceptsValidConsoleNotebookAndDesktopPcDetails() {
+        assertTrue(valid("Consola", "Sony", "Modelo 5").isEmpty());
         assertTrue(valid("Notebook", "Lenovo", "ThinkPad").isEmpty());
-        assertTrue(valid("PlayStation", "", "5").isEmpty());
         assertTrue(valid("PC de escritorio", null, "").isEmpty());
     }
 
     @Test
-    void rejectsMissingNotebookBrandAndBrandsForOtherDevices() {
+    void rejectsMissingRequiredBrandsAndDesktopPcBrands() {
+        assertFalse(valid("Consola", "", "Modelo 5").isEmpty());
         assertFalse(valid("Notebook", "", "ThinkPad").isEmpty());
-        assertFalse(valid("PlayStation", "Sony", "5").isEmpty());
         assertFalse(valid("PC de escritorio", "Armada", "").isEmpty());
     }
 
     @Test
     void rejectsMissingModelsAndDesktopPcModels() {
+        assertFalse(valid("Consola", "Sony", "").isEmpty());
         assertFalse(valid("Notebook", "Lenovo", "").isEmpty());
-        assertFalse(valid("PlayStation", "", "").isEmpty());
         assertFalse(valid("PC de escritorio", "", "Armada").isEmpty());
     }
 
     @Test
     void rejectsUnsupportedDeviceTypes() {
         assertFalse(valid("Tablet", "", "Modelo").isEmpty());
+        assertFalse(valid("PlayStation", "Sony", "Modelo 5").isEmpty());
     }
 
     private java.util.Set<jakarta.validation.ConstraintViolation<CreateTicketRequest>> valid(String deviceType, String brand, String model) {

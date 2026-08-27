@@ -7,9 +7,9 @@ import { finalize } from 'rxjs';
 import { requestErrorMessage } from '../../core/api/problem-detail';
 import { consumeActionToken } from '../../core/auth/action-token';
 import { AuthService } from '../../core/auth/auth.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 
 const matchPasswords: ValidatorFn = (control: AbstractControl): ValidationErrors | null =>
@@ -17,7 +17,7 @@ const matchPasswords: ValidatorFn = (control: AbstractControl): ValidationErrors
 
 @Component({
   selector: 'app-reset-password',
-  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, ReactiveFormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, ReactiveFormsModule, RouterLink],
   templateUrl: './reset-password.component.html',
   styleUrl: '../auth/auth.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,7 +26,6 @@ export class ResetPasswordComponent {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
   readonly token = consumeActionToken();
   readonly form = this.fb.group({
@@ -41,9 +40,8 @@ export class ResetPasswordComponent {
     if (!this.token || this.submitting()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notifications.error('Revisá las contraseñas marcadas antes de continuar.');
       const name = this.form.hasError('passwordsMismatch') ? 'confirmPassword' : 'password';
-      this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${name}"] input`)?.focus();
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLInputElement>(`[formControlName="${name}"] input`)?.focus());
       return;
     }
     this.error.set('');
@@ -55,7 +53,6 @@ export class ResetPasswordComponent {
       next: () => {
         this.auth.clearSession();
         this.completed.set(true);
-        this.notifications.success('Tu contraseña se actualizó.');
       },
       error: (response: HttpErrorResponse) => this.error.set(requestErrorMessage(response, 'El enlace no es válido o venció. Solicitá uno nuevo.')),
     });

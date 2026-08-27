@@ -7,6 +7,7 @@ import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth.service';
+import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 
 registerLocaleData(localeEsAr);
@@ -18,6 +19,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
     provideAppInitializer(() => inject(AuthService).restoreSession()),
+    provideAppInitializer(() => inject(DeploymentVersionService).initialize()),
     { provide: LOCALE_ID, useValue: 'es-AR' },
   ]
 };

@@ -22,7 +22,7 @@
       <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock()" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
     </header>
 
-    @if (error()) { <p class="message page-message error" role="alert">{{ error() }}</p> }
+    @if (error()) { <app-feedback class="page-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
     @if (loading()) { <section class="loading-state" role="status" aria-live="polite"><span aria-hidden="true"></span><p>Sincronizando operación…</p></section> }
 
     @if (!loading() && section() === 'overview') {
