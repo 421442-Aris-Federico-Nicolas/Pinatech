@@ -11,7 +11,7 @@
 .skip-link:focus-visible { top:1rem; }
 
 .route-progress { background: var(--color-orange); height: 3px; left: 0; opacity: 0; pointer-events: none; position: fixed; top: 0; transform: scaleX(0); transform-origin: left; width: 100%; z-index: 1001; }
-.route-progress.active { animation: route-progress 1s ease-in-out infinite alternate; opacity: 1; }
+.route-progress.active { animation: route-progress 1s linear infinite alternate; opacity: 1; }
 @keyframes route-progress { from { transform: scaleX(.12); } to { transform: scaleX(.82); } }
 
 .app-overlays {
@@ -42,7 +42,6 @@
 .app-notification {
   --notification-accent: var(--color-cyan);
   align-items: start;
-  animation: notification-in 200ms cubic-bezier(.2, .8, .3, 1) both;
   background: var(--color-info-bg);
   border: 1px solid var(--color-info-border);
   border-radius: var(--radius-lg);
@@ -52,12 +51,20 @@
   gap: var(--space-3);
   grid-template-columns: auto minmax(0, 1fr) auto;
   overflow: hidden;
+  opacity: 1;
   padding: var(--space-4);
   pointer-events: auto;
   position: relative;
+  transform: translateY(0) scale(1);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
   width: 100%;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-.5rem) scale(.98);
+  }
 }
-.app-notification.is-exiting { animation: notification-out 180ms ease-in both; pointer-events: none; }
+.app-notification.is-exiting { opacity: 0; pointer-events: none; transform: translateY(-.35rem) scale(.98); transition-duration: 180ms; transition-timing-function: var(--ease-out); }
 .notification-icon { align-items: center; background: color-mix(in srgb, var(--notification-accent) 14%, transparent); border-radius: var(--radius-md); color: var(--notification-accent); display: inline-flex; font-size: 1.4rem; height: 2.5rem; justify-content: center; width: 2.5rem; }
 .notification-body { display: grid; gap: var(--space-1); min-width: 0; padding-top: .1rem; }
 .notification-announcement { display: grid; gap: var(--space-1); min-width: 0; }
@@ -67,15 +74,16 @@
 .app-notification button:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 .app-notification .notification-action { justify-self: start; margin-top: var(--space-2); }
 .app-notification .notification-close { align-items: center; background: transparent; border-color: transparent; display: inline-flex; font-size: 1.25rem; justify-content: center; margin: calc(var(--space-2) * -1); padding: 0; width: var(--control-min-height); }
-.notification-progress { background: color-mix(in srgb, var(--notification-accent) 16%, transparent); bottom: 0; height: 3px; left: 0; overflow: hidden; position: absolute; right: 0; }
-.notification-progress span { animation: notification-progress var(--notification-duration) linear forwards; background: var(--notification-accent); display: block; height: 100%; transform-origin: left; width: 100%; }
-.app-notification.is-paused .notification-progress span { animation-play-state: paused; }
 .app-notification[data-tone="success"] { --notification-accent: var(--color-success); background: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
 .app-notification[data-tone="warning"] { --notification-accent: var(--color-warning); background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
 .app-notification[data-tone="error"] { --notification-accent: var(--color-danger); background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
-@keyframes notification-in { from { opacity: 0; transform: translateY(-.5rem) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes notification-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-.35rem); } }
-@keyframes notification-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+:is(.deployment-update button, .app-notification button, .menu-toggle, nav button[mat-button]) {
+  transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out);
+}
+:is(.deployment-update button, .app-notification button, .menu-toggle, nav button[mat-button]):active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(.97);
+}
 
 header { position: sticky; top: 0; z-index: 100; }
 
@@ -202,8 +210,8 @@ nav { align-items:center; display:flex; flex:1; gap:.15rem; }
   .brand { margin-right:auto; }
   .brand-mark { height:56px; width:56px; }
   .menu-toggle { display:inline-flex; }
-  nav { align-items:stretch; background:var(--pin-navy-deep); border-bottom:2px solid var(--pin-orange); display:none; flex-direction:column; left:0; max-block-size:calc(100dvh - 72px); overflow-y:auto; overscroll-behavior:contain; padding:1rem max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left)); position:absolute; right:0; top:100%; }
-  nav.open { display:flex; }
+  nav { align-items:stretch; background:var(--pin-navy-deep); border-bottom:2px solid var(--pin-orange); display:flex; flex-direction:column; left:0; max-block-size:calc(100dvh - 72px); opacity:0; overflow-y:auto; overscroll-behavior:contain; padding:1rem max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left)); pointer-events:none; position:absolute; right:0; top:100%; transform:translateY(-1rem); transition:transform 180ms var(--ease-out), opacity 160ms var(--ease-out), visibility 0s linear 180ms; visibility:hidden; }
+  nav.open { opacity:1; pointer-events:auto; transform:translateY(0); transition:transform 240ms var(--ease-drawer), opacity 180ms var(--ease-out), visibility 0s linear 0s; visibility:visible; }
   .nav-link { padding:.8rem; }
   .spacer { display:none; }
 }
@@ -219,6 +227,16 @@ nav { align-items:center; display:flex; flex:1; gap:.15rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .route-progress.active { animation: none; transform: scaleX(.75); }
-  .app-notification, .app-notification.is-exiting { animation-duration: .01ms; transform: none; }
-  .notification-progress span { animation-timing-function: steps(20, end); }
+  .app-notification { transform: none; transition: opacity 200ms var(--ease-out); }
+  .app-notification.is-exiting { transform: none; transition: opacity 180ms var(--ease-out); }
+  :is(.deployment-update button, .app-notification button, .menu-toggle, nav button[mat-button]):active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; }
+
+  @starting-style {
+    .app-notification { opacity: 0; transform: none; }
+  }
+
+  @media (max-width: 960px) {
+    nav { transform:none; transition:opacity 200ms var(--ease-out), visibility 0s linear 200ms; }
+    nav.open { transform:none; transition:opacity 200ms var(--ease-out), visibility 0s linear 0s; }
+  }
 }

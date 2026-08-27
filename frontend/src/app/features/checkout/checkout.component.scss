@@ -103,9 +103,20 @@ h1 {
 .empty p:not(.eyebrow), .result-lead { color: var(--color-text-muted); line-height: 1.6; }
 .reservation-status, .expiration-warning { font-size: .9rem; line-height: 1.55; }
 .reservation-status { background: var(--color-success-bg); border-left: 3px solid var(--color-success); color: var(--color-success-text); }
-.result { border-top: 5px solid var(--color-cyan); position: relative; }
-.result-mark { color: var(--color-border); font-size: 8rem; font-variant-numeric: tabular-nums; font-weight: var(--font-weight-black); letter-spacing: -.08em; position: absolute; right: var(--space-4); top: -2rem; z-index: 0; }
+.result {
+  border-top: 5px solid var(--color-cyan);
+  opacity: 1;
+  position: relative;
+  transform: scale(1);
+  transform-origin: center;
+  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+}
+.result-mark { color: var(--color-border); font-size: 8rem; font-variant-numeric: tabular-nums; font-weight: var(--font-weight-black); letter-spacing: -.08em; opacity: 1; position: absolute; right: var(--space-4); top: -2rem; transform: translateY(0); transition: opacity 200ms var(--ease-out) 50ms, transform 200ms var(--ease-out) 50ms; z-index: 0; }
 .result > *:not(.result-mark) { position: relative; z-index: 1; }
+@starting-style {
+  .result { opacity: 0; transform: scale(.97); }
+  .result-mark { opacity: 0; transform: translateY(-.5rem); }
+}
 .result h1 { max-width: 620px; }
 .result dl { border-block: 1px solid var(--color-border); display: grid; grid-template-columns: 1fr 1fr; margin: var(--space-8) 0; }
 .result dl div { padding: var(--space-4) 0; }
@@ -131,4 +142,12 @@ h1 {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .button-spinner { animation: none; }
+  .result { transform: none; transition: opacity 200ms var(--ease-out); }
+  .result-mark { transform: none; transition: opacity 200ms var(--ease-out); }
+  @starting-style {
+    .result { opacity: 0; transform: none; }
+    .result-mark { opacity: 0; transform: none; }
+  }
+}

@@ -77,13 +77,15 @@ article {
   display: flex;
   overflow: hidden;
 }
-.quantity button { background: transparent; border: 0; color: var(--color-text); cursor: pointer; font: inherit; font-size: 1.2rem; height: var(--control-min-height); touch-action: manipulation; width: var(--control-min-height); }
+.quantity button { background: transparent; border: 0; color: var(--color-text); cursor: pointer; font: inherit; font-size: 1.2rem; height: var(--control-min-height); touch-action: manipulation; transition: background-color var(--duration-press) var(--ease-out), color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: var(--control-min-height); }
 .quantity button:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-cyan); }
 .quantity button:disabled { cursor: not-allowed; opacity: .4; }
+.quantity button:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(.97); }
 .quantity span { min-width: 28px; text-align: center; }
 .subtotal { color: var(--color-text-strong); font-size: var(--text-md); text-align: right; }
 .remove, .clear { min-height: var(--control-min-height); }
 .clear { margin: var(--space-4) 0; }
+.cart-motion-ghost { overflow: hidden; }
 
 .summary { padding: var(--space-6); position: sticky; top: 110px; }
 .summary h2 { margin-top: 0; }
@@ -124,5 +126,5 @@ article {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .quantity button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; }
 }

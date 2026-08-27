@@ -96,7 +96,7 @@ describe('NotificationService', () => {
     expect(service.notification()).toEqual(expect.objectContaining({ id: currentId, exiting: true }));
   });
 
-  it('ignores a stale exit callback after a notification is replaced', () => {
+  it('cancels a stale exit when replaced and gives the replacement its full duration', () => {
     const service = TestBed.inject(NotificationService);
     service.show('Anterior');
     const staleId = service.notification()!.id;
@@ -108,6 +108,78 @@ describe('NotificationService', () => {
     vi.advanceTimersByTime(80);
 
     expect(service.notification()).toEqual(expect.objectContaining({ id: currentId, exiting: false }));
+    vi.advanceTimersByTime(919);
+    expect(service.notification()?.exiting).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(service.notification()?.exiting).toBe(true);
+  });
+
+  it('preserves focus pause when an exiting notification is replaced', () => {
+    const service = TestBed.inject(NotificationService);
+    service.show('Anterior', { duration: 1000 });
+    const previousId = service.notification()!.id;
+    service.pause(previousId, 'focus');
+    service.dismiss(previousId);
+
+    service.show('Actual', { action: 'Continuar', duration: 1200 });
+    const currentId = service.notification()!.id;
+    expect(service.notification()).toEqual(expect.objectContaining({ id: currentId, paused: true, exiting: false }));
+    vi.advanceTimersByTime(2000);
+    expect(service.notification()?.exiting).toBe(false);
+
+    service.resume(currentId, 'focus');
+    vi.advanceTimersByTime(1199);
+    expect(service.notification()?.exiting).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(service.notification()?.exiting).toBe(true);
+  });
+
+  it('preserves active pointer and focus pauses across replacement and starts a full timer after both clear', () => {
+    const service = TestBed.inject(NotificationService);
+    service.show('Anterior', { duration: 1000 });
+    const previousId = service.notification()!.id;
+    vi.advanceTimersByTime(400);
+    service.pause(previousId, 'pointer');
+    service.pause(previousId, 'focus');
+
+    service.show('Actual', { duration: 1200 });
+    const currentId = service.notification()!.id;
+    expect(service.notification()).toEqual(expect.objectContaining({ id: currentId, paused: true, exiting: false }));
+
+    service.resume(currentId, 'pointer');
+    vi.advanceTimersByTime(2000);
+    expect(service.notification()).toEqual(expect.objectContaining({ id: currentId, paused: true, exiting: false }));
+
+    service.resume(currentId, 'focus');
+    expect(service.notification()?.paused).toBe(false);
+    vi.advanceTimersByTime(1199);
+    expect(service.notification()?.exiting).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(service.notification()?.exiting).toBe(true);
+  });
+
+  it('completes the old action while preserving focus for the replacement action', () => {
+    const service = TestBed.inject(NotificationService);
+    const previousAction = vi.fn();
+    const previousComplete = vi.fn();
+    service.show('Anterior', { action: 'Abrir', duration: 1000 }).onAction().subscribe({
+      next: previousAction,
+      complete: previousComplete,
+    });
+    const previousId = service.notification()!.id;
+    service.pause(previousId, 'focus');
+
+    const replacementAction = vi.fn();
+    service.show('Actual', { action: 'Continuar', duration: 1000 }).onAction().subscribe(replacementAction);
+    const currentId = service.notification()!.id;
+    expect(previousAction).not.toHaveBeenCalled();
+    expect(previousComplete).toHaveBeenCalledOnce();
+    expect(service.notification()?.paused).toBe(true);
+
+    service.resume(currentId, 'focus');
+    service.activate(currentId);
+    expect(replacementAction).toHaveBeenCalledOnce();
+    expect(service.notification()?.exiting).toBe(true);
   });
 
   it('pauses the remaining timeout until all overlapping reasons resume', () => {

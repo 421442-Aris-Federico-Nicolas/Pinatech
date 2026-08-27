@@ -13,10 +13,7 @@
     } @else if (order(); as currentOrder) {
       @switch (result(currentOrder)) {
         @case ('approved') {
-          <app-feedback class="state approved" tone="success" announce="polite">
-            <h1>Pago aprobado</h1>
-            <p>Nuestro servidor confirmó la acreditación del pedido #{{ currentOrder.id }}.</p>
-          </app-feedback>
+          <app-pinatech-sale-success title="Pago aprobado" message="Nuestro servidor confirmó la acreditación del pago." [orderNumber]="currentOrder.id" />
         }
         @case ('refunded') {
           <app-feedback class="state refunded" tone="info" announce="polite">
@@ -45,8 +42,8 @@
         }
       }
 
-      <dl>
-        <div><dt>Pedido</dt><dd>#{{ currentOrder.id }}</dd></div>
+      <dl [class.single-detail]="result(currentOrder) === 'approved'">
+        @if (result(currentOrder) !== 'approved') { <div><dt>Pedido</dt><dd>#{{ currentOrder.id }}</dd></div> }
         <div><dt>Total</dt><dd>{{ currentOrder.total | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
       </dl>
     } @else {

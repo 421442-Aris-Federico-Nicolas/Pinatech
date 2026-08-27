@@ -15,15 +15,17 @@ main { margin: auto; max-width: 1320px; padding: var(--space-8) clamp(var(--spac
 .carousel:focus-visible { border-radius: var(--radius-lg); outline: var(--focus-outline); outline-offset: 4px; }
 .carousel-stage { align-items: center; background: var(--color-bg-deep); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); display: flex; height: clamp(360px, 45vw, 560px); justify-content: center; margin: 0; overflow: hidden; position: relative; }
 .carousel-stage > img { display: block; height: 100%; object-fit: contain; width: 100%; }
-.carousel-control { align-items: center; background: var(--overlay-soft); border: 1px solid var(--color-border-strong); border-radius: 50%; color: var(--color-text-strong); cursor: pointer; display: flex; font-size: 2rem; height: var(--control-min-height); justify-content: center; position: absolute; top: 50%; transform: translateY(-50%); width: var(--control-min-height); }
+.carousel-control { align-items: center; background: var(--overlay-soft); border: 1px solid var(--color-border-strong); border-radius: 50%; color: var(--color-text-strong); cursor: pointer; display: flex; font-size: 2rem; height: var(--control-min-height); justify-content: center; position: absolute; top: 50%; transform: translateY(-50%); transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: var(--control-min-height); }
 .carousel-control:hover { background: var(--color-surface-hover); border-color: var(--color-cyan); }
+.carousel-control:active:not(:disabled):not([aria-disabled="true"]) { transform: translateY(-50%) scale(.97); }
 .carousel-control.previous { left: var(--space-4); }
 .carousel-control.next { right: var(--space-4); }
 .carousel-counter { background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); bottom: .8rem; color: var(--color-text); font-size: var(--text-xs); font-weight: var(--font-weight-bold); padding: .35rem .6rem; position: absolute; right: .8rem; }
 .carousel-thumbnails { display: flex; gap: .6rem; overflow-x: auto; padding: .15rem; }
-.carousel-thumbnails button { background: var(--color-surface); border: 2px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; flex: 0 0 82px; height: 66px; overflow: hidden; padding: 0; }
+.carousel-thumbnails button { background: var(--color-surface); border: 2px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; flex: 0 0 82px; height: 66px; overflow: hidden; padding: 0; transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); }
 .carousel-thumbnails button:hover, .carousel-thumbnails button.active { border-color: var(--color-cyan); }
 .carousel-thumbnails button.active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-cyan) 18%, transparent); }
+.carousel-thumbnails button:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(.97); }
 .carousel-thumbnails img { display: block; height: 100%; object-fit: cover; width: 100%; }
 
 .section-kicker { color: var(--color-cyan); font-size: var(--text-xs); font-weight: var(--font-weight-black); letter-spacing: .12em; margin: var(--space-6) 0 var(--space-2); text-transform: uppercase; }
@@ -100,4 +102,4 @@ h1 { font-size: clamp(1.75rem, 3vw, 2.65rem); font-weight: var(--font-weight-med
 @media (max-width: 900px) { .product { grid-template-columns: 1fr; } .visual { min-height: 420px; } }
 @media (max-width: 700px) { .characteristic-highlights, .characteristic-groups { grid-template-columns: 1fr; } .characteristic-groups dl > div { grid-template-columns: 1fr; } .characteristic-groups dd { font-weight: var(--font-weight-bold); } }
 @media (max-width: 600px) { :host { min-height: calc(100dvh - 72px); } .carousel-stage { height: 340px; } .carousel-control.previous { left: .6rem; } .carousel-control.next { right: .6rem; } .purchase { align-items: stretch; flex-direction: column; } .quantity { justify-content: space-between; } }
-@media (prefers-reduced-motion: reduce) { .loading span { animation: none; } *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+@media (prefers-reduced-motion: reduce) { .loading span { animation: none; } .carousel-control:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: translateY(-50%) !important; } .carousel-thumbnails button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; } }

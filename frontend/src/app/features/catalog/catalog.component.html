@@ -1,7 +1,7 @@
 <main>
   <header class="catalog-header">
     <div><p class="eyebrow">Pinatech hardware</p><h1>Catálogo</h1></div>
-    @if (page(); as result) { <p [attr.role]="resultsAnnounce() ? 'status' : null" [attr.aria-live]="resultsAnnounce() ? 'polite' : null" aria-atomic="true">{{ result.totalElements }} {{ result.totalElements === 1 ? 'producto' : 'productos' }}</p> }
+    @if (page(); as result) { <p [attr.role]="resultsAnnounce() && result.totalElements > 0 ? 'status' : null" [attr.aria-live]="resultsAnnounce() && result.totalElements > 0 ? 'polite' : null" [attr.aria-atomic]="resultsAnnounce() && result.totalElements > 0 ? 'true' : null">{{ result.totalElements }} {{ result.totalElements === 1 ? 'producto' : 'productos' }}</p> }
   </header>
 
   <div class="toolbar">
@@ -40,7 +40,7 @@
            }
          </ul>
       } @else {
-         <section appCard class="state"><h2>No encontramos productos</h2><p>Probá con otros términos o quitá los filtros actuales.</p><button appButton="filled" type="button" (click)="clearFilters()">Limpiar filtros</button></section>
+         <app-pinatech-empty-state appCard><button appButton="filled" type="button" (click)="clearFilters()">Limpiar filtros</button></app-pinatech-empty-state>
       }
     </div>
   </section>

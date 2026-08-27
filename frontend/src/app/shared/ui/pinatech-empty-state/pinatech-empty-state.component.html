@@ -1,0 +1,16 @@
+<section class="empty-state" role="status" aria-live="polite" aria-atomic="true">
+  <div class="mascot-stage" [class.is-ready]="spriteReady()" aria-hidden="true">
+    <img #spritePreload class="sprite-preload" src="/pinatech-not-found-sprite.png" alt="" width="2176" height="286" (load)="markSpriteReady()">
+    <span class="drop drop--one"></span>
+    <span class="drop drop--two"></span>
+    <div class="mascot"></div>
+    <span class="mascot-shadow"></span>
+  </div>
+
+  <div class="copy">
+    <h2>{{ title() }}</h2>
+    <p>{{ message() }}</p>
+  </div>
+
+  <ng-content />
+</section>
