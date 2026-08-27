@@ -6,6 +6,7 @@ import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 import { OrdersComponent } from './orders.component';
 
 describe('OrdersComponent', () => {
+  const pickupLocation = { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' };
   const order: Order = {
     id: 42,
     status: 'PENDING_PAYMENT',
@@ -14,6 +15,8 @@ describe('OrdersComponent', () => {
     currency: 'ARS',
     paymentMethod: null,
     deliveryMethod: null,
+    fulfillmentMethod: 'PICKUP',
+    pickupLocation,
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
@@ -38,7 +41,10 @@ describe('OrdersComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Pendiente de pago');
     expect(fixture.nativeElement.textContent).toContain('Preparación pendiente');
     expect(fixture.nativeElement.textContent).toContain('Reserva vigente hasta');
-    expect(fixture.nativeElement.textContent).toContain('A definir');
+    expect(fixture.nativeElement.textContent).toContain('Retiro');
+    expect(fixture.nativeElement.textContent).toContain('Pinatech Centro');
+    expect(fixture.nativeElement.textContent).toContain('Av. Colón 123');
+    expect(fixture.nativeElement.textContent).toContain('Lunes a viernes de 9 a 18.');
     expect(fixture.nativeElement.querySelector('.orders')?.tagName).toBe('OL');
     expect(fixture.nativeElement.querySelector('.items')?.tagName).toBe('UL');
     expect(fixture.nativeElement.querySelector('.badges')?.tagName).toBe('UL');
@@ -71,7 +77,7 @@ describe('OrdersComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.state [role="status"]')?.textContent).toContain('Volviendo a cargar');
+    expect(fixture.nativeElement.querySelector('.state .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a cargar');
   });
 
   it('explains when an expired reservation can no longer be paid', async () => {
@@ -119,7 +125,7 @@ describe('OrdersComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.capability-error [role="status"]')?.textContent).toContain('Volviendo a consultar');
+    expect(fixture.nativeElement.querySelector('.capability-error .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a consultar');
 
     retry.next({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] });
     retry.complete();

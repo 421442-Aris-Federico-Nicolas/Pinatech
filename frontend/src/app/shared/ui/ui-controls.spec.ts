@@ -21,10 +21,10 @@ import { AppTextareaComponent } from './textarea/app-textarea.component';
   ],
   template: `
     <form [formGroup]="form">
-      <app-input label="Nombre" formControlName="name" spellcheck="false" />
-      <app-select label="Opción" formControlName="choice" [options]="options" />
+      <app-input label="Nombre" formControlName="name" spellcheck="false" error="Nombre requerido" />
+      <app-select label="Opción" formControlName="choice" [options]="options" error="Opción requerida" />
     </form>
-    <app-textarea label="Notas" autocomplete="off" spellcheck="true" [(ngModel)]="notes" [ngModelOptions]="{ standalone: true }" />
+    <app-textarea label="Notas" autocomplete="off" spellcheck="true" error="Notas requeridas" [(ngModel)]="notes" [ngModelOptions]="{ standalone: true }" />
     <article appCard><span appBadge="warning">Pendiente</span><button appButton="outlined">Acción</button></article>
   `,
 })
@@ -57,6 +57,9 @@ describe('shared UI controls', () => {
     expect(textarea.value).toBe('Inicial');
     expect(textarea.autocomplete).toBe('off');
     expect(textarea.getAttribute('spellcheck')).toBe('true');
+    expect(fixture.nativeElement.querySelectorAll('.app-field__error[role="alert"]').length).toBe(0);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toContain('error');
 
     (fixture.nativeElement.querySelector('app-input') as HTMLElement).focus();
     expect(document.activeElement).toBe(input);

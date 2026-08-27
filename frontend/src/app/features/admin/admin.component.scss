@@ -193,24 +193,7 @@ main {
   gap: 0.4rem;
   padding: 0.7rem 1rem;
 }
-.message {
-  border: 1px solid;
-  border-radius: 10px;
-  margin: 0 auto 1rem;
-  max-width: 1500px;
-  padding: 0.8rem 1rem;
-}
-.page-message { position: sticky; top: 7rem; z-index: 10; }
-.message.error {
-  background: #35151e;
-  border-color: #843046;
-  color: #fecdd3;
-}
-.message.success {
-  background: #082c3a;
-  border-color: #176378;
-  color: #b8f3ff;
-}
+.page-message { margin: 0 auto 1rem; max-width: 1500px; position: sticky; top: 7rem; z-index: 10; }
 .loading-state {
   display: grid;
   gap: 1rem;

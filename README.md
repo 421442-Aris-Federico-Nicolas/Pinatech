@@ -56,7 +56,9 @@ El backend es un monolito modular. Cada capacidad agrupa sus controladores, serv
 ```text
 backend/src/main/java/com/computerstore/
 ├── auth/        # Inicio, renovacion y cierre de sesion
+├── profile/     # Perfil, direccion y cambios sensibles de cuenta
 ├── user/        # Usuarios y roles
+├── email/       # Verificacion, recuperacion y correo transaccional
 ├── catalog/     # Productos, categorias, marcas, variantes e imagenes
 ├── inventory/   # Stock disponible, reservas y movimientos
 ├── order/       # Pedidos, vencimientos y transiciones de estado
@@ -86,7 +88,9 @@ Los controladores exponen DTOs y no entidades JPA. Los servicios delimitan las o
 
 ### Identidad y seguridad
 
-Spring Security protege los recursos de la API. Los access tokens JWT de corta duracion se mantienen en memoria en el frontend. La renovacion usa refresh tokens rotativos enviados mediante cookies `HttpOnly`; en persistencia solo se conservan sus hashes.
+Spring Security protege los recursos de la API. Los access tokens JWT de corta duracion se mantienen en memoria en el frontend. La renovacion usa refresh tokens rotativos enviados mediante cookies `HttpOnly`; en persistencia solo se conservan sus hashes. Los cambios de email y contrasena invalidan todas las sesiones mediante una version por cuenta.
+
+La verificacion de email, recuperacion de contrasena y confirmacion de cambios usan tokens aleatorios de un solo uso almacenados solamente como hash.
 
 Los roles principales son cliente, tecnico y administrador. La API aplica autorizacion por endpoint y por propiedad del recurso.
 

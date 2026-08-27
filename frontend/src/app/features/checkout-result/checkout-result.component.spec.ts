@@ -13,6 +13,8 @@ describe('CheckoutResultComponent', () => {
     currency: 'ARS',
     paymentMethod: 'MERCADO_PAGO',
     deliveryMethod: null,
+    fulfillmentMethod: 'PICKUP',
+    pickupLocation: { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' },
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
@@ -44,7 +46,7 @@ describe('CheckoutResultComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Pago aprobado');
     expect(fixture.nativeElement.querySelector('.result-card')?.classList).toContain('app-card');
     expect(fixture.nativeElement.querySelector('.actions a')?.classList).toContain('app-button');
-    expect(fixture.nativeElement.querySelector('.state[role="status"]')?.querySelector('button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.state .app-feedback__body[role="status"]')?.querySelector('button')).toBeNull();
     expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Mercado Pago');
     fixture.destroy();
   });
@@ -71,7 +73,10 @@ describe('CheckoutResultComponent', () => {
     const retry = [...fixture.nativeElement.querySelectorAll('button')]
       .find((button: HTMLButtonElement) => button.textContent?.includes('Volver a verificar el pago'));
     expect(retry).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('.state[role="status"]')?.contains(retry)).toBe(false);
+    const announcement = fixture.nativeElement.querySelector('.state .app-feedback__body[role="status"]') as HTMLElement;
+    expect(announcement).toBeTruthy();
+    expect(announcement.contains(retry as Node)).toBe(false);
+    expect(announcement.closest('.state')?.contains(retry as Node)).toBe(true);
 
     (retry as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -99,7 +104,7 @@ describe('CheckoutResultComponent', () => {
     const fixture = TestBed.createComponent(CheckoutResultComponent);
     vi.advanceTimersByTime(0);
     fixture.detectChanges();
-    const retryButton = fixture.nativeElement.querySelector('.result-card > button') as HTMLButtonElement;
+    const retryButton = fixture.nativeElement.querySelector('.result-card app-feedback button') as HTMLButtonElement;
 
     retryButton.click();
     vi.advanceTimersByTime(0);
@@ -108,7 +113,7 @@ describe('CheckoutResultComponent', () => {
     expect(retryButton.isConnected).toBe(true);
     expect(retryButton.disabled).toBe(true);
     expect(retryButton.getAttribute('aria-busy')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.result-card > [role="status"]')?.textContent).toContain('Volviendo a verificar');
+    expect(fixture.nativeElement.querySelector('.result-card > app-feedback .app-feedback__body[role="status"]')?.textContent).toContain('Volviendo a verificar');
     fixture.destroy();
   });
 });

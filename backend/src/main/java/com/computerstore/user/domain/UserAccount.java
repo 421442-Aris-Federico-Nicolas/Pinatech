@@ -31,7 +31,7 @@ public class UserAccount {
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
-    @Column(nullable = false, unique = true, length = 254)
+    @Column(nullable = false, length = 254)
     private String email;
 
     @Column(name = "password_hash", nullable = false, length = 255)
@@ -42,6 +42,12 @@ public class UserAccount {
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "session_version", nullable = false)
+    private long sessionVersion;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -84,6 +90,34 @@ public class UserAccount {
         roles.add(role);
     }
 
+    public void updateProfile(String firstName, String lastName, String phone) {
+        if (firstName != null) {
+            this.firstName = firstName;
+        }
+        if (lastName != null) {
+            this.lastName = lastName;
+        }
+        if (phone != null) {
+            this.phone = phone.isBlank() ? null : phone;
+        }
+    }
+
+    public void changeEmail(String email) {
+        this.email = email;
+    }
+
+    public void markEmailVerified() {
+        emailVerifiedAt = Instant.now();
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void incrementSessionVersion() {
+        sessionVersion++;
+    }
+
     public Long getId() { return id; }
     public String getFirstName() { return firstName; }
     public String getLastName() { return lastName; }
@@ -91,5 +125,8 @@ public class UserAccount {
     public String getPasswordHash() { return passwordHash; }
     public String getPhone() { return phone; }
     public boolean isActive() { return active; }
+    public boolean isEmailVerified() { return emailVerifiedAt != null; }
+    public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
+    public long getSessionVersion() { return sessionVersion; }
     public Set<Role> getRoles() { return Set.copyOf(roles); }
 }

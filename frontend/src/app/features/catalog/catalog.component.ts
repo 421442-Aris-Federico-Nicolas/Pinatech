@@ -7,6 +7,7 @@ import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
+import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
 import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product, ProductVariant } from './catalog.service';
@@ -14,7 +15,7 @@ import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Pro
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
 @Component({
-  imports: [AppButtonDirective, AppCardDirective, AppInputComponent, AppProductCardComponent, FormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppProductCardComponent, FormsModule, RouterLink],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',
@@ -41,6 +42,7 @@ export class CatalogComponent {
   readonly optionsError = signal(false);
   readonly filtersOpen = signal(false);
   readonly priceError = signal('');
+  readonly resultsAnnounce = signal(false);
 
   constructor() {
     this.loadOptions();
@@ -58,6 +60,7 @@ export class CatalogComponent {
 
   applyFilters(page = 1, replaceUrl = false): void {
     if (!this.validatePrices()) return;
+    this.resultsAnnounce.set(true);
     const queryParams: Record<string, string | number> = {};
     const search = this.filters.search.trim();
     if (search) queryParams['search'] = search;

@@ -24,11 +24,7 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
 .local-previews button, .selected-files button { background: transparent; border: 0; color: var(--color-danger); cursor: pointer; font: inherit; font-size: var(--text-xs); min-height: var(--control-min-height); padding: 0; text-align: left; touch-action: manipulation; }
 .local-previews button:disabled, .selected-files button:disabled { cursor: not-allowed; opacity: .5; }
 
-.message { border-left: 3px solid; margin: var(--space-4) 0 0; padding: var(--space-3); }
-.message.error, .list-error { background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
-.message.success, .ticket-message { background: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
-.message.warning, .ticket-message.warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
-.ticket-message.error { background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
+.request-feedback { margin-top: var(--space-4); }
 .tickets-panel > header { align-items: start; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; margin-bottom: var(--space-4); padding-bottom: var(--space-4); }
 .ticket-card { border-left: 3px solid var(--color-cyan-strong); margin-bottom: var(--space-3); overflow: visible; padding: var(--space-4); }
 .ticket-card > header { align-items: start; display: flex; gap: var(--space-4); justify-content: space-between; }
@@ -40,10 +36,8 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
 .selected-files { display: grid; flex-basis: 100%; gap: var(--space-2); }
 .selected-files span { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); display: flex; gap: var(--space-3); justify-content: space-between; overflow-wrap: anywhere; padding: var(--space-2) var(--space-3); }
 .ticket-upload > .app-button { margin-left: auto; }
-.ticket-message { border-left: 3px solid; margin: var(--space-3) 0 0; overflow-wrap: anywhere; padding: .65rem .8rem; }
+.ticket-message { margin-top: var(--space-3); }
 .ticket-card app-ticket-attachment-gallery { display: block; margin-top: var(--space-4); }
-.list-error { border: 1px solid var(--color-danger-border); display: grid; justify-items: start; overflow-wrap: anywhere; padding: var(--space-4); }
-.list-error p { margin-top: 0; }
 .empty { color: var(--color-text-subtle); min-height: 180px; place-content: center; text-align: center; }
 button:active:not(:disabled) { transform: translateY(1px); }
 

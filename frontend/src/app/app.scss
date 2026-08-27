@@ -14,35 +14,68 @@
 .route-progress.active { animation: route-progress 1s ease-in-out infinite alternate; opacity: 1; }
 @keyframes route-progress { from { transform: scaleX(.12); } to { transform: scaleX(.82); } }
 
-.app-notification {
-  align-items: center;
-  animation: notification-in .2s ease-out;
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  bottom: max(var(--space-5), env(safe-area-inset-bottom));
-  box-shadow: var(--shadow-lg);
-  color: var(--color-text);
+.app-overlays {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: 5px minmax(0, 1fr) auto;
-  left: auto;
-  max-width: min(30rem, calc(100vw - 2rem));
-  padding: var(--space-3);
+  left: max(var(--space-3), env(safe-area-inset-left));
+  margin-inline: auto;
+  max-width: 42rem;
+  pointer-events: none;
   position: fixed;
-  right: max(var(--space-5), env(safe-area-inset-right));
-  z-index: 1000;
+  right: max(var(--space-3), env(safe-area-inset-right));
+  top: max(var(--space-3), env(safe-area-inset-top));
+  z-index: 1003;
 }
-.app-notification p { line-height: var(--line-height-base); margin: 0; overflow-wrap: anywhere; }
-.notification-mark { align-self: stretch; background: var(--color-cyan); border-radius: var(--radius-pill); }
-.app-notification button { background: transparent; border: 0; border-radius: var(--radius-sm); color: var(--color-orange-hover); cursor: pointer; font-weight: var(--font-weight-bold); min-height: var(--control-min-height); padding: 0 var(--space-2); }
-.app-notification[data-tone="success"] { background: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
-.app-notification[data-tone="success"] .notification-mark { background: var(--color-success); }
-.app-notification[data-tone="warning"] { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
-.app-notification[data-tone="warning"] .notification-mark { background: var(--color-warning); }
-.app-notification[data-tone="error"] { background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
-.app-notification[data-tone="error"] .notification-mark { background: var(--color-danger); }
-@keyframes notification-in { from { opacity: 0; transform: translateY(.75rem); } to { opacity: 1; transform: translateY(0); } }
+.deployment-update { pointer-events: auto; }
+.deployment-update strong { display: block; margin-bottom: var(--space-1); }
+.deployment-update p { margin: 0; }
+.deployment-update button { background: transparent; border: 1px solid currentColor; border-radius: var(--radius-md); color: inherit; cursor: pointer; font: inherit; font-weight: var(--font-weight-bold); min-height: var(--control-min-height); padding: 0 var(--space-4); }
+.deployment-update button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+.notification-region {
+  margin-inline: auto;
+  max-width: 34rem;
+  pointer-events: none;
+  width: 100%;
+}
+
+.app-notification {
+  --notification-accent: var(--color-cyan);
+  align-items: start;
+  animation: notification-in 200ms cubic-bezier(.2, .8, .3, 1) both;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-info-text);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: var(--space-4);
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
+}
+.app-notification.is-exiting { animation: notification-out 180ms ease-in both; pointer-events: none; }
+.notification-icon { align-items: center; background: color-mix(in srgb, var(--notification-accent) 14%, transparent); border-radius: var(--radius-md); color: var(--notification-accent); display: inline-flex; font-size: 1.4rem; height: 2.5rem; justify-content: center; width: 2.5rem; }
+.notification-body { display: grid; gap: var(--space-1); min-width: 0; padding-top: .1rem; }
+.notification-announcement { display: grid; gap: var(--space-1); min-width: 0; }
+.notification-title { color: inherit; font-size: var(--text-sm); font-weight: var(--font-weight-bold); letter-spacing: .01em; line-height: 1.25; }
+.app-notification p { color: inherit; font-size: var(--text-sm); line-height: var(--line-height-base); margin: 0; opacity: .9; overflow-wrap: anywhere; }
+.app-notification button { background: color-mix(in srgb, currentColor 10%, transparent); border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: var(--radius-md); color: inherit; cursor: pointer; font-size: var(--text-sm); font-weight: var(--font-weight-bold); min-height: var(--control-min-height); padding: 0 var(--space-3); }
+.app-notification button:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
+.app-notification .notification-action { justify-self: start; margin-top: var(--space-2); }
+.app-notification .notification-close { align-items: center; background: transparent; border-color: transparent; display: inline-flex; font-size: 1.25rem; justify-content: center; margin: calc(var(--space-2) * -1); padding: 0; width: var(--control-min-height); }
+.notification-progress { background: color-mix(in srgb, var(--notification-accent) 16%, transparent); bottom: 0; height: 3px; left: 0; overflow: hidden; position: absolute; right: 0; }
+.notification-progress span { animation: notification-progress var(--notification-duration) linear forwards; background: var(--notification-accent); display: block; height: 100%; transform-origin: left; width: 100%; }
+.app-notification.is-paused .notification-progress span { animation-play-state: paused; }
+.app-notification[data-tone="success"] { --notification-accent: var(--color-success); background: var(--color-success-bg); border-color: var(--color-success-border); color: var(--color-success-text); }
+.app-notification[data-tone="warning"] { --notification-accent: var(--color-warning); background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+.app-notification[data-tone="error"] { --notification-accent: var(--color-danger); background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
+@keyframes notification-in { from { opacity: 0; transform: translateY(-.5rem) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes notification-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-.35rem); } }
+@keyframes notification-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 header { position: sticky; top: 0; z-index: 100; }
 
@@ -176,12 +209,16 @@ nav { align-items:center; display:flex; flex:1; gap:.15rem; }
 }
 
 @media (max-width: 560px) {
-  .app-notification { bottom: max(var(--space-3), env(safe-area-inset-bottom)); left: var(--space-3); max-width: none; right: var(--space-3); }
+  .deployment-update button { width: 100%; }
+  .app-notification { gap: var(--space-2); grid-template-columns: 2.25rem minmax(0, 1fr) auto; padding: var(--space-3); }
+  .notification-icon { font-size: 1.25rem; height: 2.25rem; width: 2.25rem; }
+  .app-notification .notification-action { justify-self: stretch; width: 100%; }
   .footer-content { align-items: flex-start; flex-direction: column; gap: var(--space-5); }
   .footer-contact { align-items: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .route-progress.active { animation: none; transform: scaleX(.75); }
-  .app-notification { animation: none; }
+  .app-notification, .app-notification.is-exiting { animation-duration: .01ms; transform: none; }
+  .notification-progress span { animation-timing-function: steps(20, end); }
 }

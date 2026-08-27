@@ -1,14 +1,15 @@
 package com.computerstore.service.dto;
 import jakarta.validation.constraints.*;
 public record CreateTicketRequest(
-        @NotBlank @Pattern(regexp = "PlayStation|Notebook|PC de escritorio") String deviceType,
+        @NotBlank @Pattern(regexp = "Consola|Notebook|PC de escritorio") String deviceType,
         @Size(max = 100) String brand,
         @Size(max = 150) String model,
         @NotBlank @Size(max = 2000) String reportedProblem
 ) {
-    @AssertTrue(message = "La marca sólo debe informarse y es obligatoria para notebooks.")
+    @AssertTrue(message = "La marca es obligatoria para consolas y notebooks, y no debe informarse para PC de escritorio.")
     public boolean isBrandValid() {
-        return "Notebook".equals(deviceType)
+        boolean requiresBrand = "Consola".equals(deviceType) || "Notebook".equals(deviceType);
+        return requiresBrand
                 ? brand != null && !brand.isBlank()
                 : brand == null || brand.isBlank();
     }

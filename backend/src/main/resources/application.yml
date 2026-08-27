@@ -56,11 +56,35 @@ app:
     max-login-attempts: ${AUTH_MAX_LOGIN_ATTEMPTS:5}
     max-registration-attempts: ${AUTH_MAX_REGISTRATION_ATTEMPTS:3}
     max-refresh-attempts: ${AUTH_MAX_REFRESH_ATTEMPTS:20}
+    max-account-action-attempts: ${AUTH_MAX_ACCOUNT_ACTION_ATTEMPTS:5}
     window-ms: ${AUTH_RATE_LIMIT_WINDOW_MS:60000}
+  account-tokens:
+    email-verification-ttl: ${EMAIL_VERIFICATION_TTL:PT24H}
+    password-reset-ttl: ${PASSWORD_RESET_TTL:PT1H}
+    email-change-ttl: ${EMAIL_CHANGE_TTL:PT1H}
+  storefront:
+    base-url: ${STOREFRONT_BASE_URL:http://localhost:4200}
+  email:
+    logo-url: ${EMAIL_LOGO_URL:}
+    resend:
+      enabled: ${RESEND_ENABLED:false}
+      api-key: ${RESEND_API_KEY:}
+      from: ${RESEND_FROM:}
   orders:
     reservation-ttl: ${ORDER_RESERVATION_TTL:PT15M}
     expiration-batch-size: ${ORDER_EXPIRATION_BATCH_SIZE:100}
     expiration-check-interval-ms: ${ORDER_EXPIRATION_CHECK_INTERVAL_MS:60000}
+  fulfillment:
+    pickup:
+      enabled: ${PICKUP_ENABLED:false}
+      code: ${PICKUP_LOCATION_CODE:}
+      name: ${PICKUP_LOCATION_NAME:}
+      address-lines: ${PICKUP_ADDRESS_LINES:}
+      locality: ${PICKUP_LOCALITY:}
+      province-code: ${PICKUP_PROVINCE_CODE:}
+      postal-code: ${PICKUP_POSTAL_CODE:}
+      instructions: ${PICKUP_INSTRUCTIONS:}
+      hours: ${PICKUP_HOURS:}
   payments:
     mercado-pago:
       enabled: ${MP_ENABLED:false}

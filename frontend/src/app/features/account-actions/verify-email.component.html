@@ -1,0 +1,18 @@
+<main>
+  <a class="back" appButton="text" routerLink="/">← Volver a <span translate="no">Pinatech</span></a>
+  <section appCard class="auth-card" aria-labelledby="verify-title">
+    <p class="eyebrow">Seguridad de la cuenta</p>
+    <h1 id="verify-title">Verificar email</h1>
+    @if (!token) {
+      <app-feedback tone="error">El enlace está incompleto. Abrí el enlace completo que recibiste por email o solicitá uno nuevo desde tu perfil.</app-feedback>
+      <a appButton="outlined" routerLink="/profile">Ir a Mi perfil</a>
+    } @else if (confirmed()) {
+      <app-feedback tone="success" announce="polite"><h2>Email verificado</h2><p>Ya podés usar todas las funciones de tu cuenta.</p></app-feedback>
+      <a appButton="filled" [attr.href]="auth.isAuthenticated() ? '/profile' : '/login'">{{ auth.isAuthenticated() ? 'Volver a Mi perfil' : 'Iniciar sesión' }}</a>
+    } @else {
+      <p class="intro">Para proteger tu cuenta, confirmá que querés verificar el email asociado a este enlace.</p>
+      @if (error()) { <app-feedback tone="error" announce="assertive">{{ error() }}</app-feedback> }
+      <button appButton="filled" type="button" (click)="confirm()" [disabled]="submitting()" [attr.aria-busy]="submitting()">{{ submitting() ? 'Verificando…' : 'Verificar mi email' }}</button>
+    }
+  </section>
+</main>

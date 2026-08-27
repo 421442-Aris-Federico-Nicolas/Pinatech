@@ -11,6 +11,7 @@ import com.computerstore.user.domain.UserAccount;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -59,6 +60,13 @@ public class CustomerOrder {
     @Column(name = "delivery_method", length = 50)
     private String deliveryMethod;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_method", length = 30)
+    private FulfillmentMethod fulfillmentMethod;
+
+    @Embedded
+    private PickupLocationSnapshot pickupLocation;
+
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal subtotal;
 
@@ -94,6 +102,19 @@ public class CustomerOrder {
             String idempotencyKey,
             String requestHash
     ) {
+        this(user, items, total, reservationExpiresAt, idempotencyKey, requestHash, null, null);
+    }
+
+    public CustomerOrder(
+            UserAccount user,
+            List<OrderItem> items,
+            BigDecimal total,
+            Instant reservationExpiresAt,
+            String idempotencyKey,
+            String requestHash,
+            FulfillmentMethod fulfillmentMethod,
+            PickupLocationSnapshot pickupLocation
+    ) {
         this.user = user;
         this.status = OrderStatus.PENDING_PAYMENT;
         this.paymentStatus = PaymentStatus.PENDING;
@@ -104,6 +125,8 @@ public class CustomerOrder {
         this.reservationExpiresAt = Objects.requireNonNull(reservationExpiresAt);
         this.idempotencyKey = idempotencyKey;
         this.requestHash = requestHash;
+        this.fulfillmentMethod = fulfillmentMethod;
+        this.pickupLocation = pickupLocation;
         items.forEach(this::addItem);
     }
 
@@ -218,6 +241,8 @@ public class CustomerOrder {
     public String getCurrency() { return currency; }
     public String getPaymentMethod() { return paymentMethod; }
     public String getDeliveryMethod() { return deliveryMethod; }
+    public FulfillmentMethod getFulfillmentMethod() { return fulfillmentMethod; }
+    public PickupLocationSnapshot getPickupLocation() { return pickupLocation; }
     public BigDecimal getTotal() { return total; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getReservationExpiresAt() { return reservationExpiresAt; }

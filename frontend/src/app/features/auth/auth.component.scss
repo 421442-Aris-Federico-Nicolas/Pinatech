@@ -31,15 +31,16 @@ main {
 h1 { font-size: 2.2rem; letter-spacing: -.05em; margin: .35rem 0 var(--space-6); }
 .wide h1 { margin-bottom: var(--space-2); }
 .intro { color: var(--color-text-muted); font-size: .9rem; line-height: var(--line-height-base); margin: 0 0 var(--space-5); }
-.context { background: var(--color-info-bg); border-left: 3px solid var(--color-cyan); color: var(--color-info-text); font-size: var(--text-md); line-height: var(--line-height-base); padding: var(--space-3); }
 form { display: grid; gap: var(--space-3); }
 .name-row { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
-.error { background: var(--color-danger-bg); border: 1px solid var(--color-danger-border); color: var(--color-danger); margin: 0; overflow-wrap: anywhere; padding: var(--space-3); }
 form > button { margin-top: var(--space-2); width: 100%; }
 .button-spinner { animation: spin .8s linear infinite; border: 2px solid color-mix(in srgb, currentColor 45%, transparent); border-radius: 50%; border-top-color: currentColor; display: inline-block; height: 1rem; margin-right: var(--space-2); vertical-align: -.15rem; width: 1rem; }
 .account-link { color: var(--color-text-muted); font-size: var(--text-md); margin: var(--space-3) 0 0; text-align: center; }
 .account-link a { color: var(--color-cyan); font-weight: var(--font-weight-bold); }
 .account-link a:hover { text-decoration-thickness: 2px; }
+.forgot-link { color: var(--color-cyan); font-size: var(--text-md); font-weight: var(--font-weight-bold); justify-self: end; margin-top: calc(var(--space-2) * -1); }
+.forgot-link:hover { text-decoration-thickness: 2px; }
+.auth-card > a.app-button, .auth-card > button.app-button { margin-top: var(--space-3); width: 100%; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }

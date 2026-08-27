@@ -4,22 +4,20 @@
     <div class="header-actions"><button appButton="outlined" type="button" (click)="load(true)" [disabled]="loading()">{{ loading() ? 'Actualizando…' : 'Actualizar pedidos' }}</button><a appButton="text" routerLink="/catalog">Seguir explorando</a></div>
   </header>
 
-  @if (paymentError()) { <p class="payment-error" role="alert">{{ paymentError() }}</p> }
   @if (loadingCapabilities() && !capabilitiesError()) {
     <p class="capability-status" role="status" aria-live="polite">Consultando disponibilidad del pago online…</p>
   }
   @if (capabilitiesError()) {
-    <div class="capability-error" [attr.aria-busy]="loadingCapabilities()">
-      <p role="alert">{{ capabilitiesError() }}</p>
-      <button appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando disponibilidad del pago online' : 'Reintentar consulta de pago online'">
+    <app-feedback class="capability-error" tone="error" [announce]="loadingCapabilities() ? 'polite' : 'assertive'" [attr.aria-busy]="loadingCapabilities()">
+      {{ loadingCapabilities() ? 'Volviendo a consultar la disponibilidad del pago online.' : capabilitiesError() }}
+      <button feedback-actions appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando disponibilidad del pago online' : 'Reintentar consulta de pago online'">
         {{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}
       </button>
-      @if (loadingCapabilities()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a consultar la disponibilidad del pago online.</p> }
-    </div>
+    </app-feedback>
   }
 
   @if (error()) {
-    <section appCard class="state error" [attr.aria-busy]="loading()"><div role="alert"><h2>No pudimos mostrar tus pedidos</h2><p>{{ error() }}</p></div><button appButton="outlined" type="button" (click)="load()" [disabled]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="loading() ? 'Cargando tus pedidos nuevamente' : 'Reintentar carga de pedidos'">{{ loading() ? 'Cargando pedidos…' : 'Reintentar carga de pedidos' }}</button>@if (loading()) { <p class="visually-hidden" role="status" aria-live="polite">Volviendo a cargar tus pedidos.</p> }</section>
+    <section appCard class="state error" [attr.aria-busy]="loading()"><app-feedback tone="error" [announce]="loading() ? 'polite' : 'assertive'"><div><h2>{{ loading() ? 'Volviendo a cargar tus pedidos' : 'No pudimos mostrar tus pedidos' }}</h2><p>{{ loading() ? 'Estamos consultando tu historial nuevamente.' : error() }}</p></div><button feedback-actions appButton="outlined" type="button" (click)="load()" [disabled]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="loading() ? 'Cargando tus pedidos nuevamente' : 'Reintentar carga de pedidos'">{{ loading() ? 'Cargando pedidos…' : 'Reintentar carga de pedidos' }}</button></app-feedback></section>
   } @else if (loading()) {
     <section appCard class="state"><div role="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando pedidos</h2><p>Estamos consultando tu historial.</p></div></section>
   } @else if (!orders().length) {
@@ -39,9 +37,9 @@
 
           @if (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED') {
             @if (isReservationExpired(order)) {
-              <p class="reservation expired"><strong>Reserva vencida.</strong> El stock ya no está reservado para este pedido.</p>
+              <app-feedback class="reservation expired" tone="warning"><strong>Reserva vencida.</strong> El stock ya no está reservado para este pedido.</app-feedback>
             } @else {
-              <p class="reservation"><strong>Reserva vigente hasta:</strong> {{ order.reservationExpiresAt | date:'medium' }}. El registro no implica que el pago esté confirmado.</p>
+              <app-feedback class="reservation"><strong>Reserva vigente hasta:</strong> {{ order.reservationExpiresAt | date:'medium' }}. El registro no implica que el pago esté confirmado.</app-feedback>
             }
           }
 
@@ -55,7 +53,25 @@
               @if (payingOrder() === order.id) { <p class="payment-progress" role="status" aria-live="polite">Preparando la redirección segura a <span translate="no">Mercado Pago</span>.</p> }
             </div>
           } @else if (paymentUnavailableReason(order); as reason) {
-            <p class="payment-unavailable" role="status">{{ reason }}</p>
+            <app-feedback class="payment-unavailable" tone="warning">{{ reason }}</app-feedback>
+          }
+          @if (paymentError()?.orderId === order.id) { <app-feedback class="payment-error" tone="error" announce="assertive">{{ paymentError()?.message }}</app-feedback> }
+
+          @if (order.pickupLocation; as pickup) {
+            <section class="pickup" [attr.aria-labelledby]="'pickup-title-' + order.id">
+              <div class="pickup-heading">
+                <div><p>Retiro del pedido</p><h3 [id]="'pickup-title-' + order.id">{{ pickup.name }}</h3></div>
+                <strong>{{ methodLabel(order.fulfillmentMethod) }}</strong>
+              </div>
+              <address>
+                @for (line of pickup.addressLines; track $index) { <span>{{ line }}</span> }
+                <span>{{ pickup.locality }}, {{ pickup.provinceCode }} · CP {{ pickup.postalCode }}</span>
+              </address>
+              <dl>
+                <div><dt>Horarios</dt><dd>{{ pickup.hours }}</dd></div>
+                <div><dt>Indicaciones</dt><dd>{{ pickup.instructions }}</dd></div>
+              </dl>
+            </section>
           }
 
           <ul class="items" aria-label="Productos del pedido">
@@ -67,9 +83,9 @@
           <footer>
             <dl>
               <div><dt>Pago</dt><dd [attr.translate]="order.paymentMethod === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(order.paymentMethod) }}</dd></div>
-              <div><dt>Entrega</dt><dd>{{ methodLabel(order.deliveryMethod) }}</dd></div>
+              <div><dt>Modalidad</dt><dd>{{ methodLabel(order.fulfillmentMethod) }}</dd></div>
             </dl>
-            <div class="total"><span>Total</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            <div class="total"><span>Total de productos · retiro sin costo</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
           </footer>
         </article></li>
       }

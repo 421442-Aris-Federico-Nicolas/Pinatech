@@ -1,29 +1,91 @@
 <main>
-  <header><p class="eyebrow">Tu cuenta</p><h1>Mi perfil</h1><p>Datos asociados a tu sesión en <span translate="no">Pinatech</span>.</p></header>
+  <header><p class="eyebrow">Tu cuenta</p><h1>Mi perfil</h1><p>Administrá tus datos, dirección y seguridad en <span translate="no">Pinatech</span>.</p></header>
 
-  @if (auth.user(); as user) {
-    <div class="profile-layout">
-      <section appCard class="identity" aria-labelledby="identity-title">
-        <span class="monogram" aria-hidden="true">{{ user.firstName.charAt(0) }}{{ user.lastName.charAt(0) }}</span>
-        <div><p>Cuenta <span translate="no">Pinatech</span></p><h2 id="identity-title">{{ user.firstName }} {{ user.lastName }}</h2><ul class="roles" aria-label="Roles de la cuenta">@for (role of user.roles; track role) { <li appBadge="neutral">{{ roleLabel(role) }}</li> }</ul></div>
+  @if (loading()) {
+    <section appCard class="loading-card" aria-live="polite"><span class="spinner" aria-hidden="true"></span><p>Cargando tu perfil…</p></section>
+  } @else if (loadError()) {
+    <app-feedback class="load-error" tone="error" announce="assertive"><div><h2>No pudimos cargar tu perfil</h2><p>{{ loadError() }}</p></div><button feedback-actions appButton="outlined" type="button" (click)="load()">Reintentar</button></app-feedback>
+  } @else if (profile(); as account) {
+    <section appCard class="identity" aria-labelledby="identity-title">
+      <span class="monogram" aria-hidden="true">{{ account.firstName.charAt(0) }}{{ account.lastName.charAt(0) }}</span>
+      <div><p>Cuenta <span translate="no">Pinatech</span></p><h2 id="identity-title">{{ account.firstName }} {{ account.lastName }}</h2><ul class="roles" aria-label="Roles de la cuenta">@for (role of account.roles; track role) { <li appBadge="neutral">{{ roleLabel(role) }}</li> }</ul></div>
+      <span class="verification" [class.verified]="account.emailVerified">{{ account.emailVerified ? 'Email verificado' : 'Verificación pendiente' }}</span>
+    </section>
+
+    @if (actionError()) { <app-feedback class="page-error" tone="error" announce="assertive">{{ actionError() }}</app-feedback> }
+
+    <div class="profile-grid" [class.with-sidebar]="account.roles.includes('CUSTOMER')">
+      <section appCard aria-labelledby="personal-title">
+        <div class="section-heading"><p>Información personal</p><h2 id="personal-title">Datos de contacto</h2></div>
+        <form id="personal-form" [formGroup]="personalForm" (ngSubmit)="savePersonal()" novalidate>
+          <div class="form-row">
+            <app-input label="Nombre" name="firstName" formControlName="firstName" autocomplete="given-name" [maxLength]="100" required [error]="fieldError(personalForm.controls.firstName, 'Nombre')" />
+            <app-input label="Apellido" name="lastName" formControlName="lastName" autocomplete="family-name" [maxLength]="100" required [error]="fieldError(personalForm.controls.lastName, 'Apellido')" />
+          </div>
+          <app-input label="Teléfono (opcional)" type="tel" name="phone" formControlName="phone" autocomplete="tel" inputMode="tel" [maxLength]="30" hint="Entre 6 y 30 dígitos; podés usar +, espacios, paréntesis o guiones." [error]="fieldError(personalForm.controls.phone, 'Teléfono', 'Ingresá un teléfono válido.')" />
+          <button appButton="filled" type="submit" [disabled]="pending() !== null" [attr.aria-busy]="pending() === 'profile'">{{ pending() === 'profile' ? 'Guardando…' : 'Guardar datos' }}</button>
+        </form>
       </section>
 
-      <section appCard class="data" aria-labelledby="data-title">
-        <div class="section-heading"><p>Información personal</p><h2 id="data-title">Datos de contacto</h2></div>
-        <dl>
-          <div><dt>Nombre</dt><dd>{{ user.firstName }} {{ user.lastName }}</dd></div>
-          <div><dt>Email</dt><dd><a [href]="'mailto:' + user.email">{{ user.email }}</a></dd></div>
-          <div><dt>Teléfono</dt><dd>{{ user.phone || 'No informado' }}</dd></div>
-        </dl>
-        <p class="read-only">Estos datos son de solo lectura. La edición todavía no está disponible.</p>
+      <section appCard aria-labelledby="email-title">
+        <div class="section-heading"><p>Acceso y seguridad</p><h2 id="email-title">Email</h2></div>
+        <div class="current-email"><span>Email actual</span><strong>{{ account.email }}</strong></div>
+        @if (!account.emailVerified) {
+          <app-feedback class="email-warning" tone="warning"><div><strong>Tu email todavía no está verificado.</strong><p>Verificalo para acceder a todas las funciones protegidas.</p></div><button feedback-actions appButton="outlined" type="button" (click)="resendVerification()" [disabled]="pending() !== null">{{ pending() === 'verification' ? 'Enviando…' : 'Reenviar verificación' }}</button></app-feedback>
+        }
+        <form id="email-form" [formGroup]="emailForm" (ngSubmit)="requestEmailChange()" novalidate>
+          <app-input label="Email nuevo" type="email" name="email" formControlName="email" autocomplete="email" inputMode="email" spellcheck="false" [maxLength]="254" required hint="Te enviaremos un enlace al email nuevo antes de aplicar el cambio." [error]="fieldError(emailForm.controls.email, 'Email')" />
+          <app-input label="Contraseña actual" type="password" name="currentPassword" formControlName="currentPassword" autocomplete="current-password" [maxLength]="72" required [error]="fieldError(emailForm.controls.currentPassword, 'Contraseña actual')" />
+          <button appButton="outlined" type="submit" [disabled]="pending() !== null" [attr.aria-busy]="pending() === 'email'">{{ pending() === 'email' ? 'Enviando…' : 'Solicitar cambio' }}</button>
+        </form>
+        @if (emailStatus()) { <app-feedback class="inline-status" tone="success" announce="polite">{{ emailStatus() }}</app-feedback> }
       </section>
 
-      <aside appCard aria-labelledby="preferences-title">
-        <span class="aside-number">Próximamente</span>
-        <h2 id="preferences-title">Direcciones y preferencias</h2>
-        <p>Se habilitarán cuando estén definidas las modalidades y condiciones de entrega. Por ahora no necesitás cargar una dirección.</p>
-        @if (user.roles.includes('CUSTOMER')) { <a appButton="text" routerLink="/orders">Ver mis pedidos</a> }
-      </aside>
+      <section appCard class="address-card" aria-labelledby="address-title">
+        <div class="section-heading split"><div><p>Entrega</p><h2 id="address-title">Dirección principal</h2></div>
+          @if (account.address && !editingAddress()) { <button appButton="text" type="button" (click)="beginAddressEdit()">Editar</button> }
+        </div>
+        @if (account.address && !editingAddress()) {
+          <address>
+            <strong>{{ account.address.street }} {{ account.address.number }}</strong>
+            @if (account.address.floorApartment) { <span>{{ account.address.floorApartment }}</span> }
+            <span>{{ account.address.locality }}, {{ account.address.provinceCode }} ({{ account.address.postalCode }})</span>
+            <span>{{ account.address.countryCode }}</span>
+            @if (account.address.reference) { <small>Referencia: {{ account.address.reference }}</small> }
+          </address>
+          @if (confirmingDelete()) {
+            <app-feedback class="delete-confirm" tone="warning"><p>¿Querés eliminar esta dirección?</p><div feedback-actions><button appButton="filled" tone="danger" type="button" (click)="deleteAddress()" [disabled]="pending() !== null">{{ pending() === 'delete-address' ? 'Eliminando…' : 'Sí, eliminar' }}</button><button appButton="text" type="button" (click)="confirmingDelete.set(false)" [disabled]="pending() !== null">Cancelar</button></div></app-feedback>
+          } @else {
+            <button class="delete-link" appButton="text" type="button" (click)="confirmingDelete.set(true)">Eliminar dirección</button>
+          }
+        } @else {
+          <form id="address-form" [formGroup]="addressForm" (ngSubmit)="saveAddress()" novalidate>
+            <div class="form-row street-row">
+              <app-input label="Calle" name="street" formControlName="street" autocomplete="address-line1" [maxLength]="150" required [error]="fieldError(addressForm.controls.street, 'Calle')" />
+              <app-input label="Número" name="number" formControlName="number" autocomplete="address-line2" [maxLength]="30" required [error]="fieldError(addressForm.controls.number, 'Número')" />
+            </div>
+            <app-input label="Piso / departamento (opcional)" name="floorApartment" formControlName="floorApartment" autocomplete="address-line3" [maxLength]="50" [error]="fieldError(addressForm.controls.floorApartment, 'Piso o departamento')" />
+            <div class="form-row">
+              <app-input label="Localidad" name="locality" formControlName="locality" autocomplete="address-level2" [maxLength]="120" required [error]="fieldError(addressForm.controls.locality, 'Localidad')" />
+              <app-input label="Provincia (código)" name="provinceCode" formControlName="provinceCode" autocomplete="address-level1" [maxLength]="3" required hint="Ejemplo: BA, C o SF." [error]="fieldError(addressForm.controls.provinceCode, 'Provincia', 'Usá un código de 1 a 3 letras.')" />
+            </div>
+            <div class="form-row">
+              <app-input label="Código postal" name="postalCode" formControlName="postalCode" autocomplete="postal-code" [maxLength]="12" required [error]="fieldError(addressForm.controls.postalCode, 'Código postal', 'Ingresá un código postal de 4 a 12 caracteres.')" />
+              <app-input label="País (código)" name="countryCode" formControlName="countryCode" autocomplete="country" [maxLength]="2" required hint="Código ISO de 2 letras, por ejemplo AR." [error]="fieldError(addressForm.controls.countryCode, 'País', 'Usá un código de país de 2 letras.')" />
+            </div>
+            <app-textarea label="Referencia (opcional)" name="reference" formControlName="reference" [rows]="3" [maxLength]="300" hint="Indicaciones útiles para encontrar la dirección." [error]="fieldError(addressForm.controls.reference, 'Referencia')" />
+            <div class="form-actions"><button appButton="filled" type="submit" [disabled]="pending() !== null" [attr.aria-busy]="pending() === 'address'">{{ pending() === 'address' ? 'Guardando…' : account.address ? 'Guardar cambios' : 'Agregar dirección' }}</button>@if (account.address) { <button appButton="text" type="button" (click)="cancelAddressEdit()" [disabled]="pending() !== null">Cancelar</button> }</div>
+          </form>
+        }
+      </section>
+
+      @if (account.roles.includes('CUSTOMER')) {
+        <aside appCard aria-labelledby="orders-title">
+          <div class="section-heading"><p>Tu actividad</p><h2 id="orders-title">Pedidos</h2></div>
+          <p>Consultá el estado y el historial de tus compras.</p>
+          <a appButton="text" routerLink="/orders">Ver mis pedidos</a>
+        </aside>
+      }
     </div>
   }
 </main>

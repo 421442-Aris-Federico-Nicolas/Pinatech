@@ -101,6 +101,13 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);
     }
 
+    @ExceptionHandler(EmailVerificationRequiredException.class)
+    ProblemDetail handleEmailVerificationRequired(
+            EmailVerificationRequiredException exception, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "email-verification-required", "Email verification required",
+                exception.getMessage(), request);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ProblemDetail handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);

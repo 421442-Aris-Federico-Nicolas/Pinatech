@@ -9,7 +9,7 @@
               <img [src]="item.url" [alt]="'Adjunto ' + item.attachment.fileName + ' subido por ' + item.attachment.uploadedByName" width="640" height="480" loading="lazy">
             </a>
           } @else if (item.error) {
-            <div class="download-error" role="alert"><span>No se pudo cargar.</span><button type="button" (click)="retry(item.attachment)">Reintentar</button></div>
+            <app-feedback class="download-error" tone="error" announce="assertive"><span>No se pudo cargar.</span><button feedback-actions type="button" (click)="retry(item.attachment)">Reintentar</button></app-feedback>
           } @else if (item.loading) {
             <span role="status">Descargando “{{ item.attachment.fileName }}”…</span>
           } @else {
