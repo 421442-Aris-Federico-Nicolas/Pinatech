@@ -1,5 +1,6 @@
 package com.computerstore.order.dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record CheckoutCapabilitiesResponse(
@@ -7,6 +8,8 @@ public record CheckoutCapabilitiesResponse(
         boolean orderRequestsEnabled,
         boolean onlinePaymentsEnabled,
         boolean deliveryQuotesEnabled,
+        BigDecimal mercadoPagoSurchargeRate,
+        BigDecimal bankTransferDiscountRate,
         List<String> paymentMethods,
         List<String> deliveryMethods,
         List<String> fulfillmentMethods,

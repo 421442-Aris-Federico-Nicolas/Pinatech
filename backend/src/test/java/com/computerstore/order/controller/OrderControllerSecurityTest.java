@@ -95,7 +95,7 @@ class OrderControllerSecurityTest {
                         .with(user(principal("ROLE_CUSTOMER")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"items":[{"variantId":1,"quantity":1}],
+                                {"items":[{"variantId":1,"quantity":1}],"paymentMethod":"MERCADO_PAGO",
                                  "fulfillmentMethod":"PICKUP","pickupLocationCode":"CORDOBA-CENTRO",
                                  "pickupLocationVersion":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                                 """))
@@ -112,7 +112,7 @@ class OrderControllerSecurityTest {
 
     private String validOrderRequest() {
         return """
-                {"items":[{"variantId":1,"quantity":1}],
+                {"items":[{"variantId":1,"quantity":1}],"paymentMethod":"MERCADO_PAGO",
                  "fulfillmentMethod":"PICKUP","pickupLocationCode":"CORDOBA-CENTRO",
                  "pickupLocationVersion":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                 """;

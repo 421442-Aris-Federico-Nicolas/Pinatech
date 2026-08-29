@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class ResendTransactionalEmailServiceTest {
@@ -53,9 +54,9 @@ class ResendTransactionalEmailServiceTest {
         assertDoesNotThrow(() -> service.sendEmailVerification(
                 "user@example.com", "Ana", "raw-token"));
         assertDoesNotThrow(() -> service.sendAccountAction(
-                "user@example.com", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token"));
+                "user@example.com", "Ana", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token"));
         assertDoesNotThrow(() -> service.sendEmailChangedNotice(
-                "old@example.com", "new@example.com"));
+                "old@example.com", "Ana", "new@example.com"));
     }
 
     @Test
@@ -109,7 +110,7 @@ class ResendTransactionalEmailServiceTest {
 
         String actionUrl = service.accountActionUrl("/verify-email", "raw/token&value");
         ResendTransactionalEmailService.EmailContent content = service.contentFor(
-                AccountActionPurpose.EMAIL_VERIFICATION, actionUrl);
+                AccountActionPurpose.EMAIL_VERIFICATION, "Ana", actionUrl);
 
         assertTrue(actionUrl.startsWith("http://localhost:4200/app/verify-email"));
         assertTrue(actionUrl.endsWith("#token=raw/token%26value"));
@@ -126,7 +127,7 @@ class ResendTransactionalEmailServiceTest {
                 logoUrl, new ObjectMapper());
 
         ResendTransactionalEmailService.EmailContent content = service.contentFor(
-                AccountActionPurpose.EMAIL_VERIFICATION,
+                AccountActionPurpose.EMAIL_VERIFICATION, "Ana",
                 "https://store.example.com/verify-email#token=raw-token");
 
         assertTrue(content.html().contains(
@@ -157,24 +158,72 @@ class ResendTransactionalEmailServiceTest {
     }
 
     @Test
-    void passwordResetAndEmailChangeContentRemainUnchanged() {
+    void passwordResetAndEmailChangeUseTheBrandedTemplate() {
         ResendTransactionalEmailService service = new ResendTransactionalEmailService(
-                false, "", "", "https://store.example.com", "", new ObjectMapper());
-        String actionUrl = "https://store.example.com/action#token=raw&amp;unsafe";
+                true, "key", "Pinatech <accounts@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+        String actionUrl = "https://store.example.com/action#token=raw&unsafe";
 
-        assertEquals(new ResendTransactionalEmailService.EmailContent(
-                        "Restablece tu contrasena de Pinatech",
-                        "Restablece tu contrasena ingresando en: " + actionUrl,
-                        "<p>Recibimos una solicitud para restablecer tu contrasena.</p><p><a href=\""
-                                + "https://store.example.com/action#token=raw&amp;amp;unsafe"
-                                + "\">Restablecer contrasena</a></p>"),
-                service.contentFor(AccountActionPurpose.PASSWORD_RESET, actionUrl));
-        assertEquals(new ResendTransactionalEmailService.EmailContent(
-                        "Confirma tu nuevo email de Pinatech",
-                        "Confirma tu nuevo email ingresando en: " + actionUrl,
-                        "<p>Confirma este email como el nuevo email de tu cuenta.</p><p><a href=\""
-                                + "https://store.example.com/action#token=raw&amp;amp;unsafe"
-                                + "\">Confirmar nuevo email</a></p>"),
-                service.contentFor(AccountActionPurpose.EMAIL_CHANGE, actionUrl));
+        ResendTransactionalEmailService.EmailContent reset = service.contentFor(
+                AccountActionPurpose.PASSWORD_RESET, "Ana & <Admin>", actionUrl);
+        ResendTransactionalEmailService.EmailContent change = service.contentFor(
+                AccountActionPurpose.EMAIL_CHANGE, "Ana", actionUrl);
+
+        assertTrue(reset.html().startsWith("<!doctype html>"));
+        assertTrue(reset.html().contains("Hola Ana &amp; &lt;Admin&gt;,"));
+        assertTrue(reset.html().contains("Restablecer contrasena"));
+        assertTrue(reset.html().contains(">" + actionUrl.replace("&", "&amp;") + "</a>"));
+        assertTrue(reset.html().contains("https://cdn.example.com/logo.png"));
+        assertTrue(reset.html().contains("#0b1f3a"));
+        assertTrue(reset.html().contains("#f97316"));
+        assertTrue(reset.text().startsWith("Hola Ana & <Admin>,\n\n"));
+        assertTrue(reset.text().contains(actionUrl));
+        assertTrue(change.html().contains("Confirmar nuevo email"));
+        assertTrue(change.html().contains("Si el boton no funciona"));
+        assertTrue(change.text().contains("Confirmar nuevo email:\n" + actionUrl));
+    }
+
+    @ParameterizedTest
+    @EnumSource(OrderEmailEventType.class)
+    void orderEventsUseTheBrandedTemplate(OrderEmailEventType eventType) {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+        String orderUrl = "https://store.example.com/orders?order=42&view=<full>";
+        String reason = "Importe < incorrecto & referencia duplicada";
+
+        ResendTransactionalEmailService.EmailContent content = service.contentForOrderEvent(
+                "Ana & <Admin>", eventType, 42L, reason, orderUrl);
+
+        assertTrue(content.html().startsWith("<!doctype html>"));
+        assertTrue(content.html().contains("role=\"presentation\""));
+        assertTrue(content.html().contains("Hola Ana &amp; &lt;Admin&gt;,"));
+        assertFalse(content.html().contains("Hola Ana & <Admin>"));
+        assertTrue(content.html().contains("Ver mi pedido"));
+        assertTrue(content.html().contains(">" + orderUrl.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") + "</a>"));
+        assertTrue(content.text().startsWith("Hola Ana & <Admin>,\n\n"));
+        assertTrue(content.text().contains(orderUrl));
+        if (eventType == OrderEmailEventType.BANK_TRANSFER_REJECTED) {
+            assertTrue(content.html().contains("Importe &lt; incorrecto &amp; referencia duplicada"));
+            assertFalse(content.html().contains(reason));
+            assertTrue(content.text().contains("Motivo: " + reason));
+        }
+    }
+
+    @Test
+    void changedEmailNoticeUsesBrandingWithoutInventingAnActionLink() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <accounts@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+
+        ResendTransactionalEmailService.EmailContent content = service.contentForEmailChanged(
+                "Ana", "new+alerts@example.com");
+
+        assertTrue(content.html().contains("Email actualizado"));
+        assertTrue(content.html().contains("Nuevo email"));
+        assertTrue(content.html().contains("new+alerts@example.com"));
+        assertFalse(content.html().contains("<a href="));
+        assertFalse(content.html().contains("Si el boton no funciona"));
+        assertTrue(content.text().contains("Nuevo email: new+alerts@example.com"));
     }
 }

@@ -6,10 +6,12 @@ import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
+import { bankTransferPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
+import { CheckoutService } from '../checkout/checkout.service';
 
 @Component({
   imports: [AppButtonDirective, AppFeedbackComponent, CurrencyPipe, RouterLink],
@@ -26,6 +28,7 @@ export class ProductComponent {
   private readonly meta = inject(Meta);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notifications = inject(NotificationService);
+  private readonly checkout = inject(CheckoutService);
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
   private readonly productId = Number(this.route.snapshot.paramMap.get('id'));
   readonly cart = inject(CartService);
@@ -40,7 +43,10 @@ export class ProductComponent {
     const variant = this.selectedVariant();
     return variant ? Math.max(0, this.cart.stockLimit(variant) - this.quantityInCart()) : 0;
   });
-  readonly priceWithoutNationalTax = computed(() => (this.product()?.price ?? 0) / 1.105);
+  readonly transferPricing = computed(() => bankTransferPrice(this.product()?.price ?? 0));
+  readonly transferPriceWithoutTax = computed(() => priceWithoutNationalTax(this.transferPricing().total));
+  readonly listPriceWithoutTax = computed(() => priceWithoutNationalTax(this.product()?.price ?? 0));
+  readonly pickupLocations = signal<string[]>([]);
   readonly loading = signal(true);
   readonly error = signal<'not-found' | 'request' | null>(null);
   readonly highlightedSpecifications = computed(() => this.product()?.specifications.filter((item) => item.highlighted) ?? []);
@@ -60,7 +66,18 @@ export class ProductComponent {
       const product = this.product();
       if (!product) return;
       const variantId = this.positiveNumber(params.get('variant'));
-      this.selectedVariantId.set(product.variants.find((variant) => variant.id === variantId)?.id ?? product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id ?? null);
+      this.selectedVariantId.set(product.variants.find((variant) => variant.id === variantId && variant.inStock)?.id
+        ?? product.variants.find((variant) => variant.inStock)?.id
+        ?? product.variants[0]?.id
+        ?? null);
+    });
+    this.checkout.capabilities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (capabilities) => this.pickupLocations.set(
+        capabilities.fulfillmentMethods.includes('PICKUP')
+          ? capabilities.pickupLocations.map((location) => `${location.name}, ${location.locality}`)
+          : [],
+      ),
+      error: () => this.pickupLocations.set([]),
     });
 
     if (!Number.isInteger(this.productId) || this.productId <= 0) {
@@ -79,7 +96,10 @@ export class ProductComponent {
         this.product.set(product);
         this.imageIndex.set(0);
         const requestedVariant = this.positiveNumber(this.route.snapshot.queryParamMap.get('variant'));
-        this.selectedVariantId.set(product.variants.find((variant) => variant.id === requestedVariant)?.id ?? product.variants.find((variant) => variant.inStock)?.id ?? product.variants[0]?.id ?? null);
+        this.selectedVariantId.set(product.variants.find((variant) => variant.id === requestedVariant && variant.inStock)?.id
+          ?? product.variants.find((variant) => variant.inStock)?.id
+          ?? product.variants[0]?.id
+          ?? null);
         this.loading.set(false);
         this.title.setTitle(`${product.name} | Pinatech`);
         this.meta.updateTag({ name: 'description', content: product.description.slice(0, 155) || `${product.name} en Pinatech.` });

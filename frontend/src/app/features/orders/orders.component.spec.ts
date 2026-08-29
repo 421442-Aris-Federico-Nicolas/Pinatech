@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { BankTransferService } from '../../core/orders/bank-transfer.service';
 import { CHECKOUT_WINDOW, CheckoutService } from '../checkout/checkout.service';
 import { OrdersComponent } from './orders.component';
 
@@ -13,11 +14,14 @@ describe('OrdersComponent', () => {
     paymentStatus: 'PENDING',
     fulfillmentStatus: 'PENDING',
     currency: 'ARS',
-    paymentMethod: null,
+    paymentMethod: 'MERCADO_PAGO',
     deliveryMethod: null,
     fulfillmentMethod: 'PICKUP',
     pickupLocation,
-    total: 3000,
+    subtotal: 3000,
+    paymentDiscount: 0,
+    paymentSurcharge: 300,
+    total: 3300,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
     customerName: 'Ada Lovelace',
@@ -31,6 +35,7 @@ describe('OrdersComponent', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: { mine: () => of([order]) } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
         { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
       ],
     }).compileComponents();
@@ -60,6 +65,7 @@ describe('OrdersComponent', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: { mine } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
         { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
       ],
     }).compileComponents();
@@ -87,6 +93,7 @@ describe('OrdersComponent', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: { mine: () => of([expired]) } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
         { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] }) } },
       ],
     }).compileComponents();
@@ -110,6 +117,7 @@ describe('OrdersComponent', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: { mine: () => of([payable]) } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
         { provide: CheckoutService, useValue: { capabilities: capabilitiesRequest } },
       ],
     }).compileComponents();
@@ -145,6 +153,7 @@ describe('OrdersComponent', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: { mine: () => of([payable]) } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
         { provide: CheckoutService, useValue: {
           capabilities: () => of({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] }),
           mercadoPago,
@@ -162,5 +171,61 @@ describe('OrdersComponent', () => {
 
     expect(mercadoPago).toHaveBeenCalledWith(42, 'PENDING');
     expect(assign).toHaveBeenCalledWith('https://www.mercadopago.com.ar/checkout');
+  });
+
+  it('isolates transfer proof status and upload validation from Mercado Pago retry', async () => {
+    const transfer = { ...order, paymentMethod: 'BANK_TRANSFER' as const, paymentDiscount: 300, paymentSurcharge: 0, total: 2700 };
+    const details = {
+      orderId: 42,
+      paymentDueAt: '2099-07-29T20:00:00Z',
+      bankAccount: { holder: 'Pinatech SA', taxId: '30-12345678-9', bankName: 'Banco', alias: 'PINATECH.PAGOS', cbu: '1234567890123456789012', currency: 'ARS' },
+      proof: null,
+    };
+    const uploaded = { ...details, proof: { id: '4d2e8ab1-46d7-4fd1-a711-7a4d60197be1', status: 'PENDING_REVIEW' as const, originalFilename: 'comprobante.pdf', contentType: 'application/pdf', sizeBytes: 1200, submittedAt: '2026-07-28T21:00:00Z', reviewedAt: null, rejectionReason: null, previewCount: 1 } };
+    const rejected = { ...uploaded, proof: { ...uploaded.proof, status: 'REJECTED' as const, reviewedAt: '2026-07-28T22:00:00Z', rejectionReason: 'El importe no coincide.' } };
+    const get = vi.fn(() => of(details));
+    const uploadProof = vi.fn()
+      .mockReturnValueOnce(of(uploaded))
+      .mockReturnValueOnce(of(rejected));
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([transfer]) } },
+        { provide: BankTransferService, useValue: { get, uploadProof } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: true, paymentMethods: ['MERCADO_PAGO'] }) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('PINATECH.PAGOS');
+    expect(fixture.nativeElement.textContent).not.toContain('Continuar pago');
+
+    const invalid = new File(['x'], 'proof.txt', { type: 'text/plain' });
+    fixture.componentInstance.selectProof(42, { target: { files: [invalid], value: 'proof.txt' } } as unknown as Event);
+    expect(fixture.componentInstance.proofErrors()[42]).toContain('JPEG, PNG o PDF');
+
+    const valid = new File(['proof'], 'proof.pdf', { type: 'application/pdf' });
+    fixture.componentInstance.selectProof(42, { target: { files: [valid], value: 'proof.pdf' } } as unknown as Event);
+    const invalidAfterValid = new File(['x'], 'proof.txt', { type: 'text/plain' });
+    fixture.componentInstance.selectProof(42, { target: { files: [invalidAfterValid], value: 'proof.txt' } } as unknown as Event);
+    expect(fixture.componentInstance.selectedProofs()[42]).toBeUndefined();
+    fixture.componentInstance.selectProof(42, { target: { files: [valid], value: 'proof.pdf' } } as unknown as Event);
+    fixture.componentInstance.uploadProof(42);
+    fixture.detectChanges();
+
+    expect(uploadProof).toHaveBeenCalledWith(42, valid);
+    expect(fixture.componentInstance.orders()[0].paymentStatus).toBe('UNDER_REVIEW');
+    expect(fixture.nativeElement.textContent).toContain('Comprobante pendiente de revisión');
+
+    fixture.componentInstance.selectProof(42, { target: { files: [valid], value: 'proof.pdf' } } as unknown as Event);
+    fixture.componentInstance.uploadProof(42);
+
+    expect(fixture.componentInstance.orders()[0]).toMatchObject({
+      status: 'CANCELLED',
+      paymentStatus: 'REJECTED',
+      fulfillmentStatus: 'CANCELLED',
+    });
   });
 });

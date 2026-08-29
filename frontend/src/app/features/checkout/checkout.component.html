@@ -6,16 +6,21 @@
       <app-feedback class="result-status" tone="success" announce="polite">
         <p class="eyebrow">Pedido registrado</p>
         <h1 id="request-title">Tu pedido #{{ order.id }} está registrado</h1>
-        <p class="result-lead">El pedido se registró y se inició el proceso de pago en <span translate="no">Mercado Pago</span>. Esta pantalla no confirma un pago: consultá el estado informado por nuestro sistema.</p>
+        <p class="result-lead">@if (order.paymentMethod === 'MERCADO_PAGO') { El pedido se registró y se inició el proceso de pago en <span translate="no">Mercado Pago</span>. } @else { El pedido por transferencia se registró. Consultá los datos bancarios y cargá el comprobante desde Mis pedidos. } Esta pantalla no confirma un pago.</p>
       </app-feedback>
-      @if (isReservationExpired(order)) {
-        <app-feedback class="expiration-warning" tone="warning">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</app-feedback>
-      } @else {
-        <p class="reservation-status">La reserva fue informada con vigencia hasta la fecha indicada.</p>
-      }
+      @if (order.paymentMethod === 'MERCADO_PAGO') {
+        @if (isReservationExpired(order)) {
+          <app-feedback class="expiration-warning" tone="warning">La vigencia informada de la reserva ya venció o no es válida. Consultá Mis pedidos antes de continuar.</app-feedback>
+        } @else {
+          <p class="reservation-status">La reserva fue informada con vigencia hasta la fecha indicada.</p>
+        }
+      } @else { <p class="reservation-status">Los datos bancarios y la fecha límite exacta están disponibles en Mis pedidos.</p> }
       <dl>
-        <div><dt>Total de productos</dt><dd>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
-        <div><dt>Vigencia informada de la reserva</dt><dd>@if (reservationExpiration(order); as expiration) { Hasta {{ expiration | date:'medium' }} } @else { Fecha no disponible }</dd></div>
+        <div><dt>Precio de lista</dt><dd>{{ order.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
+        @if (order.paymentDiscount > 0) { <div><dt>Descuento por transferencia</dt><dd>− {{ order.paymentDiscount | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
+        @if (order.paymentSurcharge > 0) { <div><dt>Ajuste histórico de pago</dt><dd>{{ order.paymentSurcharge | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
+        <div><dt>Total</dt><dd>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
+        <div>@if (order.paymentMethod === 'MERCADO_PAGO') { <dt>Vigencia informada de la reserva</dt><dd>@if (reservationExpiration(order); as expiration) { Hasta {{ expiration | date:'medium' }} } @else { Fecha no disponible }</dd> } @else { <dt>Método de pago</dt><dd>{{ methodLabel(order.paymentMethod) }}</dd> }</div>
       </dl>
       <div class="result-actions">
         <a appButton="filled" routerLink="/orders">Ir a Mis pedidos</a>
@@ -35,7 +40,7 @@
       <div>
         <p class="eyebrow">Paso final</p>
         <h1>Revisá tu pedido</h1>
-        <p>Verificá los productos antes de continuar a <span translate="no">Mercado Pago</span>.</p>
+        <p>Verificá los productos y elegí cómo pagar.</p>
       </div>
       <a appButton="text" routerLink="/cart">Editar carrito</a>
     </header>
@@ -54,7 +59,7 @@
                   <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'" decoding="async">
                 } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
                 <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span> · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
-                <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
+                <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }} lista</span>
               </article></li>
             }
           </ul>
@@ -112,21 +117,26 @@
           @if (!reconciling() && !loadingCapabilities()) { @if (capabilities(); as options) {
             @if (!options.orderRequestsEnabled) {
               <app-feedback class="notice" tone="warning">No se pueden iniciar pedidos en este momento.</app-feedback>
-            } @else if (options.onlinePaymentsEnabled) {
-              @if (options.paymentMethods.includes('MERCADO_PAGO')) {
-                <app-feedback class="notice available" tone="success">Podés pagar online de forma segura en <span translate="no">Mercado Pago</span>.</app-feedback>
-              } @else {
-                <app-feedback class="notice" tone="warning"><span translate="no">Mercado Pago</span> no está disponible en este momento.</app-feedback>
-              }
+            } @else if (!bankTransferEnabled(options) && !mercadoPagoEnabled(options)) {
+              <app-feedback class="notice" tone="warning">No hay métodos de pago disponibles en este momento.</app-feedback>
             } @else {
-              <app-feedback class="notice" tone="warning">Los pagos online no están disponibles en este momento.</app-feedback>
+              <fieldset class="payment-methods" [disabled]="submitting()">
+                <legend>Elegí un método de pago</legend>
+                @if (bankTransferEnabled(options)) {
+                  <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'BANK_TRANSFER'">
+                    <input type="radio" name="paymentMethod" value="BANK_TRANSFER" [checked]="selectedPaymentMethod() === 'BANK_TRANSFER'" (change)="selectPaymentMethod($event)">
+                    <span><strong>Transferencia bancaria · {{ options.bankTransferDiscountRate | percent:'1.0-2' }} menos</strong><small>Precio especial: {{ transferPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(transferPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
+                  </label>
+                }
+                @if (mercadoPagoEnabled(options)) {
+                  <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'MERCADO_PAGO'">
+                    <input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="selectedPaymentMethod() === 'MERCADO_PAGO'" (change)="selectPaymentMethod($event)">
+                    <span><strong translate="no">Mercado Pago</strong><small>Precio de lista: {{ mercadoPagoPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(mercadoPagoPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
+                  </label>
+                }
+              </fieldset>
+              <p class="fine-print">La transferencia se revisa después de cargar el comprobante. En <span translate="no">Mercado Pago</span>, la redirección no acredita el pago por sí sola.</p>
             }
-            @if (options.paymentMethods.length) {
-              <p class="methods"><strong>Métodos informados:</strong>
-                @for (method of options.paymentMethods; track method; let last = $last) { <span [attr.translate]="method === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(method) }}</span>{{ last ? '.' : ', ' }} }
-              </p>
-            }
-            <p class="fine-print">Ingresarás los datos de pago únicamente en <span translate="no">Mercado Pago</span>. La redirección no acredita el pago por sí sola.</p>
           } }
         </section>
       </div>
@@ -134,10 +144,13 @@
       <aside appCard class="summary" aria-labelledby="summary-title">
         <p class="eyebrow">Resumen</p>
         <h2 id="summary-title">Tu pedido</h2>
-        <div><span>{{ cart.count() }} {{ cart.count() === 1 ? 'producto' : 'productos' }}</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <div><span>Precio de lista / Mercado Pago</span><strong>{{ selectedPricing().subtotal | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         <div><span>Retiro en Córdoba</span><strong>Sin costo</strong></div>
-        <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <p class="summary-note">Primero reservaremos temporalmente el stock y luego te redirigiremos a <span translate="no">Mercado Pago</span>.</p>
+        @if (selectedPaymentMethod() === 'BANK_TRANSFER') {
+          <div class="discount"><span>Descuento por transferencia ({{ (capabilities()?.bankTransferDiscountRate ?? 0.1) | percent:'1.0-2' }})</span><strong>− {{ selectedPricing().discount | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+        }
+        <div class="total"><span>{{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Precio especial por transferencia' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Total con Mercado Pago' : 'Total de lista' }}</span><strong>{{ selectedPricing().total | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+        <p class="summary-note">La transferencia aplica el descuento una sola vez sobre el precio de lista.</p>
 
         @if (!emailVerified()) {
           <app-feedback class="verification-required" tone="warning">
@@ -155,24 +168,24 @@
           <app-feedback class="error" tone="error" [announce]="reconciling() ? 'polite' : 'assertive'" [attr.aria-busy]="reconciling()">{{ reconciling() ? 'Volviendo a verificar la disponibilidad del carrito.' : reconciliationError() }}<button feedback-actions appButton="outlined" type="button" (click)="reconcileCheckout()" [disabled]="reconciling()">{{ reconciling() ? 'Verificando…' : 'Reintentar verificación' }}</button></app-feedback>
         } @else if (capabilitiesError()) {
           <app-feedback class="error" tone="error" [announce]="loadingCapabilities() ? 'polite' : 'assertive'" [attr.aria-busy]="loadingCapabilities()">{{ loadingCapabilities() ? 'Volviendo a consultar las opciones disponibles.' : capabilitiesError() }}<button feedback-actions appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button></app-feedback>
-        } @else if (capabilities() && !mercadoPagoEnabled()) {
-          <app-feedback class="error" tone="warning"><span translate="no">Mercado Pago</span> no está disponible en este momento.</app-feedback>
+        } @else if (capabilities() && !bankTransferEnabled() && !mercadoPagoEnabled()) {
+          <app-feedback class="error" tone="warning">No hay métodos de pago disponibles en este momento.</app-feedback>
         } @else if (capabilities() && !pickupEnabled()) {
           <app-feedback class="error" tone="warning">No hay un punto de retiro habilitado para completar la compra.</app-feedback>
         }
 
         @if (capabilities()) {
-          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Preparando el pago con Mercado Pago, esperá' : 'Pagar con Mercado Pago'">
+          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Registrando pedido, esperá' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí un método de pago para continuar'">
             @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
-            <span>{{ submitting() ? 'Preparando pago…' : 'Pagar con ' }}@if (!submitting()) { <span translate="no">Mercado Pago</span> }</span>
+            <span>{{ submitting() ? 'Registrando pedido…' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí cómo pagar' }}</span>
           </button>
-          @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y preparando la redirección segura.</p> }
-          <small>{{ !pickupAccepted() && pickupEnabled() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
+          @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y registrando tu elección de pago.</p> }
+          <small>{{ !selectedPaymentMethod() ? 'Elegí un método de pago para continuar.' : !pickupAccepted() && pickupEnabled() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
         }
         @if (submitError()) {
           <app-feedback class="submit-error" tone="error" announce="assertive">
             <p>{{ submitError() }}</p>
-             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
+             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'pending-transfer') { <a routerLink="/orders">Ver pedido pendiente</a> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
           </app-feedback>
         }
       </aside>

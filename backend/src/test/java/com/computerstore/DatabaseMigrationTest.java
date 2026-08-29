@@ -168,7 +168,33 @@ class DatabaseMigrationTest {
                 SELECT is_nullable FROM information_schema.columns
                 WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'password_hash'
                 """, String.class));
-        assertEquals("20", jdbc.queryForObject(
+        assertEquals(11, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'customer_orders'
+                  AND column_name IN ('payment_surcharge', 'payment_discount', 'payment_due_at', 'bank_holder', 'bank_tax_id',
+                    'bank_name', 'bank_alias', 'bank_cbu', 'bank_currency', 'subtotal', 'total')
+                """, Integer.class));
+        assertEquals("0", jdbc.queryForObject("""
+                SELECT column_default FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'customer_orders'
+                  AND column_name = 'payment_discount'
+                """, String.class));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conrelid = 'customer_orders'::regclass
+                  AND conname IN ('chk_customer_orders_payment_adjustments', 'chk_customer_orders_amounts')
+                """, Integer.class));
+        assertEquals(3, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('bank_transfer_proofs', 'bank_transfer_proof_previews', 'email_outbox')
+                """, Integer.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public'
+                  AND tablename = 'customer_orders'
+                  AND indexname = 'uq_customer_orders_one_pending_transfer_per_user'
+                """, Integer.class));
+        assertEquals("22", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }
@@ -209,9 +235,9 @@ class DatabaseMigrationTest {
         Long orderId = jdbc.queryForObject("""
                 INSERT INTO customer_orders (
                     user_id, status, subtotal, total, reservation_expires_at,
-                    currency, payment_status, fulfillment_status
+                    currency, payment_status, fulfillment_status, payment_method
                 ) VALUES (?, 'PENDING_PAYMENT', 100, 100, CURRENT_TIMESTAMP + INTERVAL '10 minutes',
-                          'ARS', 'PENDING', 'PENDING') RETURNING id
+                          'ARS', 'PENDING', 'PENDING', 'MERCADO_PAGO') RETURNING id
                 """, Long.class, userId);
         try {
             Long attemptId = insertAttempt(orderId, "constraint-a");
@@ -236,6 +262,30 @@ class DatabaseMigrationTest {
             jdbc.update("DELETE FROM provider_payments WHERE attempt_id IN (SELECT id FROM payment_attempts WHERE order_id = ?)", orderId);
             jdbc.update("DELETE FROM payment_attempts WHERE order_id = ?", orderId);
             jdbc.update("DELETE FROM customer_orders WHERE id = ?", orderId);
+            jdbc.update("DELETE FROM users WHERE id = ?", userId);
+        }
+    }
+
+    @Test
+    void defaultsPaymentMethodForOrdersInsertedByThePreviousBackendDuringDeployment() {
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash)
+                VALUES ('Rolling', 'Deploy', ?, 'hash') RETURNING id
+                """, Long.class, "rolling-deploy-" + UUID.randomUUID() + "@example.com");
+        Long orderId = null;
+        try {
+            orderId = jdbc.queryForObject("""
+                    INSERT INTO customer_orders (
+                        user_id, status, subtotal, total, reservation_expires_at,
+                        currency, payment_status, fulfillment_status, payment_method
+                    ) VALUES (?, 'PENDING_PAYMENT', 100, 100, CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+                              'ARS', 'PENDING', 'PENDING', NULL) RETURNING id
+                    """, Long.class, userId);
+
+            assertEquals("MERCADO_PAGO", jdbc.queryForObject(
+                    "SELECT payment_method FROM customer_orders WHERE id = ?", String.class, orderId));
+        } finally {
+            if (orderId != null) jdbc.update("DELETE FROM customer_orders WHERE id = ?", orderId);
             jdbc.update("DELETE FROM users WHERE id = ?", userId);
         }
     }

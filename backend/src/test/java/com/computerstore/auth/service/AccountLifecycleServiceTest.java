@@ -63,13 +63,14 @@ class AccountLifecycleServiceTest {
         service.requestPasswordReset(" Missing@Example.com ");
 
         verify(tokens, never()).issue(any(), any(), any());
-        verify(emails, never()).sendAccountAction(any(), any(), any());
+        verify(emails, never()).sendAccountAction(any(), any(), any(), any());
     }
 
     @Test
     void passwordResetRequestIssuesAHashedActionForAnActiveAccount() {
         when(user.getId()).thenReturn(9L);
         when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getFirstName()).thenReturn("Ana");
         when(user.isActive()).thenReturn(true);
         when(users.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
         when(users.findByIdForUpdate(9L)).thenReturn(Optional.of(user));
@@ -77,7 +78,8 @@ class AccountLifecycleServiceTest {
 
         service.requestPasswordReset("user@example.com");
 
-        verify(emails).sendAccountAction("user@example.com", AccountActionPurpose.PASSWORD_RESET, "raw-token");
+        verify(emails).sendAccountAction(
+                "user@example.com", "Ana", AccountActionPurpose.PASSWORD_RESET, "raw-token");
     }
 
     @Test
@@ -92,7 +94,7 @@ class AccountLifecycleServiceTest {
 
         verify(emails).sendEmailVerification("user@example.com", "Ana", "raw-token");
         verify(emails, never()).sendAccountAction(
-                "user@example.com", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token");
+                "user@example.com", "Ana", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token");
     }
 
     @Test

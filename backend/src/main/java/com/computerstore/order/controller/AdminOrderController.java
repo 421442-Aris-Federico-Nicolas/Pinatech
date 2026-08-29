@@ -22,6 +22,9 @@ import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.dto.OrderStatusRequest;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
+import com.computerstore.email.OrderEmailEventType;
+import com.computerstore.email.OrderEmailOutboxService;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.validation.Valid;
 
@@ -32,10 +35,18 @@ public class AdminOrderController {
 
     private final CustomerOrderRepository orders;
     private final OrderStockService stock;
+    private final OrderEmailOutboxService outbox;
 
-    public AdminOrderController(CustomerOrderRepository orders, OrderStockService stock) {
+    @Autowired
+    public AdminOrderController(CustomerOrderRepository orders, OrderStockService stock,
+                                OrderEmailOutboxService outbox) {
         this.orders = orders;
         this.stock = stock;
+        this.outbox = outbox;
+    }
+
+    public AdminOrderController(CustomerOrderRepository orders, OrderStockService stock) {
+        this(orders, stock, null);
     }
 
     @GetMapping
@@ -58,6 +69,11 @@ public class AdminOrderController {
             throw new InvalidStateTransitionException(
                     "A paid order cannot be cancelled until its payment is refunded.");
         }
+        if (request.status() == OrderStatus.CANCELLED
+                && order.getPaymentStatus() == PaymentStatus.UNDER_REVIEW) {
+            throw new InvalidStateTransitionException(
+                    "A transfer under review must be rejected with a reason.");
+        }
         if (order.isReservationExpired(Instant.now())) {
             stock.release(order);
             order.expire();
@@ -77,6 +93,9 @@ public class AdminOrderController {
             }
         } else if (request.status() == OrderStatus.PREPARING && previous != OrderStatus.PREPARING) {
             stock.consume(order);
+        }
+        if (request.status() == OrderStatus.DELIVERED && previous != OrderStatus.DELIVERED && outbox != null) {
+            outbox.enqueue(order, OrderEmailEventType.ORDER_DELIVERED);
         }
         return OrderResponseMapper.toResponse(order);
     }

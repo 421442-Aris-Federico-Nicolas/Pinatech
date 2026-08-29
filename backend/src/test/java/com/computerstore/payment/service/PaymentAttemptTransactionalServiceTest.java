@@ -30,6 +30,7 @@ import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.FulfillmentMethod;
 import com.computerstore.order.domain.OrderItem;
 import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.domain.PaymentStatus;
 import com.computerstore.order.domain.PickupLocationSnapshot;
 import com.computerstore.order.repository.CustomerOrderRepository;
@@ -164,6 +165,35 @@ class PaymentAttemptTransactionalServiceTest {
         assertFalse(result.created());
         assertEquals(attempt.getPublicId(), result.response().attemptId());
         verify(attempts, never()).save(any());
+    }
+
+    @Test
+    void newMercadoPagoPreferenceUsesTheListPriceWithoutSurcharge() {
+        CustomerOrder order = order(NOW.plusSeconds(300));
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+        when(attempts.findActiveByOrderId(any(), any())).thenReturn(List.of());
+        when(attempts.save(any(PaymentAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentPreparation preparation = service.prepare(42L, 7L, "payment-key");
+
+        assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().amount());
+        assertEquals(1, preparation.preferenceRequest().items().size());
+        assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().items().getFirst().unitPrice());
+    }
+
+    @Test
+    void historicalMercadoPagoPreferenceKeepsItsPersistedSurchargeItem() {
+        CustomerOrder order = orderWithHistoricalSurcharge(NOW.plusSeconds(300));
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+        when(attempts.findActiveByOrderId(any(), any())).thenReturn(List.of());
+        when(attempts.save(any(PaymentAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentPreparation preparation = service.prepare(42L, 7L, "payment-key");
+
+        assertEquals(new BigDecimal("110.00"), preparation.preferenceRequest().amount());
+        assertEquals(2, preparation.preferenceRequest().items().size());
+        assertEquals("MERCADO_PAGO_SURCHARGE", preparation.preferenceRequest().items().get(1).id());
+        assertEquals(new BigDecimal("10.00"), preparation.preferenceRequest().items().get(1).unitPrice());
     }
 
     @Test
@@ -328,6 +358,25 @@ class PaymentAttemptTransactionalServiceTest {
 
     private CustomerOrder orderWithChangedPickupSnapshot(Instant expiry) {
         return order(expiry, true, true, "CORDOBA-CENTRO", "Previous pickup name");
+    }
+
+    private CustomerOrder orderWithHistoricalSurcharge(Instant expiry) {
+        Product product = Mockito.mock(Product.class);
+        when(product.getName()).thenReturn("Keyboard");
+        when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        when(variant.getId()).thenReturn(1L);
+        when(variant.getProduct()).thenReturn(product);
+        when(variant.getColorName()).thenReturn("Black");
+        UserAccount user = Mockito.mock(UserAccount.class);
+        when(user.isEmailVerified()).thenReturn(true);
+        PickupLocationSnapshot pickup = new PickupLocationSnapshot(
+                "CORDOBA-CENTRO", "Current pickup name", List.of("Current address", "Local 4"),
+                "Cordoba", "X", "5000", "Current instructions", "Current hours");
+        return new CustomerOrder(
+                user, List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"),
+                new BigDecimal("10.00"), BigDecimal.ZERO, PaymentMethod.MERCADO_PAGO,
+                expiry, null, null, null, null, FulfillmentMethod.PICKUP, pickup);
     }
 
     private CustomerOrder order(

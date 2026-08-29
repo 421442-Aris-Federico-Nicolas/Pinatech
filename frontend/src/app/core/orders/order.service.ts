@@ -25,19 +25,24 @@ export interface PickupLocation {
   hours: string;
 }
 
+export type PaymentMethod = 'BANK_TRANSFER' | 'MERCADO_PAGO';
+
 export interface Order {
   id: number;
   status: string;
   paymentStatus: string;
   fulfillmentStatus: string;
   currency: string;
-  paymentMethod: string | null;
+  paymentMethod: PaymentMethod;
   deliveryMethod: string | null;
   fulfillmentMethod: string | null;
   pickupLocation: PickupLocation | null;
+  subtotal: number;
+  paymentDiscount: number;
+  paymentSurcharge: number;
   total: number;
   createdAt: string;
-  reservationExpiresAt: string;
+  reservationExpiresAt: string | null;
   customerName: string;
   customerEmail: string;
   items: OrderItem[];

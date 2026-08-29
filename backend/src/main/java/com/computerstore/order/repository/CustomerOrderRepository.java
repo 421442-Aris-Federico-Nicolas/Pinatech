@@ -3,6 +3,8 @@ import com.computerstore.order.domain.CustomerOrder;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentMethod;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -14,6 +16,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     List<CustomerOrder> findAllByOrderByCreatedAtDesc();
 
     Optional<CustomerOrder> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+    boolean existsByUserIdAndStatusAndPaymentMethod(Long userId, OrderStatus status, PaymentMethod paymentMethod);
 
     @Query(value = "SELECT EXISTS (SELECT 1 FROM customer_orders customer_order JOIN order_items item ON item.order_id = customer_order.id WHERE item.variant_id = :variantId AND customer_order.status NOT IN ('DELIVERED', 'CANCELLED'))", nativeQuery = true)
     boolean existsActiveByVariantId(@Param("variantId") Long variantId);

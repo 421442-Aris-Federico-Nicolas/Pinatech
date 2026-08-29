@@ -2,6 +2,7 @@ package com.computerstore.order.domain;
 
 public enum PaymentStatus {
     PENDING,
+    UNDER_REVIEW,
     APPROVED,
     REJECTED,
     EXPIRED,

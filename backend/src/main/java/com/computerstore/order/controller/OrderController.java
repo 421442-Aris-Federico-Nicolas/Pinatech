@@ -1,6 +1,7 @@
 package com.computerstore.order.controller;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,16 +20,23 @@ import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.order.config.OrderProperties;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.OrderItem;
+import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.dto.CreateOrderRequest;
 import com.computerstore.order.dto.OrderResponse;
 import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
 import com.computerstore.order.service.FulfillmentPolicy;
+import com.computerstore.payment.config.BankTransferProperties;
+import com.computerstore.email.OrderEmailEventType;
+import com.computerstore.email.OrderEmailOutboxService;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.user.repository.UserAccountRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,20 +53,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/orders")
 public class OrderController {
 
+    public static final BigDecimal BANK_TRANSFER_DISCOUNT_RATE = new BigDecimal("0.10");
+
     private final CustomerOrderRepository orders;
     private final ProductVariantRepository variants;
     private final UserAccountRepository users;
     private final OrderStockService stock;
     private final OrderProperties properties;
     private final FulfillmentPolicy fulfillment;
+    private final BankTransferProperties bankTransfer;
+    private final OrderEmailOutboxService outbox;
 
+    @Autowired
     public OrderController(
             CustomerOrderRepository orders,
             ProductVariantRepository variants,
             UserAccountRepository users,
             OrderStockService stock,
             OrderProperties properties,
-            FulfillmentPolicy fulfillment
+            FulfillmentPolicy fulfillment,
+            ObjectProvider<BankTransferProperties> bankTransfer,
+            ObjectProvider<OrderEmailOutboxService> outbox
     ) {
         this.orders = orders;
         this.variants = variants;
@@ -66,6 +81,22 @@ public class OrderController {
         this.stock = stock;
         this.properties = properties;
         this.fulfillment = fulfillment;
+        this.bankTransfer = bankTransfer.getIfAvailable(() ->
+                new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
+        this.outbox = outbox.getIfAvailable();
+    }
+
+    public OrderController(CustomerOrderRepository orders, ProductVariantRepository variants,
+                           UserAccountRepository users, OrderStockService stock, OrderProperties properties,
+                           FulfillmentPolicy fulfillment) {
+        this.orders = orders;
+        this.variants = variants;
+        this.users = users;
+        this.stock = stock;
+        this.properties = properties;
+        this.fulfillment = fulfillment;
+        this.bankTransfer = new BankTransferProperties(false, "", "", "", "", "", "ARS", null);
+        this.outbox = null;
     }
 
     @PostMapping
@@ -82,13 +113,20 @@ public class OrderController {
         if (!user.isEmailVerified()) {
             throw new EmailVerificationRequiredException();
         }
+        PaymentMethod paymentMethod = request.paymentMethod();
         String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
-        String requestHash = idempotencyKey == null ? null : requestHash(request);
+        String requestHash = idempotencyKey == null ? null : requestHash(request, paymentMethod);
 
         if (idempotencyKey != null) {
             var existing = orders.findByUserIdAndIdempotencyKey(auth.id(), idempotencyKey);
             if (existing.isPresent()) {
-                if (!requestHash.equals(existing.get().getRequestHash())) {
+                boolean sameRequest = requestHash.equals(existing.get().getRequestHash());
+                if (!sameRequest && paymentMethod == PaymentMethod.MERCADO_PAGO
+                        && existing.get().getPaymentMethod() == PaymentMethod.MERCADO_PAGO
+                        && existing.get().getPaymentSurcharge().signum() == 0) {
+                    sameRequest = legacyRequestHash(request).equals(existing.get().getRequestHash());
+                }
+                if (!sameRequest) {
                     throw new DuplicateResourceException("Idempotency key was already used for a different order.");
                 }
                 return ResponseEntity.ok(OrderResponseMapper.toResponse(existing.get()));
@@ -97,6 +135,15 @@ public class OrderController {
 
         var pickupLocation = fulfillment.select(
                 request.fulfillmentMethod(), request.pickupLocationCode(), request.pickupLocationVersion());
+        if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
+            if (!bankTransfer.available()) {
+                throw new InvalidRequestException("Bank transfer payment is not available.");
+            }
+            if (orders.existsByUserIdAndStatusAndPaymentMethod(
+                    auth.id(), OrderStatus.PENDING_PAYMENT, PaymentMethod.BANK_TRANSFER)) {
+                throw new DuplicateResourceException("You already have a pending bank transfer order.");
+            }
+        }
 
         var sortedInputs = request.items().stream()
                 .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId))
@@ -112,17 +159,30 @@ public class OrderController {
             items.add(new OrderItem(variant, input.quantity()));
         }
 
-        BigDecimal total = items.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subtotal = items.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal surcharge = BigDecimal.ZERO.setScale(2);
+        BigDecimal discount = paymentMethod == PaymentMethod.BANK_TRANSFER
+                ? subtotal.multiply(BANK_TRANSFER_DISCOUNT_RATE).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2);
+        Instant now = Instant.now();
+        boolean transfer = paymentMethod == PaymentMethod.BANK_TRANSFER;
         CustomerOrder order = orders.save(new CustomerOrder(
                 user,
                 items,
-                total,
-                Instant.now().plus(properties.reservationTtl()),
+                subtotal,
+                surcharge,
+                discount,
+                paymentMethod,
+                now.plus(transfer ? bankTransfer.proofTtl() : properties.reservationTtl()),
+                transfer ? now.plus(bankTransfer.proofTtl()) : null,
+                transfer ? bankTransfer.snapshot() : null,
                 idempotencyKey,
                 requestHash,
                 request.fulfillmentMethod(),
                 pickupLocation));
         stock.reserve(order);
+        if (outbox != null) outbox.enqueue(order, OrderEmailEventType.ORDER_CREATED);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponseMapper.toResponse(order));
     }
 
@@ -156,16 +216,26 @@ public class OrderController {
         return key;
     }
 
-    private String requestHash(CreateOrderRequest request) {
+    private String requestHash(CreateOrderRequest request, PaymentMethod paymentMethod) {
+        return hash(paymentMethod.name() + "|" + canonicalOrderRequest(request));
+    }
+
+    private String legacyRequestHash(CreateOrderRequest request) {
+        return hash(canonicalOrderRequest(request));
+    }
+
+    private String canonicalOrderRequest(CreateOrderRequest request) {
         String items = request.items().stream()
                 .sorted(Comparator.comparing(CreateOrderRequest.Item::variantId)
                         .thenComparing(CreateOrderRequest.Item::quantity))
                 .map(item -> item.variantId() + ":" + item.quantity())
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
-        String canonicalRequest = request.fulfillmentMethod().name()
-                + "|" + request.pickupLocationCode().trim()
+        return request.fulfillmentMethod().name() + "|" + request.pickupLocationCode().trim()
                 + "|" + request.pickupLocationVersion().trim() + "|" + items;
+    }
+
+    private String hash(String canonicalRequest) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonicalRequest.getBytes(StandardCharsets.UTF_8)));

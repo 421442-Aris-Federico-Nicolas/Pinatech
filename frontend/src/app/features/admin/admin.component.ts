@@ -16,7 +16,7 @@ import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
-import { AdminService, Brand, Category, Inventory, ProductPayload } from './admin.service';
+import { AdminService, Brand, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
@@ -41,6 +41,7 @@ export class AdminComponent {
   private readonly router = inject(Router, { optional: true });
   private readonly notifications = inject(NotificationService);
   private productSnapshot = '';
+  private proofPreviewGeneration = 0;
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
   readonly sidebarCollapsed = signal(false);
@@ -50,6 +51,10 @@ export class AdminComponent {
   readonly brands = signal<Brand[]>([]);
   readonly inventories = signal<Inventory[]>([]);
   readonly orders = signal<Order[]>([]);
+  readonly pendingTransferProofs = signal<PendingBankTransferProof[]>([]);
+  readonly proofPreviewUrls = signal<Record<string, string[]>>({});
+  readonly proofReviewing = signal<string | null>(null);
+  readonly proofReviewError = signal<Record<string, string>>({});
   readonly selected = signal<Product | null>(null);
   readonly inventory = signal<Inventory | null>(null);
   readonly selectedVariantId = signal<number | null>(null);
@@ -72,6 +77,9 @@ export class AdminComponent {
   editingBrandId: number | null = null;
   adjustment = 0;
   adjustmentReason = '';
+  proofAmounts: Record<string, number | null> = {};
+  proofReferences: Record<string, string> = {};
+  proofRejectionReasons: Record<string, string> = {};
 
   readonly soldOrders = computed(() => this.orders().filter((order) => order.paymentStatus === 'APPROVED'));
   readonly revenue = computed(() => this.soldOrders().reduce((total, order) => total + order.total, 0));
@@ -109,7 +117,10 @@ export class AdminComponent {
     const orderId = Number(this.route?.snapshot.queryParamMap.get('order'));
     if (orderId > 0) this.expandedOrder.set(orderId);
     this.productSnapshot = this.productState();
-    this.destroyRef.onDestroy(() => this.revokePendingImages());
+    this.destroyRef.onDestroy(() => {
+      this.revokePendingImages();
+      this.clearProofPreviews();
+    });
     this.reload(true);
   }
 
@@ -123,13 +134,16 @@ export class AdminComponent {
       brands: this.service.brands(),
       inventories: this.service.inventories(),
       orders: this.service.orders(),
+      transferProofs: this.service.pendingBankTransferProofs(),
     }).pipe(finalize(() => this.loading.set(false))).subscribe({
-      next: ({ products, categories, brands, inventories, orders }) => {
+      next: ({ products, categories, brands, inventories, orders, transferProofs }) => {
         this.products.set(products.content);
         this.categories.set(categories);
         this.brands.set(brands);
         this.inventories.set(inventories);
         this.orders.set(orders);
+        this.pendingTransferProofs.set(transferProofs);
+        this.loadProofPreviews(transferProofs);
         const requestedId = Number(this.route?.snapshot.queryParamMap.get('product'));
         const selectedId = this.selected()?.id ?? (requestedId > 0 ? requestedId : null);
         if (selectedId) {
@@ -508,12 +522,14 @@ export class AdminComponent {
     });
   }
 
-  orderActions(status: string): OrderAction[] {
+  orderActions(status: string, paymentStatus?: string): OrderAction[] {
     switch (status as OrderStatus) {
-      case 'PENDING_PAYMENT': return [{ label: 'Cancelar', status: 'CANCELLED', danger: true }];
+      case 'PENDING_PAYMENT': return paymentStatus === 'UNDER_REVIEW'
+        ? []
+        : [{ label: 'Cancelar', status: 'CANCELLED', danger: true }];
       case 'PAID': return [{ label: 'Preparar pedido', status: 'PREPARING' }];
       case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }];
-      case 'READY': return [{ label: 'Marcar entregado', status: 'DELIVERED' }];
+      case 'READY': return [{ label: 'Registrar entrega física', status: 'DELIVERED' }];
       default: return [];
     }
   }
@@ -538,6 +554,110 @@ export class AdminComponent {
   }
   stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
+
+  approveProof(proof: PendingBankTransferProof): void {
+    if (!this.proofPreviewsReady(proof)) {
+      this.setProofError(proof.id, 'Esperá a que carguen todas las vistas previas antes de aprobar.');
+      return;
+    }
+    const amount = Number(this.proofAmounts[proof.id]);
+    const reference = (this.proofReferences[proof.id] ?? '').trim();
+    if (!Number.isFinite(amount) || amount !== proof.total) {
+      this.setProofError(proof.id, `El importe debe coincidir exactamente con ${proof.total.toFixed(2)}.`, `#proof-amount-${proof.id}`);
+      return;
+    }
+    const normalizedReference = reference.toUpperCase().replace(/[\s-]/g, '');
+    if (!/^[A-Z0-9]{6,100}$/.test(normalizedReference)) {
+      this.setProofError(proof.id, 'La referencia debe contener entre 6 y 100 letras o números.', `#proof-reference-${proof.id}`);
+      return;
+    }
+    if (this.proofReviewing() !== null) return;
+    this.proofReviewing.set(proof.id);
+    this.clearProofError(proof.id);
+    this.service.approveBankTransferProof(proof.id, amount, reference).pipe(finalize(() => this.proofReviewing.set(null))).subscribe({
+      next: () => this.finishProofReview(proof, 'Comprobante aprobado y pago acreditado.'),
+      error: () => this.setProofError(proof.id, 'No se pudo aprobar el comprobante.'),
+    });
+  }
+
+  proofPreviewsReady(proof: PendingBankTransferProof): boolean {
+    return proof.previewCount > 0 && (this.proofPreviewUrls()[proof.id]?.length ?? 0) === proof.previewCount;
+  }
+
+  rejectProof(proof: PendingBankTransferProof): void {
+    const reason = (this.proofRejectionReasons[proof.id] ?? '').trim();
+    if (!reason || reason.length > 1000) {
+      this.setProofError(proof.id, 'Ingresá un motivo de hasta 1000 caracteres.', `#proof-reason-${proof.id}`);
+      return;
+    }
+    if (this.proofReviewing() !== null) return;
+    this.proofReviewing.set(proof.id);
+    this.clearProofError(proof.id);
+    this.service.rejectBankTransferProof(proof.id, reason).pipe(finalize(() => this.proofReviewing.set(null))).subscribe({
+      next: () => this.finishProofReview(proof, 'Comprobante rechazado; el cliente podrá ver el motivo.'),
+      error: () => this.setProofError(proof.id, 'No se pudo rechazar el comprobante.'),
+    });
+  }
+
+  private loadProofPreviews(proofs: PendingBankTransferProof[]): void {
+    this.clearProofPreviews();
+    const generation = ++this.proofPreviewGeneration;
+    for (const proof of proofs) {
+      const requests = Array.from({ length: proof.previewCount }, (_, index) => this.service.bankTransferProofPreview(proof.id, index));
+      if (!requests.length) continue;
+      forkJoin(requests).subscribe({
+        next: (blobs) => {
+          const urls = blobs.map((blob) => URL.createObjectURL(blob));
+          if (generation !== this.proofPreviewGeneration) {
+            urls.forEach((url) => URL.revokeObjectURL(url));
+            return;
+          }
+          this.proofPreviewUrls.update((current) => ({ ...current, [proof.id]: urls }));
+        },
+        error: () => this.setProofError(proof.id, 'No se pudo cargar la vista previa sanitizada.'),
+      });
+    }
+  }
+
+  private finishProofReview(proof: PendingBankTransferProof, message: string): void {
+    this.pendingTransferProofs.update((proofs) => proofs.filter((current) => current.id !== proof.id));
+    this.revokeProofPreviews(proof.id);
+    delete this.proofAmounts[proof.id];
+    delete this.proofReferences[proof.id];
+    delete this.proofRejectionReasons[proof.id];
+    this.notifications.success(message);
+    forkJoin({ orders: this.service.orders(), inventories: this.service.inventories() }).subscribe({
+      next: ({ orders, inventories }) => {
+        this.orders.set(orders);
+        this.inventories.set(inventories);
+      },
+      error: () => this.notifications.warning('La revisión se registró, pero no pudimos sincronizar pedidos y stock. Usá Actualizar para reintentar.'),
+    });
+  }
+
+  private clearProofError(proofId: string): void {
+    this.proofReviewError.update((current) => ({ ...current, [proofId]: '' }));
+  }
+
+  private setProofError(proofId: string, message: string, selector?: string): void {
+    this.proofReviewError.update((current) => ({ ...current, [proofId]: message }));
+    if (selector) queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus());
+  }
+
+  private revokeProofPreviews(proofId: string): void {
+    this.proofPreviewUrls()[proofId]?.forEach((url) => URL.revokeObjectURL(url));
+    this.proofPreviewUrls.update((current) => {
+      const next = { ...current };
+      delete next[proofId];
+      return next;
+    });
+  }
+
+  private clearProofPreviews(): void {
+    this.proofPreviewGeneration++;
+    Object.values(this.proofPreviewUrls()).flat().forEach((url) => URL.revokeObjectURL(url));
+    this.proofPreviewUrls.set({});
+  }
 
   private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null }] }; }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {

@@ -22,7 +22,7 @@ describe('CheckoutService', () => {
     expect(request.request.method).toBe('GET');
     request.flush({
       currency: 'ARS', orderRequestsEnabled: true, onlinePaymentsEnabled: true,
-      deliveryQuotesEnabled: false, paymentMethods: ['MERCADO_PAGO'], deliveryMethods: [],
+      deliveryQuotesEnabled: false, paymentMethods: ['MERCADO_PAGO'], bankTransferDiscountRate: 0.1, deliveryMethods: [],
       fulfillmentMethods: ['PICKUP'],
       pickupLocations: [{ code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' }],
     });

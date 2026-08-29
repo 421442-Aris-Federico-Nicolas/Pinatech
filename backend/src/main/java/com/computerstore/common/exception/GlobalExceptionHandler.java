@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException exception, HttpServletRequest request) {
         return problem(HttpStatus.PAYLOAD_TOO_LARGE, "upload-too-large", "Upload too large",
-                "Image files must not exceed 5 MiB.", request);
+                "Files must not exceed 5 MiB.", request);
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
@@ -78,7 +78,7 @@ public class GlobalExceptionHandler {
     ProblemDetail handleStorage(FileStorageException exception, HttpServletRequest request) {
         LOGGER.error("File storage error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "file-storage-error", "File storage error",
-                "The image file could not be processed.", request);
+                "The file could not be processed.", request);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
