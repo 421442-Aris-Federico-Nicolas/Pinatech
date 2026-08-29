@@ -32,6 +32,11 @@ describe('AppProductCardComponent', () => {
     const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
     expect(select.value).toBe('1');
     expect(button.disabled).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Precio especial por transferencia');
+    expect(fixture.nativeElement.textContent).toContain('10% menos');
+    expect(fixture.nativeElement.textContent).toContain('Precio de lista / Mercado Pago');
+    expect(fixture.nativeElement.textContent).toContain('$90.00');
+    expect(fixture.nativeElement.textContent).not.toContain('recargo');
 
     button.click();
     expect(added).toEqual([product.variants[1]]);

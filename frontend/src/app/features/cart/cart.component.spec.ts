@@ -49,6 +49,23 @@ describe('CartComponent', () => {
     expect(link.classList).toContain('app-button');
     expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
     expect(fixture.nativeElement.textContent).not.toContain('Confirmar pedido');
+    expect(fixture.nativeElement.textContent).not.toContain('Descuento por transferencia');
+    expect(fixture.nativeElement.textContent).not.toContain('recargo');
+    expect(fixture.componentInstance.selectedPricing()).toEqual({ subtotal: 3000, discount: 0, total: 3000 });
+    expect(fixture.componentInstance.unitPrice(item)).toBe(1500);
+    expect(fixture.componentInstance.itemTotal(item)).toBe(3000);
+
+    (fixture.nativeElement.querySelector('.transfer-option input') as HTMLInputElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Descuento por transferencia');
+    expect(fixture.nativeElement.textContent).toContain('10%');
+    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
+    expect(fixture.componentInstance.selectedPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
+    expect(fixture.componentInstance.unitPrice(item)).toBe(1350);
+    expect(fixture.componentInstance.itemTotal(item)).toBe(2700);
+    expect((fixture.nativeElement.querySelector('a[href^="/checkout"]') as HTMLAnchorElement).getAttribute('href'))
+      .toBe('/checkout?paymentMethod=BANK_TRANSFER');
     expect(cart.checkout).not.toHaveBeenCalled();
   });
 

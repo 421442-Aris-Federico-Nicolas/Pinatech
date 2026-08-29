@@ -4,7 +4,8 @@ import { catchError, forkJoin, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Product, ProductVariant } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
-import { PickupLocation } from '../orders/order.service';
+import { PaymentMethod, PickupLocation } from '../orders/order.service';
+import { roundMoney } from '../payments/payment-pricing';
 
 export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
 export interface CartAddResult { requested: number; added: number; quantity: number; limit: number; capped: boolean; }
@@ -14,13 +15,16 @@ export interface OrderConfirmation {
   paymentStatus: string;
   fulfillmentStatus: string;
   currency: string;
-  paymentMethod: string | null;
+  paymentMethod: PaymentMethod;
   deliveryMethod: string | null;
   fulfillmentMethod: string | null;
   pickupLocation: PickupLocation | null;
+  subtotal: number;
+  paymentDiscount: number;
+  paymentSurcharge: number;
   total: number;
   createdAt: string;
-  reservationExpiresAt: string;
+  reservationExpiresAt: string | null;
 }
 
 const GUEST_CART_KEY = 'pinatech-cart-guest';
@@ -47,7 +51,7 @@ export class CartService {
   readonly legacyCartDiscarded = this.legacyCartDiscardedState.asReadonly();
   readonly notice = this.noticeState.asReadonly();
   readonly count = computed(() => this.itemsState().reduce((total, item) => total + item.quantity, 0));
-  readonly total = computed(() => this.itemsState().reduce((total, item) => total + item.product.price * item.quantity, 0));
+  readonly total = computed(() => roundMoney(this.itemsState().reduce((total, item) => total + item.product.price * item.quantity, 0)));
 
   constructor() {
     effect(() => {
@@ -145,14 +149,15 @@ export class CartService {
     );
   }
 
-  checkout(fulfillmentMethod: string, pickupLocationCode: string, pickupLocationVersion: string) {
+  checkout(paymentMethod: PaymentMethod, fulfillmentMethod: string, pickupLocationCode: string, pickupLocationVersion: string) {
     const items = this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity }));
-    const requestHash = `${fulfillmentMethod}|${pickupLocationCode}|${pickupLocationVersion}|${[...items]
+    const requestHash = `${paymentMethod}|${fulfillmentMethod}|${pickupLocationCode}|${pickupLocationVersion}|${[...items]
       .sort((left, right) => left.variantId - right.variantId || left.quantity - right.quantity)
       .map((item) => `${item.variantId}:${item.quantity}`).join(',')}`;
     const idempotencyKey = this.checkoutAttempt(requestHash);
     return this.http.post<OrderConfirmation>(`${environment.apiBaseUrl}/orders`, {
       items,
+      paymentMethod,
       fulfillmentMethod,
       pickupLocationCode,
       pickupLocationVersion,
@@ -279,20 +284,23 @@ export class CartService {
       const value = parsed as Record<string, unknown>;
       const reservationExpiresAt = typeof value['reservationExpiresAt'] === 'string'
         ? Date.parse(value['reservationExpiresAt'])
-        : Number.NaN;
-      if (!Number.isFinite(reservationExpiresAt) || reservationExpiresAt <= Date.now()) {
+        : value['reservationExpiresAt'] === null ? Number.POSITIVE_INFINITY : Number.NaN;
+      if (!Number.isFinite(reservationExpiresAt) && reservationExpiresAt !== Number.POSITIVE_INFINITY || reservationExpiresAt <= Date.now()) {
         this.remove(storageKey);
         return null;
       }
 
       return typeof value['id'] === 'number' && Number.isFinite(value['id'])
+        && typeof value['subtotal'] === 'number' && Number.isFinite(value['subtotal'])
+        && (value['paymentDiscount'] === undefined || typeof value['paymentDiscount'] === 'number' && Number.isFinite(value['paymentDiscount']))
+        && (value['paymentSurcharge'] === undefined || typeof value['paymentSurcharge'] === 'number' && Number.isFinite(value['paymentSurcharge']))
         && typeof value['total'] === 'number' && Number.isFinite(value['total'])
         && typeof value['createdAt'] === 'string'
         && typeof value['status'] === 'string'
         && typeof value['paymentStatus'] === 'string'
         && typeof value['fulfillmentStatus'] === 'string'
         && typeof value['currency'] === 'string'
-        && (typeof value['paymentMethod'] === 'string' || value['paymentMethod'] === null)
+        && (value['paymentMethod'] === 'BANK_TRANSFER' || value['paymentMethod'] === 'MERCADO_PAGO')
         && (typeof value['deliveryMethod'] === 'string' || value['deliveryMethod'] === null)
         && (typeof value['fulfillmentMethod'] === 'string' || value['fulfillmentMethod'] == null)
         && (value['pickupLocation'] == null || this.isPickupLocation(value['pickupLocation']))
@@ -302,13 +310,16 @@ export class CartService {
           paymentStatus: value['paymentStatus'],
           fulfillmentStatus: value['fulfillmentStatus'],
           currency: value['currency'],
-          paymentMethod: value['paymentMethod'] as string | null,
+          paymentMethod: value['paymentMethod'],
           deliveryMethod: value['deliveryMethod'] as string | null,
           fulfillmentMethod: typeof value['fulfillmentMethod'] === 'string' ? value['fulfillmentMethod'] : null,
           pickupLocation: this.isPickupLocation(value['pickupLocation']) ? value['pickupLocation'] : null,
+          subtotal: value['subtotal'],
+          paymentDiscount: typeof value['paymentDiscount'] === 'number' ? value['paymentDiscount'] : 0,
+          paymentSurcharge: typeof value['paymentSurcharge'] === 'number' ? value['paymentSurcharge'] : 0,
           total: value['total'],
           createdAt: value['createdAt'],
-          reservationExpiresAt: value['reservationExpiresAt'] as string,
+          reservationExpiresAt: value['reservationExpiresAt'] as string | null,
         }
         : null;
     } catch {

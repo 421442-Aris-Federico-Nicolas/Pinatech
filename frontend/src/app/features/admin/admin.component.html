@@ -61,6 +61,34 @@
     }
 
     @if (!loading() && section() === 'sales') {
+      <section appCard class="panel proof-queue" aria-labelledby="proof-queue-title">
+        <header><div><p class="panel-kicker">Transferencias</p><h2 id="proof-queue-title">Comprobantes pendientes de revisión</h2></div><strong>{{ pendingTransferProofs().length }}</strong></header>
+        @for (proof of pendingTransferProofs(); track proof.id) {
+          <article class="proof-review" [attr.aria-busy]="proofReviewing() === proof.id">
+            <div class="proof-summary"><div><strong>Pedido #{{ proof.orderId }}</strong><span>{{ proof.customerName }} · {{ proof.customerEmail }}</span><span>{{ proof.originalFilename }} · {{ proof.sizeBytes | number }} bytes</span><small>Enviado {{ proof.submittedAt | date:'medium' }}</small></div><strong>{{ proof.total | currency:proof.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            @if (proofPreviewUrls()[proof.id]?.length) {
+              <div class="proof-previews" aria-label="Vistas previas sanitizadas del comprobante">
+                @for (url of proofPreviewUrls()[proof.id]; track url; let index = $index) { <img [src]="url" [alt]="'Vista previa sanitizada ' + (index + 1) + ' del comprobante del pedido ' + proof.orderId" loading="lazy"> }
+              </div>
+            } @else if (!proofReviewError()[proof.id]) { <p class="preview-status" role="status">Cargando vista previa sanitizada…</p> }
+            <div class="proof-actions">
+              <fieldset [disabled]="proofReviewing() !== null">
+                <legend>Aprobar transferencia</legend>
+                <label [for]="'proof-amount-' + proof.id">Importe acreditado</label><input [id]="'proof-amount-' + proof.id" type="number" [min]="proof.total" [max]="proof.total" step="0.01" inputmode="decimal" [ngModel]="proofAmounts[proof.id]" (ngModelChange)="proofAmounts[proof.id] = $event" [name]="'proofAmount' + proof.id" required>
+                <label [for]="'proof-reference-' + proof.id">Referencia bancaria</label><input [id]="'proof-reference-' + proof.id" type="text" autocomplete="off" minlength="6" maxlength="100" [ngModel]="proofReferences[proof.id]" (ngModelChange)="proofReferences[proof.id] = $event" [name]="'proofReference' + proof.id" required>
+                <button appButton="filled" type="button" [disabled]="proofReviewing() !== null || !proofPreviewsReady(proof)" (click)="approveProof(proof)">Aprobar y acreditar</button>
+              </fieldset>
+              <fieldset [disabled]="proofReviewing() !== null">
+                <legend>Rechazar comprobante</legend>
+                <label [for]="'proof-reason-' + proof.id">Motivo para el cliente</label><textarea [id]="'proof-reason-' + proof.id" rows="3" maxlength="1000" [ngModel]="proofRejectionReasons[proof.id]" (ngModelChange)="proofRejectionReasons[proof.id] = $event" [name]="'proofReason' + proof.id" required></textarea>
+                <button appButton="outlined" tone="danger" type="button" [disabled]="proofReviewing() !== null" (click)="rejectProof(proof)">Rechazar comprobante</button>
+              </fieldset>
+            </div>
+            @if (proofReviewing() === proof.id) { <p class="review-status" role="status">Registrando revisión…</p> }
+            @if (proofReviewError()[proof.id]) { <p class="proof-review-error" role="alert">{{ proofReviewError()[proof.id] }}</p> }
+          </article>
+        } @empty { <p class="empty-row">No hay comprobantes pendientes de revisión.</p> }
+      </section>
       <section class="sales-toolbar">
         <div class="filter-tabs" aria-label="Filtrar pedidos">@for(filter of [['ALL','Todos'],['PENDING_PAYMENT','Pendientes'],['PAID','Pagados'],['PREPARING','Preparando'],['DELIVERED','Entregados'],['CANCELLED','Cancelados']];track filter[0]){<button type="button" [class.active]="orderFilter() === filter[0]" [attr.aria-pressed]="orderFilter() === filter[0]" (click)="filterOrders(filter[0])">{{ filter[1] }} <span>{{ filter[0] === 'ALL' ? orders().length : statusCount(filter[0]) }}</span></button>}</div>
       </section>
@@ -79,7 +107,7 @@
             @if(expandedOrder() === order.id){
               <div class="order-detail" [id]="'order-detail-' + order.id" animate.enter="order-detail-enter" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
                 <div class="order-items"><h3>Detalle del pedido</h3>@for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}</div>
-                <div class="order-actions"><p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT'){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
+                <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
               </div>
             }
           </article>
@@ -91,12 +119,12 @@
       <section class="catalog-workspace">
         <aside appCard class="panel product-list">
           <header><div><p class="panel-kicker">{{ products().length }} activos</p><h2>Productos</h2></div><button type="button" aria-label="Crear producto" (click)="resetProduct()">+</button></header>
-          <div class="items">@for(product of products();track product.id){<button type="button" class="product-row" [class.selected]="selected()?.id === product.id" [attr.aria-pressed]="selected()?.id === product.id" (click)="select(product)"><span class="product-avatar">{{ product.name.charAt(0) }}</span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ product.price | currency:'ARS':'symbol-narrow':'1.0-2' }}</small></span></button>}@empty{<p class="empty-row">No hay productos activos.</p>}</div>
+          <div class="items">@for(product of products();track product.id){<button type="button" class="product-row" [class.selected]="selected()?.id === product.id" [attr.aria-pressed]="selected()?.id === product.id" (click)="select(product)"><span class="product-avatar">{{ product.name.charAt(0) }}</span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · Lista {{ product.price | currency:'ARS':'symbol-narrow':'1.0-2' }}</small></span></button>}@empty{<p class="empty-row">No hay productos activos.</p>}</div>
         </aside>
         <form appCard class="panel editor" #productForm="ngForm" (ngSubmit)="saveProduct(productForm)" novalidate>
           <header><div><p class="panel-kicker">{{ selected() ? 'Producto #' + selected()!.id : 'Alta de producto' }}</p><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2></div>@if(selected()){<button class="text-danger" appButton="text" tone="danger" type="button" [disabled]="saving() || deactivatingProduct()" (click)="deleteProduct()">{{ deactivatingProduct() ? 'Dando de baja…' : 'Dar de baja' }}</button>}</header>
           <fieldset class="product-editor-fields" [disabled]="saving()">
-            <div class="product-form"><app-input label="Nombre" [(ngModel)]="form.name" (ngModelChange)="updateSlug()" name="productName" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse Pinatech Pro…" required /><app-input label="Slug" [(ngModel)]="form.slug" name="productSlug" autocomplete="off" spellcheck="false" placeholder="Ej. mouse-pinatech-pro…" required /><app-input label="Precio" type="number" [min]="0.01" step="0.01" [(ngModel)]="form.price" name="productPrice" inputMode="decimal" required /><app-select label="Categoría" [options]="categoryOptions()" [(ngModel)]="form.categoryId" name="productCategory" [disabled]="saving()" required /><app-select label="Marca" [options]="brandOptions()" [(ngModel)]="form.brandId" name="productBrand" [disabled]="saving()" required /><app-textarea class="wide" label="Descripción" [rows]="5" [(ngModel)]="form.description" name="productDescription" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse inalámbrico para uso profesional…" required /></div>
+            <div class="product-form"><app-input label="Nombre" [(ngModel)]="form.name" (ngModelChange)="updateSlug()" name="productName" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse Pinatech Pro…" required /><app-input label="Slug" [(ngModel)]="form.slug" name="productSlug" autocomplete="off" spellcheck="false" placeholder="Ej. mouse-pinatech-pro…" required /><app-input label="Precio de lista / Mercado Pago" type="number" [min]="0.01" step="0.01" [(ngModel)]="form.price" name="productPrice" inputMode="decimal" required /><app-select label="Categoría" [options]="categoryOptions()" [(ngModel)]="form.categoryId" name="productCategory" [disabled]="saving()" required /><app-select label="Marca" [options]="brandOptions()" [(ngModel)]="form.brandId" name="productBrand" [disabled]="saving()" required /><app-textarea class="wide" label="Descripción" [rows]="5" [(ngModel)]="form.description" name="productDescription" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse inalámbrico para uso profesional…" required /></div>
           <section class="variants-editor">
              <div class="section-label"><div><h3>Colores y variantes</h3><p>Cada color tendrá su propio stock. El orden se respeta en la tienda.</p></div><button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button></div>
             @for (variant of form.variants; track variant.id ?? $index; let index = $index) {

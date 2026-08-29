@@ -1,11 +1,13 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, PercentPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
-import { finalize, map, switchMap } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { finalize, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartService, OrderConfirmation } from '../../core/cart/cart.service';
+import { PaymentMethod } from '../../core/orders/order.service';
+import { bankTransferPrice, listPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel } from '../../core/utils/estado-label';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
@@ -15,7 +17,7 @@ import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService } from './checko
 
 @Component({
   selector: 'app-checkout',
-  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, DatePipe, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, DatePipe, PercentPipe, RouterLink],
   templateUrl: './checkout.component.html',
   styleUrl: './checkout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,11 +27,16 @@ export class CheckoutComponent {
   readonly cart = inject(CartService);
   private readonly checkoutService = inject(CheckoutService);
   private readonly browserWindow = inject(CHECKOUT_WINDOW);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly capabilities = signal<CheckoutCapabilities | null>(null);
   readonly selectedPickupCode = signal('');
+  readonly selectedPaymentMethod = signal<PaymentMethod | null>(
+    this.route.snapshot.queryParamMap.get('paymentMethod') === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : null,
+  );
   readonly pickupAccepted = signal(false);
   readonly created = signal<OrderConfirmation | null>(this.cart.items().length ? null : this.cart.confirmation());
   readonly reconciling = signal(false);
@@ -40,10 +47,19 @@ export class CheckoutComponent {
   readonly capabilitiesError = signal('');
   readonly submitError = signal('');
   readonly verificationNotice = signal('');
-  readonly submitErrorKind = signal<'verification' | 'conflict' | 'network' | 'generic' | null>(null);
+  readonly submitErrorKind = signal<'verification' | 'pending-transfer' | 'conflict' | 'network' | 'generic' | null>(null);
   readonly emailVerified = computed(() => this.auth.user()?.emailVerified === true);
   readonly selectedPickup = computed(() => this.capabilities()?.pickupLocations
     .find((location) => location.code === this.selectedPickupCode()) ?? null);
+  readonly transferPricing = computed(() => bankTransferPrice(
+    this.cart.total(),
+    this.capabilities()?.bankTransferDiscountRate ?? 0.1,
+  ));
+  readonly mercadoPagoPricing = computed(() => listPrice(this.cart.total()));
+  readonly selectedPricing = computed(() => this.selectedPaymentMethod() === 'BANK_TRANSFER'
+    ? this.transferPricing()
+    : this.mercadoPagoPricing());
+  readonly priceWithoutTax = priceWithoutNationalTax;
 
   constructor() {
     this.reconcileCheckout();
@@ -74,6 +90,9 @@ export class CheckoutComponent {
     ).subscribe({
       next: (capabilities) => {
         this.capabilities.set(capabilities);
+        if (this.selectedPaymentMethod() && !capabilities.paymentMethods.includes(this.selectedPaymentMethod()!)) {
+          this.selectedPaymentMethod.set(null);
+        }
         const currentCode = this.selectedPickupCode();
         const selectedCode = capabilities.pickupLocations.some((location) => location.code === currentCode)
           ? currentCode
@@ -95,25 +114,27 @@ export class CheckoutComponent {
   submit(): void {
     const capabilities = this.capabilities();
     const pickup = this.selectedPickup();
-    if (this.submitting() || !this.cart.items().length || !pickup || !this.canSubmit(capabilities)) return;
+    const paymentMethod = this.selectedPaymentMethod();
+    if (this.submitting() || !this.cart.items().length || !pickup || !paymentMethod || !this.canSubmit(capabilities)) return;
 
     this.submitting.set(true);
     this.submitError.set('');
     this.submitErrorKind.set(null);
-    this.cart.checkout('PICKUP', pickup.code, pickup.version).pipe(
-      switchMap((order) => this.checkoutService.mercadoPago(order.id, order.paymentStatus).pipe(
-        map((payment) => {
+    this.cart.checkout(paymentMethod, 'PICKUP', pickup.code, pickup.version).pipe(
+      switchMap((order) => paymentMethod === 'MERCADO_PAGO'
+        ? this.checkoutService.mercadoPago(order.id, order.paymentStatus).pipe(map((payment) => {
           if (!payment.checkoutUrl.trim()) throw new Error('Mercado Pago did not return a checkout URL.');
           return { order, payment };
-        }),
-      )),
+        }))
+        : of({ order, payment: null })),
       finalize(() => this.submitting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: ({ order, payment }) => {
         this.cart.completeCheckout(order);
         this.created.set(order);
-        this.browserWindow.location.assign(payment.checkoutUrl);
+        if (payment) this.browserWindow.location.assign(payment.checkoutUrl);
+        else void this.router.navigate(['/orders'], { queryParams: { order: order.id } });
       },
       error: (error: unknown) => this.handleSubmitError(error),
     });
@@ -128,6 +149,12 @@ export class CheckoutComponent {
 
   setPickupAccepted(event: Event): void {
     this.pickupAccepted.set((event.target as HTMLInputElement).checked);
+  }
+
+  selectPaymentMethod(event: Event): void {
+    this.selectedPaymentMethod.set((event.target as HTMLInputElement).value as PaymentMethod);
+    this.submitError.set('');
+    this.submitErrorKind.set(null);
   }
 
   resendVerification(): void {
@@ -156,12 +183,22 @@ export class CheckoutComponent {
       && capabilities.paymentMethods.includes('MERCADO_PAGO');
   }
 
+  bankTransferEnabled(capabilities = this.capabilities()): boolean {
+    return !!capabilities?.orderRequestsEnabled && capabilities.paymentMethods.includes('BANK_TRANSFER');
+  }
+
+  selectedPaymentEnabled(capabilities = this.capabilities()): boolean {
+    const method = this.selectedPaymentMethod();
+    return method === 'BANK_TRANSFER' ? this.bankTransferEnabled(capabilities)
+      : method === 'MERCADO_PAGO' ? this.mercadoPagoEnabled(capabilities) : false;
+  }
+
   pickupEnabled(capabilities = this.capabilities()): boolean {
     return !!capabilities?.fulfillmentMethods.includes('PICKUP') && !!this.selectedPickup();
   }
 
   canSubmit(capabilities = this.capabilities()): boolean {
-    return this.mercadoPagoEnabled(capabilities)
+    return this.selectedPaymentEnabled(capabilities)
       && this.pickupEnabled(capabilities)
       && this.pickupAccepted()
       && this.emailVerified();
@@ -173,7 +210,7 @@ export class CheckoutComponent {
   }
 
   reservationExpiration(order: OrderConfirmation): string | null {
-    return Number.isFinite(Date.parse(order.reservationExpiresAt)) ? order.reservationExpiresAt : null;
+    return order.reservationExpiresAt && Number.isFinite(Date.parse(order.reservationExpiresAt)) ? order.reservationExpiresAt : null;
   }
 
   isReservationExpired(order: OrderConfirmation): boolean {
@@ -186,16 +223,25 @@ export class CheckoutComponent {
   }
 
   private handleSubmitError(error: unknown): void {
-    let kind: 'verification' | 'conflict' | 'network' | 'generic' = 'generic';
-    let message = 'No pudimos iniciar el pago. Conservamos tu carrito para que puedas reintentarlo sin duplicar el pedido.';
+    let kind: 'verification' | 'pending-transfer' | 'conflict' | 'network' | 'generic' = 'generic';
+    let message = 'No pudimos completar la compra. Conservamos tu carrito para que puedas reintentarlo sin duplicar el pedido.';
 
     if (error instanceof HttpErrorResponse) {
       const problemType = error.error && typeof error.error === 'object'
         ? (error.error as Record<string, unknown>)['type']
         : null;
+      const problemDetail = error.error && typeof error.error === 'object'
+        ? (error.error as Record<string, unknown>)['detail']
+        : null;
       if (error.status === 403 && typeof problemType === 'string' && problemType.endsWith('email-verification-required')) {
         kind = 'verification';
         message = 'Necesitás verificar tu email antes de comprar. Revisá tu perfil y volvé a intentarlo; conservamos tu carrito.';
+      } else if (error.status === 409 && this.selectedPaymentMethod() === 'BANK_TRANSFER'
+          && typeof problemDetail === 'string' && problemDetail.includes('pending bank transfer order')) {
+        kind = 'pending-transfer';
+        message = this.mercadoPagoEnabled()
+          ? 'Ya tenés un pedido por transferencia pendiente. Revisalo antes de crear otro o elegí Mercado Pago.'
+          : 'Ya tenés un pedido por transferencia pendiente. Revisalo antes de crear otro.';
       } else if (error.status === 409) {
         kind = 'conflict';
         message = 'Cambió el stock o el pedido entró en conflicto. Revisá el carrito antes de reintentar; no quitamos tus productos.';

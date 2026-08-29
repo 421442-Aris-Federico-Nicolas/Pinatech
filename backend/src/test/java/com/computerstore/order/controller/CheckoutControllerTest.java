@@ -14,6 +14,7 @@ import com.computerstore.security.CustomUserDetailsService;
 import com.computerstore.security.JwtService;
 import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.payment.config.MercadoPagoProperties;
+import com.computerstore.payment.config.BankTransferProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +38,9 @@ class CheckoutControllerTest {
     @MockBean
     private FulfillmentPolicy fulfillmentPolicy;
 
+    @MockBean
+    private BankTransferProperties bankTransferProperties;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -48,6 +52,8 @@ class CheckoutControllerTest {
                 .andExpect(jsonPath("$.orderRequestsEnabled").value(false))
                 .andExpect(jsonPath("$.onlinePaymentsEnabled").value(false))
                 .andExpect(jsonPath("$.deliveryQuotesEnabled").value(false))
+                .andExpect(jsonPath("$.mercadoPagoSurchargeRate").value(0))
+                .andExpect(jsonPath("$.bankTransferDiscountRate").value(0.1))
                 .andExpect(jsonPath("$.paymentMethods").isEmpty())
                 .andExpect(jsonPath("$.deliveryMethods").isEmpty())
                 .andExpect(jsonPath("$.fulfillmentMethods").isEmpty())
@@ -57,6 +63,7 @@ class CheckoutControllerTest {
     @Test
     void exposesTheConfiguredPickupPointAndAvailableMethods() throws Exception {
         when(mercadoPagoProperties.enabled()).thenReturn(true);
+        when(bankTransferProperties.available()).thenReturn(true);
         when(fulfillmentPolicy.availableMethods()).thenReturn(List.of(FulfillmentMethod.PICKUP));
         when(fulfillmentPolicy.activePickupLocation()).thenReturn(Optional.of(new PickupLocationSnapshot(
                 "CORDOBA-CENTRO", "Pinatech Cordoba", List.of("Street 123", "Local 4"),
@@ -67,6 +74,7 @@ class CheckoutControllerTest {
                 .andExpect(jsonPath("$.orderRequestsEnabled").value(true))
                 .andExpect(jsonPath("$.onlinePaymentsEnabled").value(true))
                 .andExpect(jsonPath("$.paymentMethods[0]").value("MERCADO_PAGO"))
+                .andExpect(jsonPath("$.paymentMethods[1]").value("BANK_TRANSFER"))
                 .andExpect(jsonPath("$.fulfillmentMethods[0]").value("PICKUP"))
                 .andExpect(jsonPath("$.pickupLocations[0].code").value("CORDOBA-CENTRO"))
                 .andExpect(jsonPath("$.pickupLocations[0].addressLines[1]").value("Local 4"))

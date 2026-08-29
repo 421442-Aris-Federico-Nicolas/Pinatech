@@ -7,7 +7,7 @@ import { AdminService } from './admin.service';
 describe('AdminComponent payments', () => {
   const renderedOrder: Order = {
     id: 41, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
-    paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, total: 240,
+    paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 240, paymentDiscount: 0, paymentSurcharge: 24, total: 264,
     createdAt: '2026-08-17T10:00:00Z', reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com', items: [{ productId: 4, variantId: 9, productName: 'Mouse', colorName: 'Negro', colorHex: '#000000', unitPrice: 120, quantity: 2, subtotal: 240 }],
   };
@@ -19,7 +19,7 @@ describe('AdminComponent payments', () => {
         provide: AdminService,
         useValue: {
           products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]),
-          inventories: () => of([]), orders: () => of([renderedOrder]),
+          inventories: () => of([]), orders: () => of([renderedOrder]), pendingBankTransferProofs: () => of([]),
         },
       }],
       animationsEnabled,
@@ -37,7 +37,7 @@ describe('AdminComponent payments', () => {
         provide: AdminService,
         useValue: {
           products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]),
-          inventories: () => of([]), orders: () => of([]),
+          inventories: () => of([]), orders: () => of([]), pendingBankTransferProofs: () => of([]),
         },
       }],
     }).compileComponents();
@@ -45,7 +45,7 @@ describe('AdminComponent payments', () => {
     const component = fixture.componentInstance;
     const base: Order = {
       id: 1, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
-      paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, total: 100, createdAt: '2026-08-17T10:00:00Z',
+      paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 100, paymentDiscount: 0, paymentSurcharge: 10, total: 110, createdAt: '2026-08-17T10:00:00Z',
       reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada', customerEmail: 'ada@example.com', items: [],
     };
 
@@ -56,11 +56,13 @@ describe('AdminComponent payments', () => {
     ]);
 
     expect(component.soldOrders().map((order) => order.id)).toEqual([1]);
-    expect(component.revenue()).toBe(100);
-    expect(component.averageTicket()).toBe(100);
+    expect(component.revenue()).toBe(110);
+    expect(component.averageTicket()).toBe(110);
     expect(component.orderActions('PENDING_PAYMENT').map((action) => action.label)).toEqual(['Cancelar']);
+    expect(component.orderActions('PENDING_PAYMENT', 'UNDER_REVIEW')).toEqual([]);
     expect(component.orderActions('PAID').map((action) => action.label)).toEqual(['Preparar pedido']);
     expect(component.orderActions('PREPARING').map((action) => action.label)).toEqual(['Marcar listo']);
+    expect(component.orderActions('READY').map((action) => action.label)).toEqual(['Registrar entrega física']);
   });
 
   it('initializes real taxonomy selections and does not refresh over dirty product edits without confirmation', async () => {
@@ -74,7 +76,7 @@ describe('AdminComponent payments', () => {
           categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
           brands: () => of([{ id: 8, name: 'Pina' }]),
           inventories: () => of([]),
-          orders: () => of([]),
+          orders: () => of([]), pendingBankTransferProofs: () => of([]),
         },
       }],
     }).compileComponents();
@@ -103,7 +105,7 @@ describe('AdminComponent payments', () => {
           categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
           brands: () => of([{ id: 8, name: 'Pina' }]),
           inventories: () => of([]),
-          orders: () => of([]),
+          orders: () => of([]), pendingBankTransferProofs: () => of([]),
           createProduct,
         },
       }],
@@ -140,6 +142,8 @@ describe('AdminComponent payments', () => {
     const detail = fixture.nativeElement.querySelector('#order-detail-41') as HTMLElement;
     expect(summary.getAttribute('aria-expanded')).toBe('true');
     expect(detail.textContent).toContain('2 × Mouse');
+    expect(detail.textContent).toContain('Ajuste histórico de pago');
+    expect(detail.textContent).not.toContain('recargo');
     expect(detail.getAttribute('aria-hidden')).toBeNull();
     expect(detail.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(summary);
@@ -186,5 +190,60 @@ describe('AdminComponent payments', () => {
       expect(detail.hasAttribute('inert')).toBe(true);
     }
     expect(fixture.nativeElement.querySelector('.order-detail:not([aria-hidden="true"])')).toBeNull();
+  });
+
+  it('requires review fields, invokes proof actions and revokes sanitized preview URLs', async () => {
+    const proof = {
+      id: '4d2e8ab1-46d7-4fd1-a711-7a4d60197be1', status: 'PENDING_REVIEW' as const, orderId: 41, customerName: 'Ada Lovelace', customerEmail: 'ada@example.com',
+      total: 264, currency: 'ARS', originalFilename: 'proof.pdf', contentType: 'application/pdf', sizeBytes: 1200,
+      submittedAt: '2026-08-17T11:00:00Z', reviewedAt: null, rejectionReason: null, previewCount: 1,
+    };
+    const approve = vi.fn(() => of(void 0));
+    const reject = vi.fn(() => of(void 0));
+    const createDescriptor = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const revokeDescriptor = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    const createObjectURL = vi.fn(() => 'blob:sanitized-proof');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
+          orders: () => of([renderedOrder]), pendingBankTransferProofs: () => of([proof]),
+          bankTransferProofPreview: () => of(new Blob(['sanitized'], { type: 'image/png' })),
+          approveBankTransferProof: approve, rejectBankTransferProof: reject,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('sales');
+    fixture.detectChanges();
+
+    component.approveProof(proof);
+    expect(approve).not.toHaveBeenCalled();
+    expect(component.proofReviewError()[proof.id]).toContain('importe');
+    component.proofAmounts[proof.id] = 264.004;
+    component.proofReferences[proof.id] = 'REF-9001';
+    component.approveProof(proof);
+    expect(approve).not.toHaveBeenCalled();
+    expect(component.proofReviewError()[proof.id]).toContain('coincidir exactamente');
+    component.proofAmounts[proof.id] = 264;
+    component.proofReferences[proof.id] = 'REF-9001';
+    component.approveProof(proof);
+    expect(approve).toHaveBeenCalledWith(proof.id, 264, 'REF-9001');
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:sanitized-proof');
+
+    component.rejectProof(proof);
+    expect(reject).not.toHaveBeenCalled();
+    component.proofRejectionReasons[proof.id] = 'El importe no coincide';
+    component.rejectProof(proof);
+    expect(reject).toHaveBeenCalledWith(proof.id, 'El importe no coincide');
+    fixture.destroy();
+    if (createDescriptor) Object.defineProperty(URL, 'createObjectURL', createDescriptor); else delete (URL as Partial<typeof URL>).createObjectURL;
+    if (revokeDescriptor) Object.defineProperty(URL, 'revokeObjectURL', revokeDescriptor); else delete (URL as Partial<typeof URL>).revokeObjectURL;
   });
 });

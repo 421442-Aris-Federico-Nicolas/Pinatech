@@ -60,6 +60,14 @@ h1 {
 .notice { margin: 0; }
 .fine-print, .methods, .loading { color: var(--color-text-muted); font-size: var(--text-md); line-height: 1.55; margin: .9rem 0 0; }
 .methods strong { color: var(--color-text); }
+.payment-methods { border: 0; display: grid; gap: var(--space-3); margin: 0; min-width: 0; padding: 0; }
+.payment-methods legend { font-size: var(--text-md); font-weight: var(--font-weight-bold); margin-bottom: var(--space-3); }
+.payment-card { align-items: center; background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); cursor: pointer; display: flex; gap: var(--space-3); min-height: var(--control-min-height); padding: var(--space-4); }
+.payment-card:hover, .payment-card.selected { border-color: var(--color-cyan); }
+.payment-card:focus-within { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
+.payment-card input { accent-color: var(--color-cyan); flex: 0 0 auto; height: 1.2rem; width: 1.2rem; }
+.payment-card span { display: grid; gap: var(--space-1); min-width: 0; }
+.payment-card small { color: var(--color-text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .product-details strong, .product-details small, .notice, .fine-print, .methods, .summary-note, .submit-error, .result-lead { overflow-wrap: anywhere; }
 .pickup-field { display: grid; gap: var(--space-2); }
 .pickup-field label { font-size: var(--text-sm); font-weight: var(--font-weight-bold); }
@@ -81,6 +89,7 @@ h1 {
 .summary h2 { font-size: 1.55rem; margin: .3rem 0 var(--space-5); }
 .summary > div:not(.error):not(.verification-required):not(.submit-error) { display: flex; gap: var(--space-4); justify-content: space-between; padding: var(--space-3) 0; }
 .summary .total { border-top: 1px solid var(--color-border); font-size: 1.05rem; }
+.summary .discount { color: var(--color-success-text); }
 .summary-note, .payment-progress { color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-base); }
 .summary > button { margin-top: var(--space-2); width: 100%; }
 .summary > small { color: var(--color-text-subtle); display: block; margin-top: var(--space-3); text-align: center; }

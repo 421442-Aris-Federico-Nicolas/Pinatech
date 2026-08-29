@@ -49,3 +49,29 @@ app-technical .attachments-section{border-top:1px solid var(--color-border);marg
 app-admin .file-button{touch-action:manipulation}app-admin .file-button:has(input:focus-visible){outline:var(--focus-outline);outline-offset:var(--focus-offset)}app-admin .stock-editor form>:is(app-input,app-textarea){display:block}app-admin .stock-editor form>button{width:100%}app-admin .order-total,app-admin .stock-numbers strong,app-admin .reserved strong,app-admin .stock-summary strong,app-admin .kpis article>strong{font-variant-numeric:tabular-nums}app-admin .customer,app-admin .product-row>span:last-child,app-admin .order-items span{min-width:0;overflow-wrap:anywhere}
 app-admin .product-image-grid button{min-height:44px;padding:.55rem 0}app-admin .taxonomy-list button,app-admin .cancel-edit,app-admin .specifications-editor>.section-label>button{min-height:44px}app-technical .attachment-upload label{min-height:44px}app-technical .attachment-upload label.disabled{cursor:not-allowed;opacity:.55}
 app-admin .collapse,app-admin .product-list>header button,app-admin .section-label>button,app-admin .section-label .file-button,app-admin .specification-actions button,app-admin .product-image-grid button,app-admin .taxonomy-list button,app-admin .cancel-edit{min-height:44px;min-width:44px}app-admin .product-image-grid span,app-admin .inventory-products span,app-admin .inventory-products strong{min-width:0;overflow-wrap:anywhere}app-admin .order-summary:focus-visible{outline-offset:-4px}@media(max-width:760px){app-admin h1,app-admin h2,app-admin h3{scroll-margin-top:9rem}app-admin .order-summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr);position:relative}app-admin .order-summary>span:nth-child(3),app-admin .order-summary>span:nth-child(4),app-admin .order-summary>.status-badge,app-admin .order-summary>.order-total{display:grid}app-admin .order-summary>.status-badge{display:inline-block;justify-self:start}app-admin .order-total{text-align:left}app-admin .order-summary>.chevron{position:absolute;right:1rem;top:1rem}app-admin .inventory-products>button{grid-template-columns:6px minmax(0,1fr) 70px 70px}app-admin .inventory-products .reserved{display:grid}}@media(max-width:480px){app-admin .order-summary>span:nth-child(3),app-admin .order-summary>.order-total{display:grid}}
+app-admin .proof-queue { margin: 0 auto 1rem; max-width: 1500px; }
+app-admin .proof-queue > header > strong { align-items: center; background: #1c3442; border-radius: 99px; color: var(--color-cyan); display: flex; height: 2rem; justify-content: center; min-width: 2rem; }
+app-admin .proof-review { background: #0a141d; border: 1px solid #183344; border-radius: 10px; margin-top: 1rem; padding: 1rem; }
+app-admin .proof-summary { align-items: start; display: flex; gap: 1rem; justify-content: space-between; }
+app-admin .proof-summary > div { display: grid; gap: .25rem; min-width: 0; }
+app-admin .proof-summary span, app-admin .proof-summary small { color: #8fa5b4; overflow-wrap: anywhere; }
+app-admin .proof-summary > strong { color: var(--color-cyan); font-variant-numeric: tabular-nums; white-space: nowrap; }
+app-admin .proof-previews { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1rem; }
+app-admin .proof-previews img { background: #fff; border: 1px solid #294555; border-radius: 8px; height: 240px; object-fit: contain; width: 100%; }
+app-admin :is(.preview-status, .review-status) { color: #8fa5b4; }
+app-admin .proof-actions { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; margin-top: 1rem; }
+app-admin .proof-actions fieldset { border: 1px solid #294555; display: grid; gap: .55rem; min-width: 0; padding: 1rem; }
+app-admin .proof-actions legend { color: #dbe8ee; font-weight: 800; padding: 0 .35rem; }
+app-admin .proof-actions label { color: #8fa5b4; font-size: .72rem; font-weight: 700; }
+app-admin .proof-actions :is(input, textarea) { background: #101e2a; border: 1px solid #294555; border-radius: 6px; color: #edf7fb; font: inherit; min-height: var(--control-min-height); padding: .6rem; width: 100%; }
+app-admin .proof-actions textarea { min-height: 5rem; resize: vertical; }
+app-admin .proof-actions :is(input, textarea):focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
+app-admin .proof-actions button { justify-self: start; margin-top: .35rem; }
+app-admin .proof-review-error { color: var(--color-danger-text); font-weight: 700; }
+
+@media (max-width: 760px) {
+  app-admin .proof-actions { grid-template-columns: 1fr; }
+  app-admin .proof-actions button { width: 100%; }
+  app-admin .proof-summary { align-items: stretch; flex-direction: column; }
+  app-admin .proof-summary > strong { text-align: left; }
+}

@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, outp
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { resolveApiContentUrl } from '../../../core/utils/api-content-url';
+import { bankTransferPrice, priceWithoutNationalTax } from '../../../core/payments/payment-pricing';
 import { AppButtonDirective } from '../app-button.directive';
 import { AppCardDirective } from '../app-card.directive';
 import { AppSelectComponent, AppSelectOption } from '../select/app-select.component';
@@ -55,6 +56,9 @@ export class AppProductCardComponent {
     const product = this.product();
     return product.variants.find((variant) => variant.id === this.selectedVariantId()) ?? this.initialVariant();
   });
+  protected readonly transferPrice = computed(() => bankTransferPrice(this.product().price).total);
+  protected readonly transferPriceWithoutTax = computed(() => priceWithoutNationalTax(this.transferPrice()));
+  protected readonly listPriceWithoutTax = computed(() => priceWithoutNationalTax(this.product().price));
   protected readonly variantOptions = computed<readonly AppSelectOption[]>(() => this.product().variants.map((variant) => ({
     value: variant.id,
     label: `${variant.colorName}${variant.inStock ? '' : ' · sin stock'}`,

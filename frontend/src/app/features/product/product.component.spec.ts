@@ -5,6 +5,7 @@ import { EMPTY, of } from 'rxjs';
 import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
+import { CheckoutService } from '../checkout/checkout.service';
 import { ProductComponent } from './product.component';
 
 describe('ProductComponent', () => {
@@ -33,6 +34,7 @@ describe('ProductComponent', () => {
       providers: [
         { provide: CatalogService, useValue: { product: () => of(product) } },
         { provide: CartService, useValue: { add: vi.fn(), items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ fulfillmentMethods: ['PICKUP'], pickupLocations: [{ name: 'Pinatech Centro', locality: 'Córdoba' }] }) } },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -47,6 +49,12 @@ describe('ProductComponent', () => {
     const fixture = TestBed.createComponent(ProductComponent);
     fixture.detectChanges();
     const first = fixture.nativeElement.querySelector('[data-variant-id="11"]') as HTMLButtonElement;
+    expect(fixture.nativeElement.textContent).toContain('Precio especial por transferencia');
+    expect(fixture.nativeElement.textContent).toContain('10% menos');
+    expect(fixture.nativeElement.textContent).toContain('Precio de lista / Mercado Pago');
+    expect(fixture.nativeElement.textContent).toContain('Retiro sin costo');
+    expect(fixture.nativeElement.textContent).not.toContain('recargo');
+    expect(fixture.componentInstance.transferPricing().total).toBe(90);
     first.focus();
     first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     fixture.detectChanges();
@@ -59,6 +67,38 @@ describe('ProductComponent', () => {
     expect(navigate).toHaveBeenCalled();
   });
 
+  it('falls back to an available color when a deep-linked variant is out of stock', async () => {
+    const stockProduct = {
+      ...product,
+      variants: [
+        { ...product.variants[0], inStock: false, availableQuantity: 0 },
+        product.variants[1],
+      ],
+    };
+    await TestBed.configureTestingModule({
+      imports: [ProductComponent],
+      providers: [
+        { provide: CatalogService, useValue: { product: () => of(stockProduct) } },
+        { provide: CartService, useValue: { add: vi.fn(), items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ fulfillmentMethods: [], pickupLocations: [] }) } },
+        { provide: Router, useValue: { navigate: vi.fn() } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ id: 1 }), queryParamMap: convertToParamMap({ variant: 11 }) },
+            queryParamMap: of(convertToParamMap({ variant: 11 })),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(ProductComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedVariantId()).toBe(12);
+    expect(fixture.nativeElement.querySelector('[data-variant-id="12"]').tabIndex).toBe(0);
+  });
+
   it('warns with the actual quantity when the cart cap is reached', async () => {
     const warning = vi.fn(() => ({ onAction: () => EMPTY }));
     const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 5, limit: 5, capped: true }));
@@ -67,6 +107,7 @@ describe('ProductComponent', () => {
       providers: [
         { provide: CatalogService, useValue: { product: () => of(product) } },
         { provide: CartService, useValue: { add, items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ fulfillmentMethods: [], pickupLocations: [] }) } },
         { provide: NotificationService, useValue: { warning, success: vi.fn() } },
         { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
         {

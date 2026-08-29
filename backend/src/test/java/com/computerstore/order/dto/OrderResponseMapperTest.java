@@ -39,6 +39,7 @@ class OrderResponseMapperTest {
         OrderResponse response = OrderResponseMapper.toResponse(current);
 
         assertEquals("PICKUP", response.fulfillmentMethod());
+        assertEquals(BigDecimal.ZERO, response.paymentDiscount());
         assertEquals("CORDOBA-CENTRO", response.pickupLocation().code());
         assertEquals(List.of("Street 123", "Local 4"), response.pickupLocation().addressLines());
         assertNull(OrderResponseMapper.toResponse(legacy).fulfillmentMethod());

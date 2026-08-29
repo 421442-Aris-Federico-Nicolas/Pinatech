@@ -42,8 +42,11 @@
         }
       }
 
-      <dl [class.single-detail]="result(currentOrder) === 'approved'">
+      <dl>
         @if (result(currentOrder) !== 'approved') { <div><dt>Pedido</dt><dd>#{{ currentOrder.id }}</dd></div> }
+        <div><dt>Precio de lista</dt><dd>{{ currentOrder.subtotal | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
+        @if (currentOrder.paymentDiscount > 0) { <div><dt>Descuento por transferencia</dt><dd>− {{ currentOrder.paymentDiscount | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
+        @if (currentOrder.paymentSurcharge > 0) { <div><dt>Ajuste histórico de pago</dt><dd>{{ currentOrder.paymentSurcharge | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
         <div><dt>Total</dt><dd>{{ currentOrder.total | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
       </dl>
     } @else {

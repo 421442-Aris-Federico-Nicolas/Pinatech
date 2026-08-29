@@ -15,7 +15,10 @@ describe('CheckoutResultComponent', () => {
     deliveryMethod: null,
     fulfillmentMethod: 'PICKUP',
     pickupLocation: { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' },
-    total: 3000,
+    subtotal: 3000,
+    paymentDiscount: 0,
+    paymentSurcharge: 300,
+    total: 3300,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
     customerName: 'Ada Lovelace',
@@ -49,6 +52,8 @@ describe('CheckoutResultComponent', () => {
     expect(fixture.nativeElement.querySelector('.actions a')?.classList).toContain('app-button');
     expect(fixture.nativeElement.querySelector('.state .app-feedback__body[role="status"]')?.querySelector('button')).toBeNull();
     expect(fixture.nativeElement.querySelector('[translate="no"]')?.textContent).toBe('Mercado Pago');
+    expect(fixture.nativeElement.textContent).toContain('Ajuste histórico de pago');
+    expect(fixture.nativeElement.textContent).not.toContain('recargo');
     fixture.destroy();
   });
 
@@ -160,7 +165,7 @@ describe('CheckoutResultComponent', () => {
     expect(mascot.querySelector('[role="status"]')?.textContent).toContain('Pago aprobado');
     expect(mascot.querySelector('.order-number')?.textContent).toContain('Pedido #42');
     expect(fixture.nativeElement.querySelector('dl dd')?.textContent).toContain('3');
-    expect(fixture.nativeElement.querySelectorAll('dl dt')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelectorAll('dl dt')).toHaveLength(3);
     fixture.destroy();
   });
 });

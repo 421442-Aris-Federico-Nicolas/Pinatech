@@ -12,6 +12,9 @@
 .product-card__description { color: var(--color-text-muted); display: -webkit-box; line-height: var(--line-height-base); margin: 0; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .product-card__content strong { color: var(--color-text-strong); font-size: var(--text-xl); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .product-card__content small { color: var(--color-text-subtle); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.product-card__content .product-card__price-label { color: var(--color-cyan); font-weight: var(--font-weight-bold); }
+.product-card__content .product-card__list-price { color: var(--color-text-muted); margin-top: var(--space-1); }
+.product-card__list-price b { color: var(--color-text); }
 .product-card__actions { align-items: end; display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr) auto; margin-top: auto; padding: 0 var(--space-5) var(--space-5); }
 .product-card__actions app-select { min-width: 0; }
 :host(.app-product-card--featured) .product-card { min-height: 430px; }
