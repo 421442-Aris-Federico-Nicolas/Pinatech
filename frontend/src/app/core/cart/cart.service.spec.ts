@@ -119,11 +119,13 @@ describe('CartService', () => {
       paymentStatus: 'PENDING',
       fulfillmentStatus: 'PENDING',
       currency: 'ARS',
-      paymentMethod: null,
+      paymentMethod: 'MERCADO_PAGO',
       deliveryMethod: null,
       fulfillmentMethod: 'PICKUP',
       pickupLocation,
-      total: 2000,
+      subtotal: 2000,
+      paymentSurcharge: 200,
+      total: 2200,
       createdAt: '1999-12-31T20:00:00Z',
       reservationExpiresAt: '2000-01-01T20:00:00Z',
     }));
@@ -144,11 +146,13 @@ describe('CartService', () => {
       paymentStatus: 'PENDING',
       fulfillmentStatus: 'PENDING',
       currency: 'ARS',
-      paymentMethod: null,
+      paymentMethod: 'MERCADO_PAGO',
       deliveryMethod: null,
       fulfillmentMethod: 'PICKUP',
       pickupLocation,
-      total: 2000,
+      subtotal: 2000,
+      paymentSurcharge: 200,
+      total: 2200,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: 'not-a-date',
     }));
@@ -201,11 +205,12 @@ describe('CartService', () => {
     const cart = TestBed.inject(CartService);
     cart.add(product, variant, 2);
     let createdOrder: Parameters<typeof cart.completeCheckout>[0] | undefined;
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe((order) => createdOrder = order);
+    cart.checkout('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe((order) => createdOrder = order);
 
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
     expect(request.request.body).toEqual({
       items: [{ variantId: 11, quantity: 2 }],
+      paymentMethod: 'BANK_TRANSFER',
       fulfillmentMethod: 'PICKUP',
       pickupLocationCode: pickupLocation.code,
       pickupLocationVersion: pickupLocation.version,
@@ -217,11 +222,14 @@ describe('CartService', () => {
       paymentStatus: 'PENDING',
       fulfillmentStatus: 'PENDING',
       currency: 'ARS',
-      paymentMethod: null,
+      paymentMethod: 'BANK_TRANSFER',
       deliveryMethod: null,
       fulfillmentMethod: 'PICKUP',
       pickupLocation,
-      total: 2000,
+      subtotal: 2000,
+      paymentDiscount: 200,
+      paymentSurcharge: 0,
+      total: 1800,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: '2026-07-29T20:00:00Z',
     });
@@ -242,12 +250,12 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe();
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe();
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
     retry.flush({
@@ -256,10 +264,13 @@ describe('CartService', () => {
       paymentStatus: 'PENDING',
       fulfillmentStatus: 'PENDING',
       currency: 'ARS',
-      paymentMethod: null,
+      paymentMethod: 'MERCADO_PAGO',
       deliveryMethod: null,
       fulfillmentMethod: 'PICKUP',
       pickupLocation,
+      subtotal: 1000,
+      paymentDiscount: 0,
+      paymentSurcharge: 0,
       total: 1000,
       createdAt: '2026-07-28T20:00:00Z',
       reservationExpiresAt: '2026-07-29T20:00:00Z',
@@ -271,16 +282,34 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('PICKUP', 'CORDOBA_CENTRO', 'v1').subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', 'CORDOBA_CENTRO', 'v1').subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout('PICKUP', 'CORDOBA_NORTE', 'v1').subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', 'CORDOBA_NORTE', 'v1').subscribe({ error: () => undefined });
     const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
     expect(changed.request.body.pickupLocationCode).toBe('CORDOBA_NORTE');
     changed.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
+  });
+
+  it('includes the immutable payment method in the request and idempotency hash', () => {
+    const cart = TestBed.inject(CartService);
+    const http = TestBed.inject(HttpTestingController);
+    cart.add(product, variant);
+
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    const mercadoPago = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    const mercadoPagoKey = mercadoPago.request.headers.get('Idempotency-Key');
+    expect(mercadoPago.request.body.paymentMethod).toBe('MERCADO_PAGO');
+    mercadoPago.flush({}, { status: 503, statusText: 'Unavailable' });
+
+    cart.checkout('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    const transfer = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    expect(transfer.request.body.paymentMethod).toBe('BANK_TRANSFER');
+    expect(transfer.request.headers.get('Idempotency-Key')).not.toBe(mercadoPagoKey);
+    transfer.flush({}, { status: 503, statusText: 'Unavailable' });
   });
 
   it('reuses an in-memory idempotency key when storage throws and clears it after a cart mutation', () => {
@@ -290,17 +319,17 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({}, { status: 503, statusText: 'Unavailable' });
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
     retry.flush({}, { status: 503, statusText: 'Unavailable' });
 
     cart.setQuantity(variant.id, 2);
-    cart.checkout('PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
     const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
     changed.flush({}, { status: 503, statusText: 'Unavailable' });

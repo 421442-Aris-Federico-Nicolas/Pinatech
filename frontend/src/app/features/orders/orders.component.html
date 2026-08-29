@@ -25,7 +25,7 @@
   } @else {
     <ol class="orders" aria-label="Historial de pedidos">
       @for (order of orders(); track order.id) {
-        <li><article appCard>
+        <li><article appCard [id]="'order-' + order.id" tabindex="-1">
           <header class="order-header">
             <div><p>Pedido</p><h2>#{{ order.id }}</h2><small>Registrado el {{ order.createdAt | date:'medium' }}</small></div>
             <ul class="badges" aria-label="Estados del pedido">
@@ -35,7 +35,7 @@
             </ul>
           </header>
 
-          @if (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED') {
+          @if (order.paymentMethod === 'MERCADO_PAGO' && (order.paymentStatus === 'PENDING' || order.paymentStatus === 'REJECTED')) {
             @if (isReservationExpired(order)) {
               <app-feedback class="reservation expired" tone="warning"><strong>Reserva vencida.</strong> El stock ya no está reservado para este pedido.</app-feedback>
             } @else {
@@ -56,6 +56,54 @@
             <app-feedback class="payment-unavailable" tone="warning">{{ reason }}</app-feedback>
           }
           @if (paymentError()?.orderId === order.id) { <app-feedback class="payment-error" tone="error" announce="assertive">{{ paymentError()?.message }}</app-feedback> }
+
+          @if (order.paymentMethod === 'BANK_TRANSFER') {
+            <section class="bank-transfer" [attr.aria-labelledby]="'transfer-title-' + order.id">
+              <h3 [id]="'transfer-title-' + order.id">Transferencia bancaria</h3>
+              @if (transferLoading().includes(order.id) && !transferDetails()[order.id]) {
+                <p role="status">Cargando datos bancarios…</p>
+              } @else if (transferErrors()[order.id]) {
+                <app-feedback tone="error" announce="assertive">{{ transferErrors()[order.id] }}<button feedback-actions appButton="outlined" type="button" (click)="loadBankTransfer(order.id)">Reintentar</button></app-feedback>
+              } @else if (transferDetails()[order.id]; as transfer) {
+                @if (!transfer.proof && canUploadProof(order, transfer)) {
+                  <p class="transfer-deadline"><strong>Fecha límite:</strong> transferí y cargá el comprobante antes del {{ transfer.paymentDueAt | date:'medium' }}.</p>
+                } @else if (transfer.proof?.status === 'PENDING_REVIEW') {
+                  <p class="transfer-deadline"><strong>En revisión:</strong> recibimos el comprobante y la reserva permanece activa.</p>
+                } @else if (transfer.proof?.status === 'APPROVED') {
+                  <p class="transfer-deadline"><strong>Pago aprobado:</strong> no realices otra transferencia para este pedido.</p>
+                } @else {
+                  <p class="transfer-deadline"><strong>Pedido sin pago habilitado:</strong> no transfieras dinero para este pedido.</p>
+                }
+                <dl class="bank-account">
+                  <div><dt>Titular</dt><dd>{{ transfer.bankAccount.holder }}</dd></div>
+                  <div><dt>CUIT/CUIL</dt><dd>{{ transfer.bankAccount.taxId }}</dd></div>
+                  <div><dt>Banco</dt><dd>{{ transfer.bankAccount.bankName }}</dd></div>
+                  <div><dt>Alias</dt><dd>{{ transfer.bankAccount.alias }}</dd></div>
+                  <div><dt>CBU</dt><dd>{{ transfer.bankAccount.cbu }}</dd></div>
+                  <div><dt>Moneda</dt><dd>{{ transfer.bankAccount.currency }}</dd></div>
+                </dl>
+                @if (transfer.proof; as proof) {
+                  <div class="proof-status" [class.rejected]="proof.status === 'REJECTED'" role="status">
+                    <strong>{{ proofStatusLabel(proof.status) }}</strong>
+                    <span>{{ proof.originalFilename }} · {{ proof.submittedAt | date:'medium' }}</span>
+                    @if (proof.status === 'REJECTED' && proof.rejectionReason) { <span><b>Motivo:</b> {{ proof.rejectionReason }}</span> }
+                  </div>
+                }
+                @if (canUploadProof(order, transfer)) {
+                  <fieldset class="proof-upload" [disabled]="uploadingProof() !== null">
+                    <legend>Cargar comprobante</legend>
+                    <label [for]="'proof-' + order.id">Archivo JPEG, PNG o PDF, hasta 5 MiB</label>
+                    <input [id]="'proof-' + order.id" type="file" accept="image/jpeg,image/png,application/pdf" (change)="selectProof(order.id, $event)">
+                    @if (selectedProofs()[order.id]; as file) { <p class="selected-file" role="status" aria-live="polite">Seleccionado: {{ file.name }}</p> }
+                    <button appButton="filled" type="button" [disabled]="!selectedProofs()[order.id] || uploadingProof() !== null" [attr.aria-busy]="uploadingProof() === order.id" (click)="uploadProof(order.id)">{{ uploadingProof() === order.id ? 'Subiendo…' : 'Enviar comprobante' }}</button>
+                  </fieldset>
+                } @else if (!transfer.proof && order.status === 'PENDING_PAYMENT') {
+                  <app-feedback tone="warning">El plazo para cargar el comprobante venció. No transfieras dinero para este pedido.</app-feedback>
+                }
+                @if (proofErrors()[order.id]) { <p class="proof-error" role="alert">{{ proofErrors()[order.id] }}</p> }
+              }
+            </section>
+          }
 
           @if (order.pickupLocation; as pickup) {
             <section class="pickup" [attr.aria-labelledby]="'pickup-title-' + order.id">
@@ -85,7 +133,7 @@
               <div><dt>Pago</dt><dd [attr.translate]="order.paymentMethod === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(order.paymentMethod) }}</dd></div>
               <div><dt>Modalidad</dt><dd>{{ methodLabel(order.fulfillmentMethod) }}</dd></div>
             </dl>
-            <div class="total"><span>Total de productos · retiro sin costo</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            <div class="total"><span>Precio de lista</span><strong>{{ order.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong>@if (order.paymentDiscount > 0) { <span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }@if (order.paymentSurcharge > 0) { <span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }<span>Total · retiro sin costo</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
           </footer>
         </article></li>
       }

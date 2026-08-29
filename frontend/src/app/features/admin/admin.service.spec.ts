@@ -62,4 +62,29 @@ describe('AdminService product images', () => {
     expect(deletion.request.method).toBe('DELETE');
     deletion.flush(null);
   });
+
+  it('loads sanitized proof previews and submits required review data', () => {
+    const service = TestBed.inject(AdminService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.pendingBankTransferProofs().subscribe();
+    const queue = http.expectOne((request) => request.url === `${environment.apiBaseUrl}/admin/bank-transfer-proofs`);
+    expect(queue.request.params.get('status')).toBe('PENDING_REVIEW');
+    queue.flush([]);
+
+    service.bankTransferProofPreview('proof-9', 0).subscribe();
+    const preview = http.expectOne(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/proof-9/previews/0`);
+    expect(preview.request.responseType).toBe('blob');
+    preview.flush(new Blob(['sanitized'], { type: 'image/png' }));
+
+    service.approveBankTransferProof('proof-9', 1200.5, 'REF-123').subscribe();
+    const approval = http.expectOne(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/proof-9/approve`);
+    expect(approval.request.body).toEqual({ amount: 1200.5, reference: 'REF-123' });
+    approval.flush(null);
+
+    service.rejectBankTransferProof('proof-9', 'No coincide').subscribe();
+    const rejection = http.expectOne(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/proof-9/reject`);
+    expect(rejection.request.body).toEqual({ reason: 'No coincide' });
+    rejection.flush(null);
+  });
 });

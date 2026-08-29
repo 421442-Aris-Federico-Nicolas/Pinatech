@@ -9,13 +9,14 @@ import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { PinatechEmptyStateComponent } from '../../shared/ui/pinatech-empty-state/pinatech-empty-state.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
 import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product, ProductVariant } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
 @Component({
-  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppProductCardComponent, FormsModule, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppProductCardComponent, FormsModule, PinatechEmptyStateComponent, RouterLink],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './catalog.component.html',
   styleUrl: './catalog.component.scss',

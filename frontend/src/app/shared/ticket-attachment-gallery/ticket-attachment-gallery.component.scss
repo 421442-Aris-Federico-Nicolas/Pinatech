@@ -4,8 +4,8 @@
 article { display: grid; gap: .25rem; min-width: 0; }
 .preview { align-items: center; aspect-ratio: 4 / 3; background: rgba(127, 150, 166, .12); border: 1px solid rgba(127, 150, 166, .3); display: flex; justify-content: center; overflow: hidden; }
 .preview a { height: 100%; width: 100%; }
-.preview img { height: 100%; object-fit: contain; transition: transform .2s; width: 100%; }
-.preview a:hover img { transform: scale(1.03); }
+.preview img { height: 100%; object-fit: contain; transition: transform 200ms ease; width: 100%; }
+@media (hover: hover) and (pointer: fine) { .preview a:hover img { transform: scale(1.03); } }
 .preview span { color: #7f96a6; font-size: .72rem; padding: .5rem; text-align: center; }
 h3 { display: -webkit-box; font-size: .78rem; margin: 0; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 small { color: #7f96a6; font-size: .66rem; line-height: 1.35; overflow-wrap: anywhere; }
@@ -13,4 +13,4 @@ small { color: #7f96a6; font-size: .66rem; line-height: 1.35; overflow-wrap: any
 .download-error button { background: transparent; border: 1px solid currentColor; color: inherit; cursor: pointer; min-height: 44px; padding: .55rem .7rem; touch-action: manipulation; }
 .download-error button:hover,.download-error button:active { background: rgba(127, 150, 166, .18); }
 .preview a:focus-visible,.download-error button:focus-visible { outline: 3px solid var(--pin-orange, #f58a08); outline-offset: -4px; }
-@media (prefers-reduced-motion: reduce) { .preview img { transition-duration: .01ms; } }
+@media (prefers-reduced-motion: reduce) { .preview img { transition: none; } .preview a:hover img { transform: none; } }

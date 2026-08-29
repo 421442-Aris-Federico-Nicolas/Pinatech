@@ -27,6 +27,8 @@ window and server-side usage checks are complete.
 
 Keep `MP_ENABLED=false` until all Mercado Pago production values are ready. Never combine a production `APP_USR-` token with `MP_ENVIRONMENT=sandbox`.
 
+Keep `BANK_TRANSFER_ENABLED=false` until every `BANK_TRANSFER_*` value has been reviewed, the volume is attached and an administrator is assigned to the proof queue. The CBU must contain exactly 22 digits. Bank data are returned only from authenticated order endpoints and are never included in email.
+
 Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_BASE_URL` and `EMAIL_LOGO_URL` are correct and the sender domain is verified. `EMAIL_LOGO_URL` must be a public HTTPS image URL without credentials, query parameters or a fragment; it is independent of the storefront URL and is loaded directly by email clients rather than attached as CID content. Enable pickup only after every `PICKUP_*` public field has been reviewed.
 
 ### Attach persistent storage
@@ -34,6 +36,8 @@ Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_B
 1. Attach one Railway Volume to the backend service.
 2. Set its mount path to `/app/uploads`.
 3. Keep a single backend replica while files use this local volume.
+
+Private transfer originals are stored under `PRIVATE_DOCUMENTS_SUBROOT` in this same volume. They have no download endpoint; administrators receive only sanitized PNG previews. Approved files are retained for five years and rejected files for 90 days, so database and volume backups must use coordinated restore points.
 
 The image entrypoint starts as root only to set volume ownership, then runs Java as the unprivileged `spring` user. Do not set `RAILWAY_RUN_UID=0`.
 
@@ -107,7 +111,7 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version 20 in Railway logs.
+6. Flyway reports schema version 21 in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
 8. A Mercado Pago webhook test returns `200` from
    `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.

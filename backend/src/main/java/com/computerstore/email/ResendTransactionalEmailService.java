@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.computerstore.user.domain.AccountActionPurpose;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -77,14 +78,14 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     }
 
     @Override
-    public void sendAccountAction(String recipient, AccountActionPurpose purpose, String rawToken) {
+    public void sendAccountAction(String recipient, String firstName, AccountActionPurpose purpose, String rawToken) {
         String route = switch (purpose) {
             case EMAIL_VERIFICATION -> "/verify-email";
             case PASSWORD_RESET -> "/reset-password";
             case EMAIL_CHANGE -> "/confirm-email-change";
         };
         String actionUrl = accountActionUrl(route, rawToken);
-        EmailContent content = contentFor(purpose, actionUrl);
+        EmailContent content = contentFor(purpose, firstName, actionUrl);
         afterCommit(purpose.name(), () -> send(recipient, content));
     }
 
@@ -98,56 +99,186 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     }
 
     @Override
-    public void sendEmailChangedNotice(String previousEmail, String newEmail) {
-        String safeNewEmail = escapeHtml(newEmail);
-        EmailContent content = new EmailContent(
-                "Tu email de Pinatech fue actualizado",
-                "El email de tu cuenta Pinatech fue actualizado a " + newEmail
-                        + ". Si no realizaste este cambio, contactanos de inmediato.",
-                "<p>El email de tu cuenta Pinatech fue actualizado a <strong>" + safeNewEmail
-                        + "</strong>.</p><p>Si no realizaste este cambio, contactanos de inmediato.</p>");
+    public void sendEmailChangedNotice(String previousEmail, String firstName, String newEmail) {
+        EmailContent content = contentForEmailChanged(firstName, newEmail);
         afterCommit("EMAIL_CHANGED_NOTICE", () -> send(previousEmail, content));
     }
 
-    EmailContent contentFor(AccountActionPurpose purpose, String actionUrl) {
-        String safeUrl = escapeHtml(actionUrl);
+    @Override
+    public void sendOrderEvent(UUID idempotencyKey, String recipient, String customerName,
+                               OrderEmailEventType eventType, Long orderId, String rejectionReason) {
+        if (!enabled) {
+            LOGGER.info("Transactional email disabled; completed outbox event={}", eventType);
+            return;
+        }
+        String orderUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl)
+                .path("/orders").queryParam("order", orderId).build().encode().toUriString();
+        send(recipient, contentForOrderEvent(customerName, eventType, orderId, rejectionReason, orderUrl),
+                idempotencyKey);
+    }
+
+    EmailContent contentFor(AccountActionPurpose purpose, String firstName, String actionUrl) {
         return switch (purpose) {
-            case EMAIL_VERIFICATION -> renderEmailVerification("", actionUrl, emailLogoUrl);
-            case PASSWORD_RESET -> new EmailContent(
+            case EMAIL_VERIFICATION -> renderEmailVerification(firstName, actionUrl, emailLogoUrl);
+            case PASSWORD_RESET -> renderBrandedEmail(new EmailTemplate(
                     "Restablece tu contrasena de Pinatech",
-                    "Restablece tu contrasena ingresando en: " + actionUrl,
-                    "<p>Recibimos una solicitud para restablecer tu contrasena.</p><p><a href=\""
-                            + safeUrl + "\">Restablecer contrasena</a></p>");
-            case EMAIL_CHANGE -> new EmailContent(
+                    "Usa este enlace seguro para restablecer tu contrasena de Pinatech.",
+                    "Restablece tu contrasena",
+                    greeting(firstName),
+                    List.of("Recibimos una solicitud para restablecer la contrasena de tu cuenta Pinatech."),
+                    null,
+                    "Restablecer contrasena",
+                    actionUrl,
+                    "Este enlace es de un solo uso y vence pronto. Si no solicitaste el cambio, podes ignorar este email."),
+                    emailLogoUrl);
+            case EMAIL_CHANGE -> renderBrandedEmail(new EmailTemplate(
                     "Confirma tu nuevo email de Pinatech",
-                    "Confirma tu nuevo email ingresando en: " + actionUrl,
-                    "<p>Confirma este email como el nuevo email de tu cuenta.</p><p><a href=\""
-                            + safeUrl + "\">Confirmar nuevo email</a></p>");
+                    "Confirma la nueva direccion de email de tu cuenta Pinatech.",
+                    "Confirma tu nuevo email",
+                    greeting(firstName),
+                    List.of("Usa el siguiente boton para confirmar esta direccion como el nuevo email de tu cuenta."),
+                    null,
+                    "Confirmar nuevo email",
+                    actionUrl,
+                    "Este enlace es de un solo uso. Si no solicitaste este cambio, no confirmes el email y contactanos."),
+                    emailLogoUrl);
         };
     }
 
+    EmailContent contentForEmailChanged(String firstName, String newEmail) {
+        return renderBrandedEmail(new EmailTemplate(
+                "Tu email de Pinatech fue actualizado",
+                "La direccion de email de tu cuenta Pinatech fue actualizada.",
+                "Email actualizado",
+                greeting(firstName),
+                List.of("La direccion de email asociada a tu cuenta fue actualizada correctamente."),
+                new EmailCallout("Nuevo email", newEmail),
+                null,
+                null,
+                "Si no realizaste este cambio, contactanos de inmediato para proteger tu cuenta."),
+                emailLogoUrl);
+    }
+
+    EmailContent contentForOrderEvent(String customerName, OrderEmailEventType eventType, Long orderId,
+                                      String rejectionReason, String orderUrl) {
+        String orderNumber = "#" + orderId;
+        EmailTemplate template = switch (eventType) {
+            case ORDER_CREATED -> new EmailTemplate(
+                    "Recibimos tu pedido Pinatech",
+                    "Tu pedido " + orderNumber + " fue registrado correctamente.",
+                    "Recibimos tu pedido",
+                    greeting(customerName),
+                    List.of("Tu pedido " + orderNumber + " fue registrado correctamente. Podes consultar su estado desde tu cuenta."),
+                    null,
+                    "Ver mi pedido",
+                    orderUrl,
+                    "El registro del pedido no acredita el pago. Te avisaremos cuando tengamos una novedad." );
+            case PAYMENT_APPROVED -> new EmailTemplate(
+                    "Pago aprobado",
+                    "Aprobamos el pago de tu pedido " + orderNumber + ".",
+                    "Pago aprobado",
+                    greeting(customerName),
+                    List.of("Aprobamos el pago de tu pedido " + orderNumber + ". Ya podemos continuar con la preparacion."),
+                    null,
+                    "Ver mi pedido",
+                    orderUrl,
+                    "Podes seguir el estado del pedido desde tu cuenta Pinatech.");
+            case BANK_TRANSFER_REJECTED -> new EmailTemplate(
+                    "Comprobante de transferencia rechazado",
+                    "No pudimos aprobar el comprobante de tu pedido " + orderNumber + ".",
+                    "No pudimos aprobar el comprobante",
+                    greeting(customerName),
+                    List.of("Revisamos la transferencia del pedido " + orderNumber + " y el comprobante fue rechazado."),
+                    new EmailCallout("Motivo", rejectionReason == null ? "No informado" : rejectionReason),
+                    "Ver mi pedido",
+                    orderUrl,
+                    "El pedido fue cancelado y el stock reservado quedo liberado. No realices otra transferencia para este pedido.");
+            case ORDER_DELIVERED -> new EmailTemplate(
+                    "Pedido entregado",
+                    "Registramos la entrega de tu pedido " + orderNumber + ".",
+                    "Pedido entregado",
+                    greeting(customerName),
+                    List.of("Registramos la entrega fisica de tu pedido " + orderNumber + ". Gracias por elegir Pinatech."),
+                    null,
+                    "Ver mi pedido",
+                    orderUrl,
+                    "Conserva este email como confirmacion de la entrega.");
+        };
+        return renderBrandedEmail(template, emailLogoUrl);
+    }
+
     static EmailContent renderEmailVerification(String firstName, String actionUrl, String logoUrl) {
-        String name = firstName == null ? "" : firstName;
-        String textGreeting = name.isBlank() ? "Hola" : "Hola " + name;
-        String htmlGreeting = escapeHtml(textGreeting);
-        String safeActionUrl = escapeHtml(actionUrl);
-        String safeLogoUrl = escapeHtml(logoUrl);
-        String text = textGreeting + ",\n\n"
-                + "Gracias por registrarte en Pinatech. Verifica tu email para activar tu cuenta.\n\n"
-                + "Verificar mi email:\n" + actionUrl + "\n\n"
-                + "Este enlace es de un solo uso. Si no creaste una cuenta en Pinatech, "
-                + "podes ignorar este email.";
+        return renderBrandedEmail(new EmailTemplate(
+                "Verifica tu email de Pinatech",
+                "Activa tu cuenta Pinatech verificando tu direccion de email.",
+                "Verifica tu email",
+                greeting(firstName),
+                List.of("Gracias por registrarte en Pinatech. Verifica tu email para activar tu cuenta."),
+                null,
+                "Verificar mi email",
+                actionUrl,
+                "Este enlace es de un solo uso. Si no creaste una cuenta en Pinatech, podes ignorar este email."),
+                logoUrl);
+    }
+
+    private static EmailContent renderBrandedEmail(EmailTemplate template, String logoUrl) {
+        String safeLogoUrl = escapeHtml(logoUrl == null ? "" : logoUrl);
+        String safePreheader = escapeHtml(template.preheader());
+        String safeTitle = escapeHtml(template.title());
+        String safeGreeting = escapeHtml(template.greeting());
+        StringBuilder text = new StringBuilder(template.greeting()).append(",\n\n");
+        StringBuilder paragraphs = new StringBuilder();
+        for (String paragraph : template.paragraphs()) {
+            text.append(paragraph).append("\n\n");
+            paragraphs.append("<p style=\"margin:0 0 16px;font-size:16px;line-height:25px;color:#33465f;\">")
+                    .append(escapeHtml(paragraph)).append("</p>");
+        }
+        String calloutHtml = "";
+        if (template.callout() != null) {
+            text.append(template.callout().label()).append(": ").append(template.callout().value()).append("\n\n");
+            calloutHtml = """
+                    <div style="margin:8px 0 24px;padding:16px 18px;background-color:#fff3e8;border-left:4px solid #f97316;">
+                      <p style="margin:0 0 4px;font-size:12px;line-height:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#9a4b0b;">%s</p>
+                      <p style="margin:0;font-size:15px;line-height:23px;color:#33465f;">%s</p>
+                    </div>
+                    """.formatted(escapeHtml(template.callout().label()), escapeHtml(template.callout().value()));
+        }
+        String actionHtml = "";
+        String fallbackHtml = "";
+        if (template.actionLabel() != null && template.actionUrl() != null) {
+            text.append(template.actionLabel()).append(":\n").append(template.actionUrl()).append("\n\n");
+            String safeActionLabel = escapeHtml(template.actionLabel());
+            String safeActionUrl = escapeHtml(template.actionUrl());
+            actionHtml = """
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">
+                      <tr>
+                        <td align="center" bgcolor="#f97316" style="border-radius:6px;background-color:#f97316;">
+                          <a href="%s" style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border:1px solid #f97316;border-radius:6px;">%s</a>
+                        </td>
+                      </tr>
+                    </table>
+                    """.formatted(safeActionUrl, safeActionLabel);
+            fallbackHtml = """
+                    <tr>
+                      <td style="padding:8px 32px 28px;font-family:Arial,Helvetica,sans-serif;">
+                        <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:#607086;">Si el boton no funciona, abri este enlace:</p>
+                        <p style="margin:0;font-size:13px;line-height:20px;word-break:break-all;"><a href="%s" style="color:#087f8c;text-decoration:underline;word-break:break-all;">%s</a></p>
+                      </td>
+                    </tr>
+                    """.formatted(safeActionUrl, safeActionUrl);
+        }
+        text.append(template.notice());
         String html = """
                 <!doctype html>
                 <html lang="es">
                   <head>
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <title>Verifica tu email de Pinatech</title>
+                    <title>%s</title>
                   </head>
                   <body style="margin:0;padding:0;background-color:#fff8e7;color:#0b1f3a;">
                     <div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">
-                      Activa tu cuenta Pinatech verificando tu direccion de email.
+                      %s
                     </div>
                     <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="width:100%%;border-collapse:collapse;background-color:#fff8e7;">
                       <tr>
@@ -162,27 +293,17 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                             </tr>
                             <tr>
                               <td style="padding:36px 32px 20px;font-family:Arial,Helvetica,sans-serif;">
-                                <h1 style="margin:0 0 20px;font-size:28px;line-height:36px;color:#0b1f3a;font-weight:700;">Verifica tu email</h1>
+                                <h1 style="margin:0 0 20px;font-size:28px;line-height:36px;color:#0b1f3a;font-weight:700;">%s</h1>
                                 <p style="margin:0 0 16px;font-size:16px;line-height:25px;color:#0b1f3a;">%s,</p>
-                                <p style="margin:0 0 28px;font-size:16px;line-height:25px;color:#33465f;">Gracias por registrarte en Pinatech. Verifica tu email para activar tu cuenta.</p>
-                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">
-                                  <tr>
-                                    <td align="center" bgcolor="#f97316" style="border-radius:6px;background-color:#f97316;">
-                                      <a href="%s" style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border:1px solid #f97316;border-radius:6px;">Verificar mi email</a>
-                                    </td>
-                                  </tr>
-                                </table>
+                                %s
+                                %s
+                                %s
                               </td>
                             </tr>
-                            <tr>
-                              <td style="padding:8px 32px 28px;font-family:Arial,Helvetica,sans-serif;">
-                                <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:#607086;">Si el boton no funciona, abri este enlace:</p>
-                                <p style="margin:0;font-size:13px;line-height:20px;word-break:break-all;"><a href="%s" style="color:#087f8c;text-decoration:underline;word-break:break-all;">%s</a></p>
-                              </td>
-                            </tr>
+                            %s
                             <tr>
                               <td style="padding:22px 32px;background-color:#e9fbfd;border-top:1px solid #b9edf2;font-family:Arial,Helvetica,sans-serif;">
-                                <p style="margin:0;font-size:13px;line-height:21px;color:#33465f;">Este enlace es de un solo uso. Si no creaste una cuenta en Pinatech, podes ignorar este email.</p>
+                                <p style="margin:0;font-size:13px;line-height:21px;color:#33465f;">%s</p>
                               </td>
                             </tr>
                           </table>
@@ -191,8 +312,9 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     </table>
                   </body>
                 </html>
-                """.formatted(safeLogoUrl, htmlGreeting, safeActionUrl, safeActionUrl, safeActionUrl);
-        return new EmailContent("Verifica tu email de Pinatech", text, html);
+                """.formatted(escapeHtml(template.subject()), safePreheader, safeLogoUrl, safeTitle,
+                safeGreeting, paragraphs, calloutHtml, actionHtml, fallbackHtml, escapeHtml(template.notice()));
+        return new EmailContent(template.subject(), text.toString(), html);
     }
 
     private static void validateEmailLogoUrl(String logoUrl) {
@@ -242,14 +364,19 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     }
 
     private void send(String recipient, EmailContent content) {
+        send(recipient, content, null);
+    }
+
+    private void send(String recipient, EmailContent content, UUID idempotencyKey) {
         try {
             String body = buildPayload(recipient, content);
-            HttpRequest request = HttpRequest.newBuilder(RESEND_ENDPOINT)
+            HttpRequest.Builder builder = HttpRequest.newBuilder(RESEND_ENDPOINT)
                     .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+            if (idempotencyKey != null) builder.header("Idempotency-Key", idempotencyKey.toString());
+            HttpRequest request = builder.build();
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException("Resend returned HTTP " + response.statusCode());
@@ -278,6 +405,18 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     private static String escapeHtml(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
+    private static String greeting(String name) {
+        return name == null || name.isBlank() ? "Hola" : "Hola " + name.trim();
+    }
+
+    private record EmailTemplate(String subject, String preheader, String title, String greeting,
+                                 List<String> paragraphs, EmailCallout callout, String actionLabel,
+                                 String actionUrl, String notice) {
+    }
+
+    private record EmailCallout(String label, String value) {
     }
 
     record EmailContent(String subject, String text, String html) {

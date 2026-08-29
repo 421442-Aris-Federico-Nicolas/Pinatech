@@ -10,13 +10,13 @@
     </div>
   }
   <div class="notification-region" aria-label="Notificaciones">
-    @for (notification of notificationItems(); track notification.id) {
+    @for (notification of notificationItems(); track $index) {
       <aside
+        #notificationShell
         class="app-notification"
         [class.is-exiting]="notification.exiting"
         [class.is-paused]="notification.paused"
         [attr.data-tone]="notification.tone"
-        [style.--notification-duration]="notification.duration + 'ms'"
         (mouseenter)="notifications.pause(notification.id, 'pointer')"
         (mouseleave)="notifications.resume(notification.id, 'pointer')"
         (focusin)="notifications.pause(notification.id, 'focus')"
@@ -26,16 +26,18 @@
           <iconify-icon [icon]="notificationPresentation[notification.tone].icon"></iconify-icon>
         </span>
         <div class="notification-body">
-          <div
-            class="notification-announcement"
-            [attr.role]="notification.tone === 'error' ? 'alert' : 'status'"
-            [attr.aria-labelledby]="'notification-title-' + notification.id"
-            [attr.aria-describedby]="'notification-message-' + notification.id"
-            aria-atomic="true"
-          >
-            <strong class="notification-title" [id]="'notification-title-' + notification.id">{{ notificationPresentation[notification.tone].title }}</strong>
-            <p [id]="'notification-message-' + notification.id">{{ notification.message }}</p>
-          </div>
+          @for (announcement of notificationItems(); track announcement.id) {
+            <div
+              class="notification-announcement"
+              [attr.role]="announcement.tone === 'error' ? 'alert' : 'status'"
+              [attr.aria-labelledby]="'notification-title-' + announcement.id"
+              [attr.aria-describedby]="'notification-message-' + announcement.id"
+              aria-atomic="true"
+            >
+              <strong class="notification-title" [id]="'notification-title-' + announcement.id">{{ notificationPresentation[announcement.tone].title }}</strong>
+              <p [id]="'notification-message-' + announcement.id">{{ announcement.message }}</p>
+            </div>
+          }
           @if (notification.hasAction) {
             <button class="notification-action" type="button" (click)="notifications.activate(notification.id)">{{ notification.action }}</button>
           }
@@ -46,22 +48,36 @@
           aria-label="Cerrar notificación"
           (click)="notifications.dismiss(notification.id)"
         ><iconify-icon icon="line-md:close" aria-hidden="true"></iconify-icon></button>
-        <span class="notification-progress" aria-hidden="true"><span></span></span>
       </aside>
     }
   </div>
 </div>
-<div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
+<aside class="utility-bar" aria-label="Información comercial">
+  <div class="marquee-viewport">
+    <div class="marquee-track">
+      <ul class="marquee-group">
+        <li><iconify-icon icon="line-md:computer" aria-hidden="true"></iconify-icon> Catálogo de tecnología</li>
+        <li><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon> Servicio técnico en Córdoba</li>
+        <li><iconify-icon icon="mdi:shield-check-outline" aria-hidden="true"></iconify-icon> Pagá online de forma segura con <span translate="no">Mercado Pago</span></li>
+      </ul>
+      <ul class="marquee-group" aria-hidden="true">
+        <li><iconify-icon icon="line-md:computer" aria-hidden="true"></iconify-icon> Catálogo de tecnología</li>
+        <li><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon> Servicio técnico en Córdoba</li>
+        <li><iconify-icon icon="mdi:shield-check-outline" aria-hidden="true"></iconify-icon> Pagá online de forma segura con <span translate="no">Mercado Pago</span></li>
+      </ul>
+    </div>
+  </div>
+</aside>
 <header>
-<mat-toolbar aria-label="Navegación principal">
+<mat-toolbar aria-label="Navegación principal" (keydown.escape)="closeMenuFromEscape($event)">
   <a class="brand" routerLink="/">
     <span class="brand-mark"><img class="brand-logo" src="/pinatech.cba.logo.png" alt="" width="75" height="75"></span>
     <span translate="no">Pinatech</span>
   </a>
-  <button class="menu-toggle" type="button" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav" aria-label="Abrir o cerrar menú" (click)="menuOpen.update(open => !open)">
+  <button id="main-nav-toggle" class="menu-toggle" type="button" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav" [attr.aria-label]="menuOpen() ? 'Cerrar menú' : 'Abrir menú'" (click)="toggleMenu()">
     <iconify-icon [icon]="menuOpen() ? 'line-md:close' : 'line-md:menu'" aria-hidden="true"></iconify-icon>
   </button>
-  <nav id="main-nav" [class.open]="menuOpen()">
+  <nav id="main-nav" [class.open]="menuOpen()" [attr.inert]="closedMobileNav() ? '' : null" [attr.aria-hidden]="closedMobileNav() ? 'true' : null" (click)="closeMenuFromNav($event)">
     @if (!auth.isAuthenticated() || auth.user()?.roles?.includes('CUSTOMER')) {
       <a class="nav-link" routerLink="/catalog" [class.active]="catalogActive()" [attr.aria-current]="catalogActive() ? 'page' : null"><iconify-icon icon="line-md:search" aria-hidden="true"></iconify-icon> Catálogo</a>
       <a class="nav-link cart-link" routerLink="/cart" routerLinkActive="active" ariaCurrentWhenActive="page"><iconify-icon icon="line-md:shopping-cart" aria-hidden="true"></iconify-icon> Carrito <span class="cart-count" [attr.aria-label]="cart.count() + (cart.count() === 1 ? ' producto en el carrito' : ' productos en el carrito')">{{ cart.count() }}</span></a>
@@ -86,15 +102,27 @@
 <div id="main-content" tabindex="-1"><router-outlet /></div>
 <footer class="site-footer">
   <div class="footer-content">
-    <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">
-      <img src="/pinatech-favicon.png" alt="" width="48" height="48">
-      <span>
-        <strong translate="no">Pinatech</strong>
-        <small>Tecnología y servicio técnico</small>
-      </span>
-    </a>
-    <div class="footer-contact">
-      <span>Contacto</span>
+    <section class="footer-intro" aria-labelledby="footer-brand-name">
+      <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">
+        <img src="/pinatech-favicon.png" alt="" width="56" height="56">
+        <span>
+          <strong id="footer-brand-name" translate="no">Pinatech</strong>
+          <small>Tecnología que te acompaña</small>
+        </span>
+      </a>
+      <p>Hardware, tecnología y servicio técnico con atención local en Córdoba.</p>
+    </section>
+
+    <nav class="footer-nav" aria-label="Enlaces del pie de página">
+      <h2>Explorar</h2>
+      <a routerLink="/">Inicio</a>
+      <a routerLink="/catalog">Catálogo</a>
+      <a routerLink="/cart">Carrito</a>
+    </nav>
+
+    <section class="footer-contact" aria-labelledby="footer-contact-title">
+      <h2 id="footer-contact-title">Contacto</h2>
+      <p><iconify-icon icon="line-md:map-marker" aria-hidden="true"></iconify-icon> Córdoba, Argentina</p>
       <a
         href="https://www.instagram.com/pinatech.cba/"
         target="_blank"
@@ -104,9 +132,10 @@
         <iconify-icon icon="mdi:instagram" aria-hidden="true"></iconify-icon>
         <span translate="no">@pinatech.cba</span>
       </a>
-    </div>
+    </section>
   </div>
   <div class="footer-legal">
     <small>&copy; {{ currentYear }} Pinatech. Todos los derechos reservados.</small>
+    <small>Tecnología y soporte, cerca tuyo.</small>
   </div>
 </footer>

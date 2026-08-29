@@ -84,10 +84,11 @@ export class NotificationService implements OnDestroy {
   }
 
   pause(id: number, reason = 'interaction'): void {
-    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
+    if (this.active?.notification.id !== id) return;
+    const exiting = this.active.notification.exiting;
     const wasPaused = this.pauseReasons.size > 0;
     this.pauseReasons.add(reason);
-    if (wasPaused) return;
+    if (exiting || wasPaused) return;
     this.remainingDuration = Math.max(0, this.remainingDuration - (Date.now() - this.autoCloseStartedAt));
     this.clearAutoClose();
     this.active.notification = { ...this.active.notification, paused: true };
@@ -95,8 +96,9 @@ export class NotificationService implements OnDestroy {
   }
 
   resume(id: number, reason = 'interaction'): void {
-    if (this.active?.notification.id !== id || this.active.notification.exiting) return;
+    if (this.active?.notification.id !== id) return;
     this.pauseReasons.delete(reason);
+    if (this.active.notification.exiting) return;
     if (this.pauseReasons.size || this.autoCloseTimeout !== null) return;
     this.active.notification = { ...this.active.notification, paused: false };
     this.notificationState.set(this.active.notification);
@@ -106,7 +108,6 @@ export class NotificationService implements OnDestroy {
   dismiss(id: number): void {
     if (this.active?.notification.id !== id || this.active.notification.exiting) return;
     this.clearAutoClose();
-    this.pauseReasons.clear();
     this.active.notification = { ...this.active.notification, paused: true, exiting: true };
     this.notificationState.set(this.active.notification);
     this.exitTimeout = setTimeout(() => this.finishDismissal(id), NotificationService.exitDuration);
@@ -119,14 +120,19 @@ export class NotificationService implements OnDestroy {
   }
 
   private present(next: ActiveNotification): void {
+    const previous = this.active;
+    const inheritedPauseReasons = previous
+      ? [...this.pauseReasons].filter((reason) => reason === 'pointer' || reason === 'focus')
+      : [];
     this.clearAutoClose();
     this.clearExit();
-    const previous = this.active;
+    this.pauseReasons.clear();
+    inheritedPauseReasons.forEach((reason) => this.pauseReasons.add(reason));
+    if (this.pauseReasons.size) next.notification = { ...next.notification, paused: true };
     this.active = next;
     this.notificationState.set(next.notification);
     this.remainingDuration = next.duration;
-    this.pauseReasons.clear();
-    this.scheduleAutoClose();
+    if (!this.pauseReasons.size) this.scheduleAutoClose();
     previous?.action.complete();
   }
 
@@ -135,6 +141,7 @@ export class NotificationService implements OnDestroy {
     this.exitTimeout = null;
     const dismissed = this.active;
     this.active = null;
+    this.pauseReasons.clear();
     this.notificationState.set(null);
     dismissed.action.complete();
   }

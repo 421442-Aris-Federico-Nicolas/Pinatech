@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.time.Instant;
 
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.domain.ProductVariant;
@@ -81,6 +82,34 @@ class CustomerOrderTest {
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
         assertEquals(PaymentStatus.EXPIRED, order.getPaymentStatus());
         assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
+    }
+
+    @Test
+    void bankTransferProofSuspendsExpiryAndRequiresReviewBeforePayment() {
+        Product product = Mockito.mock(Product.class);
+        Mockito.when(product.getName()).thenReturn("Keyboard");
+        Mockito.when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        Mockito.when(variant.getProduct()).thenReturn(product);
+        Mockito.when(variant.getColorName()).thenReturn("Black");
+        Instant due = Instant.parse("2026-08-30T00:00:00Z");
+        CustomerOrder transfer = new CustomerOrder(
+                new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
+                List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"), new BigDecimal("0.00"),
+                new BigDecimal("0.00"), PaymentMethod.BANK_TRANSFER, due, due,
+                new BankAccountSnapshot("Pinatech", "30-12345678-9", "Bank", "alias", "1234567890123456789012", "ARS"),
+                null, null, FulfillmentMethod.PICKUP, null);
+
+        assertEquals(new BigDecimal("0.00"), transfer.getPaymentDiscount());
+        assertEquals(new BigDecimal("100.00"), transfer.getTotal());
+        transfer.submitBankTransferProof();
+        assertEquals(PaymentStatus.UNDER_REVIEW, transfer.getPaymentStatus());
+        assertEquals(null, transfer.getReservationExpiresAt());
+        assertEquals(false, transfer.isReservationExpired(due.plusSeconds(1)));
+
+        transfer.approveBankTransfer();
+        assertEquals(OrderStatus.PAID, transfer.getStatus());
+        assertEquals(PaymentStatus.APPROVED, transfer.getPaymentStatus());
     }
 
     private CustomerOrder order() {

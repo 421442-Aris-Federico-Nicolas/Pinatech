@@ -9,9 +9,6 @@ button,
 select {
   touch-action: manipulation;
 }
-button:active:not(:disabled) {
-  transform: translateY(1px);
-}
 button:focus-visible,
 .attachment-upload label:has(input:focus-visible),
 input:focus-visible,
@@ -35,21 +32,10 @@ select:focus-visible {
 .workload-list small {
   font-variant-numeric: tabular-nums;
 }
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
-}
 .technical-shell {
   display: grid;
   grid-template-columns: 245px minmax(0, 1fr);
   min-height: calc(100dvh - 100px);
-  transition: grid-template-columns 0.2s;
 }
 .technical-shell.sidebar-collapsed {
   grid-template-columns: 78px minmax(0, 1fr);
@@ -176,6 +162,12 @@ select:focus-visible {
 }
 .sidebar-collapsed .collapse {
   margin-left: 0;
+}
+:is(.collapse, .technical-sidebar nav button, .flow-list button, .recent-list > button, .panel header > button, .personal-summary button, .ticket-list > button) {
+  transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out);
+}
+:is(.collapse, .technical-sidebar nav button, .flow-list button, .recent-list > button, .panel header > button, .personal-summary button, .ticket-list > button):active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(.97);
 }
 main {
   min-width: 0;
@@ -932,6 +924,13 @@ main {
   }
   .page-heading h1 {
     font-size: 2.25rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-state span { animation: none; }
+  :is(.collapse, .technical-sidebar nav button, .flow-list button, .recent-list > button, .panel header > button, .personal-summary button, .ticket-list > button):active:not(:disabled):not([aria-disabled="true"]) {
+    opacity: .8;
+    transform: none !important;
   }
 }
 .collapse,

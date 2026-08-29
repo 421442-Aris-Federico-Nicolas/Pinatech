@@ -17,6 +17,7 @@ import com.computerstore.common.exception.ReservationExpiredException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.common.exception.BusinessRuleException;
 import com.computerstore.order.domain.OrderStatus;
+import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
 import com.computerstore.order.service.FulfillmentPolicy;
@@ -36,6 +37,10 @@ import com.computerstore.payment.repository.PaymentEventRepository;
 import com.computerstore.payment.repository.ProviderPaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.computerstore.email.OrderEmailEventType;
+import com.computerstore.email.OrderEmailOutboxService;
+import java.util.ArrayList;
 
 @Service
 public class PaymentAttemptTransactionalService {
@@ -51,7 +56,9 @@ public class PaymentAttemptTransactionalService {
     private final MercadoPagoProperties properties;
     private final FulfillmentPolicy fulfillment;
     private final Clock clock;
+    private final OrderEmailOutboxService outbox;
 
+    @Autowired
     public PaymentAttemptTransactionalService(
             PaymentAttemptRepository attempts,
             ProviderPaymentRepository providerPayments,
@@ -60,7 +67,8 @@ public class PaymentAttemptTransactionalService {
             OrderStockService stock,
             MercadoPagoProperties properties,
             FulfillmentPolicy fulfillment,
-            Clock clock
+            Clock clock,
+            OrderEmailOutboxService outbox
     ) {
         this.attempts = attempts;
         this.providerPayments = providerPayments;
@@ -70,6 +78,14 @@ public class PaymentAttemptTransactionalService {
         this.properties = properties;
         this.fulfillment = fulfillment;
         this.clock = clock;
+        this.outbox = outbox;
+    }
+
+    public PaymentAttemptTransactionalService(PaymentAttemptRepository attempts,
+            ProviderPaymentRepository providerPayments, PaymentEventRepository events,
+            CustomerOrderRepository orders, OrderStockService stock, MercadoPagoProperties properties,
+            FulfillmentPolicy fulfillment, Clock clock) {
+        this(attempts, providerPayments, events, orders, stock, properties, fulfillment, clock, null);
     }
 
     @Transactional(noRollbackFor = ReservationExpiredException.class)
@@ -82,6 +98,9 @@ public class PaymentAttemptTransactionalService {
 
         if (!order.getUser().isEmailVerified()) {
             throw new EmailVerificationRequiredException();
+        }
+        if (order.getPaymentMethod() != PaymentMethod.MERCADO_PAGO) {
+            throw new InvalidRequestException("Mercado Pago checkout is only available for Mercado Pago orders.");
         }
         fulfillment.validatePayment(order);
 
@@ -235,6 +254,7 @@ public class PaymentAttemptTransactionalService {
                 && approvedBeforeExpiry && fulfillmentEligible) {
             providerPayment.fundsOrder();
             order.approveMercadoPagoPayment();
+            if (outbox != null) outbox.enqueue(order, OrderEmailEventType.PAYMENT_APPROVED);
             attempt.summaryStatus(payment.status(), PaymentAttemptStatus.APPROVED);
             event.processed("ORDER_PAID");
             return Optional.empty();
@@ -343,14 +363,22 @@ public class PaymentAttemptTransactionalService {
     }
 
     private PaymentPreferenceRequest preferenceRequest(PaymentAttempt attempt) {
+        var items = new ArrayList<PaymentPreferenceRequest.Item>();
+        items.addAll(attempt.getOrder().getItems().stream()
+                .map(item -> new PaymentPreferenceRequest.Item(
+                        item.getVariant().getId().toString(),
+                        item.getProductName() + " - " + item.getVariantColorName(),
+                        item.getQuantity(), item.getUnitPrice()))
+                .toList());
+        // Only historical orders can carry this persisted surcharge.
+        if (attempt.getOrder().getPaymentSurcharge().signum() > 0) {
+            items.add(new PaymentPreferenceRequest.Item(
+                    "MERCADO_PAGO_SURCHARGE", "Recargo Mercado Pago", 1,
+                    attempt.getOrder().getPaymentSurcharge()));
+        }
         return new PaymentPreferenceRequest(
                 attempt.getPublicId(), attempt.getOrder().getId(), attempt.getAmount(), attempt.getCurrency(),
-                attempt.getExpiresAt(), attempt.getOrder().getItems().stream()
-                        .map(item -> new PaymentPreferenceRequest.Item(
-                                item.getVariant().getId().toString(),
-                                item.getProductName() + " - " + item.getVariantColorName(),
-                                item.getQuantity(), item.getUnitPrice()))
-                        .toList());
+                attempt.getExpiresAt(), items);
     }
 
     private PaymentCheckoutResponse response(PaymentAttempt attempt) {

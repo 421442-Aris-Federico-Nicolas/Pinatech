@@ -10,6 +10,22 @@ export interface Inventory { productId: number; variantId: number; colorName: st
 export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
 export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; }
 export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; variants: ProductVariantPayload[]; }
+export interface PendingBankTransferProof {
+  id: string;
+  status: 'PENDING_REVIEW';
+  orderId: number;
+  customerName: string;
+  customerEmail: string;
+  total: number;
+  currency: string;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
+  submittedAt: string;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  previewCount: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -47,4 +63,18 @@ export class AdminService {
   }
   orders() { return this.http.get<Order[]>(`${environment.apiBaseUrl}/admin/orders`); }
   updateOrderStatus(id: number, status: string) { return this.http.patch<Order>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }
+  pendingBankTransferProofs() {
+    return this.http.get<PendingBankTransferProof[]>(`${environment.apiBaseUrl}/admin/bank-transfer-proofs`, {
+      params: { status: 'PENDING_REVIEW' },
+    });
+  }
+  bankTransferProofPreview(proofId: string, index: number) {
+    return this.http.get(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/${proofId}/previews/${index}`, { responseType: 'blob' });
+  }
+  approveBankTransferProof(proofId: string, amount: number, reference: string) {
+    return this.http.post<void>(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/${proofId}/approve`, { amount, reference });
+  }
+  rejectBankTransferProof(proofId: string, reason: string) {
+    return this.http.post<void>(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/${proofId}/reject`, { reason });
+  }
 }

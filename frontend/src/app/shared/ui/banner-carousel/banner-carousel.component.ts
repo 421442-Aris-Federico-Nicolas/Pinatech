@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 
 export interface BannerSlide {
   readonly src: string;
@@ -19,6 +19,7 @@ export class BannerCarouselComponent {
   private readonly document = inject(DOCUMENT);
   private readonly documentHidden = signal(this.document.hidden);
   private readonly timerReset = signal(0);
+  private pointerAutoplayValue: boolean | null = null;
 
   readonly slides = input.required<readonly BannerSlide[]>();
   readonly ariaLabel = input('Banners destacados');
@@ -27,21 +28,30 @@ export class BannerCarouselComponent {
   readonly autoplayDelay = input(7000);
   readonly indexChange = output<number>();
   readonly activeIndex = signal(0);
-  readonly enteringIndex = signal<number | null>(null);
-  readonly leavingIndex = signal<number | null>(null);
-  readonly direction = signal<1 | -1>(1);
+  readonly reducedMotion = signal(false);
+  readonly userPaused = signal(false);
+  readonly autoplayPaused = computed(() => this.paused() || this.userPaused());
+  readonly driftDuration = computed(() => `${Math.max(this.autoplayDelay(), 6000)}ms`);
 
   constructor() {
     const view = this.document.defaultView;
+    const motionQuery = view?.matchMedia?.('(prefers-reduced-motion: reduce)');
     const updateVisibility = () => this.documentHidden.set(this.document.hidden);
     this.document.addEventListener('visibilitychange', updateVisibility);
     this.destroyRef.onDestroy(() => this.document.removeEventListener('visibilitychange', updateVisibility));
+
+    if (motionQuery) {
+      const updateReducedMotion = (event: MediaQueryListEvent) => this.reducedMotion.set(event.matches);
+      this.reducedMotion.set(motionQuery.matches);
+      motionQuery.addEventListener('change', updateReducedMotion);
+      this.destroyRef.onDestroy(() => motionQuery.removeEventListener('change', updateReducedMotion));
+    }
 
     effect((onCleanup) => {
       const slides = this.slides();
       const delay = this.autoplayDelay();
       this.timerReset();
-      if (!view || slides.length < 2 || delay <= 0 || this.paused() || this.documentHidden()) return;
+      if (!view || slides.length < 2 || delay <= 0 || this.autoplayPaused() || this.reducedMotion() || this.documentHidden()) return;
 
       const timer = view.setInterval(() => this.move(1, false), delay);
       onCleanup(() => view.clearInterval(timer));
@@ -59,14 +69,23 @@ export class BannerCarouselComponent {
   select(index: number): void {
     const slides = this.slides();
     if (!slides.length || index < 0 || index >= slides.length || index === this.activeIndex()) return;
-    this.startTransition(index, index > this.activeIndex() ? 1 : -1);
     this.activate(index, true);
   }
 
-  finishTransition(index: number): void {
-    if (index !== this.enteringIndex()) return;
-    this.enteringIndex.set(null);
-    this.leavingIndex.set(null);
+  prepareAutoplayToggle(): void {
+    this.pointerAutoplayValue = !this.userPaused();
+  }
+
+  toggleAutoplay(event?: MouseEvent): void {
+    const nextValue = event && event.detail > 0 && this.pointerAutoplayValue !== null
+      ? this.pointerAutoplayValue
+      : !this.userPaused();
+    this.pointerAutoplayValue = null;
+    this.userPaused.set(nextValue);
+  }
+
+  pauseAutoplay(): void {
+    this.userPaused.set(true);
   }
 
   private move(change: number, manual = true): void {
@@ -74,14 +93,7 @@ export class BannerCarouselComponent {
     if (total < 2) return;
     const current = this.activeIndex();
     const next = (current + change + total) % total;
-    this.startTransition(next, change > 0 ? 1 : -1);
     this.activate(next, manual);
-  }
-
-  private startTransition(next: number, direction: 1 | -1): void {
-    this.direction.set(direction);
-    this.leavingIndex.set(this.activeIndex());
-    this.enteringIndex.set(next);
   }
 
   private activate(index: number, manual: boolean): void {
