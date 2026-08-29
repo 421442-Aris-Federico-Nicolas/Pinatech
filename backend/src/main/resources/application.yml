@@ -43,6 +43,7 @@ management:
 app:
   storage:
     root: ${FILE_STORAGE_ROOT:./uploads}
+    private-documents-subroot: ${PRIVATE_DOCUMENTS_SUBROOT:bank-transfer-proofs}
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:4200}
     allowed-origin-patterns: "${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,https://*.devtunnels.ms}"
@@ -66,6 +67,7 @@ app:
     base-url: ${STOREFRONT_BASE_URL:http://localhost:4200}
   email:
     logo-url: ${EMAIL_LOGO_URL:}
+    outbox-interval-ms: ${EMAIL_OUTBOX_INTERVAL_MS:10000}
     resend:
       enabled: ${RESEND_ENABLED:false}
       api-key: ${RESEND_API_KEY:}
@@ -86,6 +88,17 @@ app:
       instructions: ${PICKUP_INSTRUCTIONS:}
       hours: ${PICKUP_HOURS:}
   payments:
+    bank-transfer:
+      enabled: ${BANK_TRANSFER_ENABLED:false}
+      holder: ${BANK_TRANSFER_HOLDER:}
+      tax-id: ${BANK_TRANSFER_TAX_ID:}
+      bank-name: ${BANK_TRANSFER_BANK_NAME:}
+      alias: ${BANK_TRANSFER_ALIAS:}
+      cbu: ${BANK_TRANSFER_CBU:}
+      currency: ${BANK_TRANSFER_CURRENCY:ARS}
+      proof-ttl: ${BANK_TRANSFER_PROOF_TTL:PT24H}
+      retention-interval-ms: ${BANK_TRANSFER_RETENTION_INTERVAL_MS:3600000}
+      orphan-interval-ms: ${BANK_TRANSFER_ORPHAN_INTERVAL_MS:86400000}
     mercado-pago:
       enabled: ${MP_ENABLED:false}
       environment: ${MP_ENVIRONMENT:sandbox}

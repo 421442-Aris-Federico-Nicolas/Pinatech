@@ -8,7 +8,7 @@ const LABELS: Record<EstadoDominio, Readonly<Record<string, string>>> = {
     DELIVERED: 'Entregado', CANCELLED: 'Cancelado',
   },
   pago: {
-    PENDING: 'Pago pendiente', UNPAID: 'Sin pagar', PAID: 'Pago acreditado', APPROVED: 'Pago aprobado',
+    PENDING: 'Pago pendiente', UNDER_REVIEW: 'Comprobante en revisión', UNPAID: 'Sin pagar', PAID: 'Pago acreditado', APPROVED: 'Pago aprobado',
     FAILED: 'Pago rechazado', REJECTED: 'Pago rechazado', EXPIRED: 'Pago vencido',
     REFUND_PENDING: 'Reintegro en proceso', REFUNDED: 'Pago reintegrado', CANCELLED: 'Pago cancelado',
     NOT_REQUIRED: 'Pago no requerido',
@@ -40,7 +40,7 @@ const TONES: Partial<Record<EstadoDominio, Readonly<Record<string, EstadoTono>>>
     READY: 'success', SHIPPED: 'info', DELIVERED: 'success', CANCELLED: 'danger',
   },
   pago: {
-    PENDING: 'warning', UNPAID: 'warning', PAID: 'success', APPROVED: 'success', FAILED: 'danger',
+    PENDING: 'warning', UNDER_REVIEW: 'info', UNPAID: 'warning', PAID: 'success', APPROVED: 'success', FAILED: 'danger',
     REJECTED: 'danger', EXPIRED: 'danger', REFUND_PENDING: 'warning', REFUNDED: 'accent', CANCELLED: 'danger',
   },
   entrega: {

@@ -25,8 +25,11 @@
 
   <div class="product-card__content">
     @if (mode() === 'catalog') { <p class="product-card__description">{{ product().description }}</p> }
-    <strong>{{ product().price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
-    <small>Sin impuesto nacional: {{ product().price / 1.105 | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
+    <small class="product-card__price-label">Precio especial por transferencia · 10% menos</small>
+    <strong>{{ transferPrice() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
+    <small>Sin impuestos: {{ transferPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
+    <small class="product-card__list-price">Precio de lista / Mercado Pago: <b>{{ product().price | currency:'ARS':'symbol-narrow':'1.2-2' }}</b></small>
+    <small>Sin impuestos: {{ listPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
   </div>
 
   <footer class="product-card__actions">

@@ -103,7 +103,7 @@ public class ProfileService {
             throw new DuplicateResourceException("The requested email is not available.");
         }
         String token = tokenService.issue(user, AccountActionPurpose.EMAIL_CHANGE, targetEmail);
-        emailService.sendAccountAction(targetEmail, AccountActionPurpose.EMAIL_CHANGE, token);
+        emailService.sendAccountAction(targetEmail, user.getFirstName(), AccountActionPurpose.EMAIL_CHANGE, token);
     }
 
     @Transactional
@@ -129,7 +129,7 @@ public class ProfileService {
         }
         refreshTokenRepository.revokeAllByUserId(user.getId(), Instant.now());
         tokenService.invalidateAll(user);
-        emailService.sendEmailChangedNotice(previousEmail, targetEmail);
+        emailService.sendEmailChangedNotice(previousEmail, user.getFirstName(), targetEmail);
     }
 
     private UserAccount activeUser(Long userId) {

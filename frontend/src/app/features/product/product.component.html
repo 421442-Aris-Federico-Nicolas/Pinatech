@@ -1,14 +1,28 @@
 <main>
-  @if(product();as item){
-    <a class="back" routerLink="/catalog"><span aria-hidden="true">←</span> Volver al catálogo</a>
-    <section class="product">
+  @if (product(); as item) {
+    <nav class="product-breadcrumb" aria-label="Ubicación del producto">
+      <a routerLink="/catalog">Catálogo</a><span aria-hidden="true">/</span>
+      <a routerLink="/catalog" [queryParams]="{ category: item.categoryId }">{{ item.categoryName }}</a><span aria-hidden="true">/</span>
+      <span aria-current="page" translate="no">{{ item.name }}</span>
+    </nav>
+
+    <section class="product" aria-labelledby="product-title">
       <div class="gallery">
         @if (item.images.length) {
           <section class="carousel" tabindex="0" role="group" aria-labelledby="gallery-title" (keydown.arrowleft)="$event.preventDefault(); changeImage(-1)" (keydown.arrowright)="$event.preventDefault(); changeImage(1)">
             <p id="gallery-title" class="sr-only">Galería de imágenes de {{ item.name }}</p>
+            @if (item.images.length > 1) {
+              <div class="carousel-thumbnails" role="group" aria-label="Seleccionar imagen">
+                @for (image of item.images; track image.id; let index = $index) {
+                  <button type="button" [class.active]="imageIndex() === index" (click)="selectImage(index)" [attr.aria-label]="'Ver ' + (image.altText || item.name) + ', imagen ' + (index + 1) + ' de ' + item.images.length" [attr.aria-current]="imageIndex() === index ? 'true' : null">
+                    <img [src]="imageUrl(image.contentUrl)" alt="" width="120" height="120" loading="lazy">
+                  </button>
+                }
+              </div>
+            }
             @if (currentImage(); as image) {
               <figure class="carousel-stage">
-                <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name" width="800" height="800" loading="eager" fetchpriority="high">
+                <img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.name" width="900" height="900" loading="eager" fetchpriority="high">
                 @if (item.images.length > 1) {
                   <button class="carousel-control previous" type="button" (click)="changeImage(-1)" aria-label="Ver imagen anterior"><span aria-hidden="true">‹</span></button>
                   <button class="carousel-control next" type="button" (click)="changeImage(1)" aria-label="Ver imagen siguiente"><span aria-hidden="true">›</span></button>
@@ -16,60 +30,101 @@
                 }
               </figure>
             }
-            @if (item.images.length > 1) {
-              <div class="carousel-thumbnails" role="group" aria-label="Seleccionar imagen">
-                @for (image of item.images; track image.id; let index = $index) {
-                  <button type="button" [class.active]="imageIndex() === index" (click)="selectImage(index)" [attr.aria-label]="'Ver ' + (image.altText || item.name) + ', imagen ' + (index + 1) + ' de ' + item.images.length" [attr.aria-current]="imageIndex() === index ? 'true' : null"><img [src]="imageUrl(image.contentUrl)" alt="" width="160" height="120" loading="lazy"></button>
-                }
-              </div>
-            }
           </section>
         } @else {
           <div class="visual" role="img" [attr.aria-label]="'Imagen no disponible para ' + item.name">
-             <span class="brand-chip" translate="no">{{item.brandName}}</span><div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div><div class="scan" aria-hidden="true"></div>
+            <span class="brand-chip" translate="no">{{ item.brandName }}</span>
+            <div class="brand-placeholder" aria-hidden="true"><b>PIN</b><span>Imagen no disponible</span></div>
+            <div class="scan" aria-hidden="true"></div>
           </div>
         }
       </div>
-      <div class="info">
-         <nav class="product-breadcrumb" aria-label="Ubicación del producto"><a routerLink="/catalog">Catálogo</a><span aria-hidden="true">›</span><a routerLink="/catalog" [queryParams]="{ category: item.categoryId }">{{ item.categoryName }}</a><span aria-hidden="true">›</span><span translate="no">{{ item.brandName }}</span></nav>
-         <h1 translate="no">{{item.name}}</h1>
-         <div class="product-meta"><span>Marca: <b translate="no">{{ item.brandName }}</b></span><span>ID: {{ item.id }}</span></div>
-         <section class="price" aria-labelledby="product-price-title"><span id="product-price-title">Precio publicado</span><strong>{{item.price|currency:'ARS':'symbol-narrow':'1.2-2'}}</strong><small>Precio sin impuesto nacional (10,5%): {{priceWithoutNationalTax()|currency:'ARS':'symbol-narrow':'1.2-2'}}</small></section>
-          <section class="variants" aria-labelledby="color-title"><h2 id="color-title">Color</h2><div role="radiogroup" aria-labelledby="color-title">@for(variant of item.variants;track variant.id){<button type="button" role="radio" [attr.data-variant-id]="variant.id" [attr.tabindex]="selectedVariantId() === variant.id ? 0 : -1" [class.selected]="selectedVariantId() === variant.id" [disabled]="!variant.inStock" (click)="selectVariant(variant.id)" (keydown.arrowleft)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowup)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowright)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" (keydown.arrowdown)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" [attr.aria-checked]="selectedVariantId() === variant.id"><i aria-hidden="true" [style.background]="variant.colorHex || 'var(--color-text-subtle)'"></i><span>{{variant.colorName}}</span>@if(!variant.inStock){<small>Sin stock</small>}</button>}</div></section>
+
+      <aside class="commerce-panel">
+        <header class="product-heading">
+          <p class="brand" translate="no">{{ item.brandName }}</p>
+          <h1 id="product-title" translate="no">{{ item.name }}</h1>
+          <p class="product-code">Código de producto: {{ item.id }}</p>
+        </header>
+
+        <section class="price" aria-labelledby="product-price-title">
+          <div class="special-price">
+            <span id="product-price-title">Precio especial por transferencia</span>
+            <em>10% menos</em>
+            <strong>{{ transferPricing().total | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
+            <small>Sin impuestos: {{ transferPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
+          </div>
+          <div class="list-price">
+            <span>Precio de lista / Mercado Pago</span>
+            <b>{{ item.price | currency:'ARS':'symbol-narrow':'1.2-2' }}</b>
+            <small>Sin impuestos: {{ listPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
+          </div>
+        </section>
+
+        <section class="variants" aria-labelledby="color-title">
+          <h2 id="color-title">Color</h2>
+          <div role="radiogroup" aria-labelledby="color-title">
+            @for (variant of item.variants; track variant.id) {
+              <button type="button" role="radio" [attr.data-variant-id]="variant.id" [attr.tabindex]="selectedVariantId() === variant.id ? 0 : -1" [class.selected]="selectedVariantId() === variant.id" [disabled]="!variant.inStock" (click)="selectVariant(variant.id)" (keydown.arrowleft)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowup)="$event.preventDefault(); selectAdjacentVariant(variant.id, -1)" (keydown.arrowright)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" (keydown.arrowdown)="$event.preventDefault(); selectAdjacentVariant(variant.id, 1)" [attr.aria-checked]="selectedVariantId() === variant.id">
+                <i aria-hidden="true" [style.background]="variant.colorHex || 'var(--color-text-subtle)'"></i>
+                <span>{{ variant.colorName }}</span>
+                @if (!variant.inStock) { <small>Sin stock</small> }
+              </button>
+            }
+          </div>
+        </section>
+
         @if (selectedVariant(); as variant) {
-          <p class="stock-status" [class.unavailable]="!variant.inStock || maxAddable() === 0"><span aria-hidden="true">{{ variant.inStock && maxAddable() > 0 ? '✓' : '!' }}</span>@if (!variant.inStock) { Sin stock para este color. } @else if (maxAddable() === 0) { Ya agregaste las {{ variant.availableQuantity }} unidades disponibles al carrito. } @else { Stock disponible: {{ variant.availableQuantity }} {{ variant.availableQuantity === 1 ? 'unidad' : 'unidades' }}.@if (quantityInCart()) { Podés agregar {{ maxAddable() }} más. } }</p>
+          <p class="stock-status" [class.unavailable]="!variant.inStock || maxAddable() === 0">
+            <span aria-hidden="true">{{ variant.inStock && maxAddable() > 0 ? '✓' : '!' }}</span>
+            @if (!variant.inStock) { Sin stock para este color. }
+            @else if (maxAddable() === 0) { Ya agregaste las {{ variant.availableQuantity }} unidades disponibles al carrito. }
+            @else { Stock disponible: {{ variant.availableQuantity }} {{ variant.availableQuantity === 1 ? 'unidad' : 'unidades' }}.@if (quantityInCart()) { Podés agregar {{ maxAddable() }} más. } }
+          </p>
         }
+
+        @if (pickupLocations().length) {
+          <section class="pickup-note" aria-labelledby="pickup-note-title">
+            <span aria-hidden="true">PIN</span>
+            <div><h2 id="pickup-note-title">Retiro sin costo</h2><p>Disponible en {{ pickupLocations().join(' o ') }}. Elegís el punto al finalizar la compra.</p></div>
+          </section>
+        }
+
         <div class="purchase">
-           <div class="quantity" role="group" aria-label="Cantidad">
-             <button type="button" [disabled]="quantity() === 1 || maxAddable() === 0" (click)="changeQuantity(-1)" aria-label="Disminuir cantidad">−</button><span aria-live="polite">{{quantity()}}</span><button type="button" [disabled]="quantity() >= maxAddable()" (click)="changeQuantity(1)" aria-label="Aumentar cantidad">+</button>
-           </div>
+          <div class="quantity-wrap">
+            <span>Cantidad</span>
+            <div class="quantity" role="group" aria-label="Cantidad">
+              <button type="button" [disabled]="quantity() === 1 || maxAddable() === 0" (click)="changeQuantity(-1)" aria-label="Disminuir cantidad">−</button>
+              <span aria-live="polite">{{ quantity() }}</span>
+              <button type="button" [disabled]="quantity() >= maxAddable()" (click)="changeQuantity(1)" aria-label="Aumentar cantidad">+</button>
+            </div>
+          </div>
           <button appButton="filled" type="button" [disabled]="!selectedVariant()?.inStock || maxAddable() === 0" (click)="addToCart()">{{ !selectedVariant()?.inStock ? 'Sin stock' : maxAddable() === 0 ? 'Stock máximo en carrito' : 'Agregar al carrito' }}</button>
         </div>
-          <div class="specs"><h2>Datos del catálogo</h2><dl><div><dt>Marca</dt><dd translate="no">{{item.brandName}}</dd></div><div><dt>Categoría</dt><dd>{{item.categoryName}}</dd></div></dl></div>
-      </div>
+      </aside>
     </section>
+
     @if (item.specifications.length) {
       <section class="characteristics">
         <p class="section-kicker">Ficha técnica</p>
         <h2>Características del producto</h2>
         @if (highlightedSpecifications().length) {
           <div class="characteristic-highlights">
-            @for (specification of highlightedSpecifications(); track specification.id) {<article><span aria-hidden="true">✓</span><p><small>{{ specification.name }}</small><strong>{{ specification.value }}</strong></p></article>}
+            @for (specification of highlightedSpecifications(); track specification.id) { <article><span aria-hidden="true">✓</span><p><small>{{ specification.name }}</small><strong>{{ specification.value }}</strong></p></article> }
           </div>
         }
         <div class="characteristic-groups">
           @for (group of specificationGroups(); track group.name) {
-            <article><h3>{{ group.name }}</h3><dl>@for (specification of group.specifications; track specification.id) {<div><dt>{{ specification.name }}</dt><dd>{{ specification.value }}</dd></div>}</dl></article>
+            <article><h3>{{ group.name }}</h3><dl>@for (specification of group.specifications; track specification.id) { <div><dt>{{ specification.name }}</dt><dd>{{ specification.value }}</dd></div> }</dl></article>
           }
         </div>
       </section>
     }
     <section class="product-description">
-      <p class="section-kicker">Información</p>
-      <h2>Descripción del producto</h2>
-      @if (item.description) { <p>{{ item.description }}</p> } @else { <p>Este producto no tiene una descripción publicada.</p> }
+      <p class="section-kicker">Información</p><h2>Descripción del producto</h2>
+      <p>{{ item.description || 'Este producto no tiene una descripción publicada.' }}</p>
     </section>
-  } @else if(error(); as errorType) {
+  } @else if (error(); as errorType) {
     @if (errorType === 'request') {
       <section class="not-found"><app-feedback tone="error" announce="assertive"><div><h1>No pudimos cargar el producto</h1><p>Revisá tu conexión e intentá nuevamente.</p></div><button feedback-actions appButton="filled" type="button" (click)="load()">Reintentar</button></app-feedback></section>
     } @else {

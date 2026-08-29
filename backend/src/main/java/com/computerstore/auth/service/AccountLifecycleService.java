@@ -68,7 +68,8 @@ public class AccountLifecycleService {
                 .flatMap(user -> userRepository.findByIdForUpdate(user.getId()))
                 .ifPresent(user -> {
                     String token = tokenService.issue(user, AccountActionPurpose.PASSWORD_RESET, null);
-                    emailService.sendAccountAction(user.getEmail(), AccountActionPurpose.PASSWORD_RESET, token);
+                    emailService.sendAccountAction(
+                            user.getEmail(), user.getFirstName(), AccountActionPurpose.PASSWORD_RESET, token);
                 });
     }
 

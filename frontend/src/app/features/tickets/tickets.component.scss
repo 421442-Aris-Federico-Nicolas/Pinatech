@@ -21,8 +21,9 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
 .local-previews article { background: var(--color-surface-raised); border: 1px solid var(--color-border); display: grid; gap: .3rem; min-width: 0; padding: .35rem; }
 .local-previews img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
 .local-previews span { font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.local-previews button, .selected-files button { background: transparent; border: 0; color: var(--color-danger); cursor: pointer; font: inherit; font-size: var(--text-xs); min-height: var(--control-min-height); padding: 0; text-align: left; touch-action: manipulation; }
+.local-previews button, .selected-files button { background: transparent; border: 0; color: var(--color-danger); cursor: pointer; font: inherit; font-size: var(--text-xs); min-height: var(--control-min-height); padding: 0; text-align: left; touch-action: manipulation; transition: color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); }
 .local-previews button:disabled, .selected-files button:disabled { cursor: not-allowed; opacity: .5; }
+.local-previews button:active:not(:disabled):not([aria-disabled="true"]), .selected-files button:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(.97); }
 
 .request-feedback { margin-top: var(--space-4); }
 .tickets-panel > header { align-items: start; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; margin-bottom: var(--space-4); padding-bottom: var(--space-4); }
@@ -39,7 +40,6 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
 .ticket-message { margin-top: var(--space-3); }
 .ticket-card app-ticket-attachment-gallery { display: block; margin-top: var(--space-4); }
 .empty { color: var(--color-text-subtle); min-height: 180px; place-content: center; text-align: center; }
-button:active:not(:disabled) { transform: translateY(1px); }
 
 @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 @media (max-width: 600px) {
@@ -52,4 +52,4 @@ button:active:not(:disabled) { transform: translateY(1px); }
   .upload-field, .ticket-upload { align-items: stretch; flex-direction: column; }
   .upload-field label, .ticket-upload label, .ticket-upload > .app-button { justify-content: center; margin-left: 0; width: 100%; }
 }
-@media (prefers-reduced-motion: reduce) { button:active:not(:disabled) { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .local-previews button:active:not(:disabled):not([aria-disabled="true"]), .selected-files button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; } }

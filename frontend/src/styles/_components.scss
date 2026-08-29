@@ -12,6 +12,7 @@
   padding: var(--space-2) var(--space-4);
   text-decoration: none;
   touch-action: manipulation;
+  transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out);
 }
 
 .app-button--filled { background: var(--color-orange); color: var(--color-text-inverse); }
@@ -23,7 +24,11 @@
 .app-button--danger { border-color: var(--color-danger); color: var(--color-danger); }
 .app-button--danger.app-button--filled { background: var(--color-danger); color: var(--color-text-inverse); }
 .app-button:disabled, .app-button[aria-disabled="true"] { cursor: not-allowed; opacity: .5; }
-.app-button:active:not(:disabled) { transform: translateY(1px); }
+.app-button:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; }
+}
 
 .app-card {
   background: var(--color-surface);
@@ -52,7 +57,11 @@
 .app-badge--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
 .app-badge--danger { background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
 
-.app-field { color: var(--color-text-muted); display: grid; font-size: var(--text-sm); gap: var(--space-2); }
+app-input,
+app-select,
+app-textarea { display: block; min-width: 0; }
+
+.app-field { color: var(--color-text-muted); display: grid; font-size: var(--text-sm); gap: var(--space-2); min-width: 0; }
 .app-field__label { color: var(--color-text-muted); font-weight: var(--font-weight-bold); }
 .app-field__required { color: var(--color-orange); }
 .app-field__control {
@@ -62,6 +71,7 @@
   color: var(--color-text);
   font: inherit;
   min-height: var(--control-min-height);
+  min-width: 0;
   padding: .7rem .8rem;
   width: 100%;
 }
@@ -69,6 +79,6 @@
 .app-field__control:hover:not(:disabled) { border-color: var(--color-cyan-strong); }
 .app-field__control:focus-visible { border-color: var(--color-cyan); }
 textarea.app-field__control { min-height: 7rem; resize: vertical; }
-.app-field__hint { color: var(--color-text-subtle); font-size: var(--text-xs); }
-.app-field__error { color: var(--color-danger); font-size: var(--text-xs); }
+.app-field__hint { color: var(--color-text-subtle); font-size: var(--text-xs); min-width: 0; overflow-wrap: anywhere; }
+.app-field__error { color: var(--color-danger); font-size: var(--text-xs); min-width: 0; overflow-wrap: anywhere; }
 .app-field--disabled { opacity: .55; }

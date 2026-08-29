@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService, OrderConfirmation } from '../../core/cart/cart.service';
@@ -23,6 +23,7 @@ describe('CheckoutComponent', () => {
     onlinePaymentsEnabled: true,
     deliveryQuotesEnabled: false,
     paymentMethods: ['MERCADO_PAGO'],
+    bankTransferDiscountRate: 0.1,
     deliveryMethods: [],
     fulfillmentMethods: ['PICKUP'],
     pickupLocations: [pickupLocation],
@@ -33,10 +34,13 @@ describe('CheckoutComponent', () => {
     paymentStatus: 'PENDING',
     fulfillmentStatus: 'PENDING',
     currency: 'ARS',
-    paymentMethod: null,
+    paymentMethod: 'MERCADO_PAGO',
     deliveryMethod: null,
     fulfillmentMethod: 'PICKUP',
     pickupLocation,
+    subtotal: 3000,
+    paymentDiscount: 0,
+    paymentSurcharge: 0,
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2026-07-29T20:00:00Z',
@@ -84,6 +88,10 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
+    const radios = fixture.nativeElement.querySelectorAll('input[name="paymentMethod"]') as NodeListOf<HTMLInputElement>;
+    expect([...radios].every((radio) => !radio.checked)).toBe(true);
+    radios[0].click();
+    fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Pagar con Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Pinatech Centro');
     expect(fixture.nativeElement.textContent).toContain('Entiendo que debo retirar en Córdoba');
@@ -100,7 +108,7 @@ describe('CheckoutComponent', () => {
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
-    expect(cart.checkout).toHaveBeenCalledWith('PICKUP', pickupLocation.code, pickupLocation.version);
+    expect(cart.checkout).toHaveBeenCalledWith('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version);
     expect(cart.completeCheckout).toHaveBeenCalledWith(order);
     expect(assign).toHaveBeenCalledWith(payment.checkoutUrl);
     expect(calls).toEqual(['order', 'payment', 'complete', 'redirect']);
@@ -134,12 +142,68 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
     expect(cart.items()).toEqual([item]);
     expect(cart.completeCheckout).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Conservamos tu carrito');
+  });
+
+  it('creates a transfer order without calling Mercado Pago, clears the cart and deep-links to orders', async () => {
+    const transferOrder: OrderConfirmation = { ...order, paymentMethod: 'BANK_TRANSFER', paymentDiscount: 300, total: 2700, reservationExpiresAt: null };
+    const mercadoPago = vi.fn();
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of(transferOrder)), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'] }), mercadoPago } },
+        { provide: CHECKOUT_WINDOW, useValue: { location: { assign: vi.fn() } } },
+      ],
+    }).compileComponents();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate');
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    fixture.componentInstance.pickupAccepted.set(true);
+
+    fixture.componentInstance.submit();
+
+    expect(cart.checkout).toHaveBeenCalledWith('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version);
+    expect(mercadoPago).not.toHaveBeenCalled();
+    expect(cart.completeCheckout).toHaveBeenCalledWith(transferOrder);
+    expect(navigate).toHaveBeenCalledWith(['/orders'], { queryParams: { order: 42 } });
+  });
+
+  it('uses the backend transfer discount rate once on the list subtotal', async () => {
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, bankTransferDiscountRate: 0.125, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'] }) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 375, total: 2625 });
+    expect(fixture.nativeElement.textContent).toContain('Descuento por transferencia');
+    expect(fixture.nativeElement.textContent).not.toContain('recargo');
   });
 
   it('does not create an order when Mercado Pago is disabled', async () => {
@@ -177,6 +241,8 @@ describe('CheckoutComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.detectChanges();
     fixture.componentInstance.submit();
 
@@ -246,7 +312,7 @@ describe('CheckoutComponent', () => {
 
     expect(reconcile).toHaveBeenCalledTimes(2);
     expect(capabilitiesRequest).toHaveBeenCalledOnce();
-    expect(fixture.nativeElement.textContent).toContain('Pagar con Mercado Pago');
+    expect(fixture.nativeElement.textContent).toContain('Elegí cómo pagar');
   });
 
   it('blocks checkout until the customer verifies their email', async () => {
@@ -267,6 +333,7 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -298,6 +365,7 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.componentInstance.submit();
 
     expect(cart.checkout).not.toHaveBeenCalled();
@@ -353,6 +421,7 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -382,12 +451,43 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain(expected);
     expect(fixture.nativeElement.textContent).toContain(action);
     expect(cart.items()).toEqual([item]);
+  });
+
+  it('directs an existing bank transfer conflict to the pending order', async () => {
+    const conflict = new HttpErrorResponse({
+      status: 409,
+      error: { detail: 'You already have a pending bank transfer order.' },
+    });
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => throwError(() => conflict)), completeCheckout: vi.fn(),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Ya tenés un pedido por transferencia pendiente');
+    expect(fixture.nativeElement.querySelector('.submit-error a')?.getAttribute('href')).toBe('/orders');
   });
 
   it('marks an expired confirmation and lets the user dismiss it', async () => {

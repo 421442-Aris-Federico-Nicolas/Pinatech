@@ -36,7 +36,9 @@ class CreateOrderRequestValidationTest {
     }
 
     @Test
-    void requiresFulfillmentMethodPickupLocationCodeAndVersion() {
+    void requiresPaymentFulfillmentAndPickupData() {
+        var missingPaymentMethod = new CreateOrderRequest(
+                List.of(new CreateOrderRequest.Item(1L, 1)), null, FulfillmentMethod.PICKUP, "CODE", VERSION);
         var missingMethod = new CreateOrderRequest(
                 List.of(new CreateOrderRequest.Item(1L, 1)), null, "CODE", VERSION);
         var missingLocation = new CreateOrderRequest(
@@ -44,6 +46,7 @@ class CreateOrderRequestValidationTest {
         var missingVersion = new CreateOrderRequest(
                 List.of(new CreateOrderRequest.Item(1L, 1)), FulfillmentMethod.PICKUP, "CODE", " ");
 
+        assertFalse(validator.validate(missingPaymentMethod).isEmpty());
         assertFalse(validator.validate(missingMethod).isEmpty());
         assertFalse(validator.validate(missingLocation).isEmpty());
         assertFalse(validator.validate(missingVersion).isEmpty());

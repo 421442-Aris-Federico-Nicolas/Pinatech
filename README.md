@@ -100,13 +100,15 @@ El catalogo modela productos, especificaciones, imagenes y variantes de color. C
 
 ### Pedidos
 
-Los pedidos conservan snapshots del nombre y precio del producto para no depender de cambios posteriores en el catalogo. El backend recalcula los importes y nunca confia en precios enviados por el navegador.
+Los pedidos conservan snapshots del nombre y precio de lista del producto para no depender de cambios posteriores en el catalogo. El backend recalcula los importes y nunca confia en precios enviados por el navegador.
 
 La creacion admite una clave de idempotencia. El stock se reserva durante una ventana temporal; un proceso programado cancela pedidos vencidos y libera sus unidades.
 
 ### Pagos
 
-El modulo de pagos aisla la integracion con Mercado Pago mediante un gateway. El checkout crea una preferencia asociada al pedido y registra cada intento. Los webhooks se validan y luego se consulta al proveedor antes de modificar el estado local.
+El modulo de pagos admite Mercado Pago y transferencia bancaria como metodos inmutables por pedido. El precio del catalogo es el precio de lista y de Mercado Pago; la transferencia obtiene un descuento del 10% calculado por el backend una sola vez sobre el subtotal completo.
+
+Mercado Pago se aisla mediante un gateway. El checkout crea una preferencia asociada al pedido y registra cada intento. Los webhooks se validan y luego se consulta al proveedor antes de modificar el estado local. Las transferencias reservan stock durante 24 horas hasta recibir un comprobante; luego requieren una revision administrativa auditada.
 
 La conciliacion y los reembolsos son idempotentes. Un retorno del navegador informa al usuario, pero no constituye confirmacion autoritativa del pago.
 
@@ -116,7 +118,7 @@ Los clientes crean tickets y consultan su seguimiento. Administradores asignan t
 
 ### Archivos
 
-Las imagenes se validan por contenido, se renombran con UUID y se abstraen mediante el modulo de almacenamiento. Las imagenes de productos son publicas; los adjuntos de tickets se descargan mediante endpoints autenticados con controles de propiedad y rol.
+Las imagenes se validan por contenido, se renombran con UUID y se abstraen mediante el modulo de almacenamiento. Las imagenes de productos son publicas; los adjuntos de tickets se descargan mediante endpoints autenticados con controles de propiedad y rol. Los comprobantes bancarios usan un almacenamiento privado separado: las imagenes se regeneran y los PDF se revisan solo mediante vistas PNG saneadas.
 
 ## Persistencia
 

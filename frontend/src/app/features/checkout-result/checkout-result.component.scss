@@ -11,7 +11,7 @@ main { display: grid; min-height: calc(100dvh - 100px); padding: clamp(var(--spa
 .rejected > span { background: var(--color-danger-bg); border-color: var(--color-danger-border); color: var(--color-danger); }
 .refunded > span { background: var(--color-accent-bg); border-color: var(--color-accent-border); color: var(--color-accent-text); font-size: 1.4rem; }
 .loader { animation: spin .8s linear infinite; border: 3px solid var(--color-border); border-top-color: var(--color-cyan); box-sizing: border-box; }
-dl { border-block: 1px solid var(--color-border); display: grid; grid-template-columns: 1fr 1fr; margin: var(--space-8) 0; }
+dl { border-block: 1px solid var(--color-border); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: var(--space-8) 0; }
 dl div { padding: var(--space-4) 0; }
 dl div + div { border-left: 1px solid var(--color-border); padding-left: var(--space-5); }
 dt { color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: var(--font-weight-bold); text-transform: uppercase; }

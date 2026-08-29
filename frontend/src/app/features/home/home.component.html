@@ -1,7 +1,7 @@
 <main>
-  <section class="hero" aria-labelledby="hero-title" (mouseenter)="heroPaused.set(true)" (mouseleave)="heroPaused.set(false)">
-    <app-banner-carousel [slides]="heroSlides" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPaused()" (indexChange)="selectHero($event)" />
-    @if (activeHeroPanel(); as panel) {
+  <section class="hero" aria-labelledby="hero-title" (pointerenter)="heroPointerPaused.set(true)" (pointerleave)="heroPointerPaused.set(false)" (focusin)="pauseHeroOnFocus($event, heroCarousel)">
+    <app-banner-carousel #heroCarousel [slides]="heroSlides" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPointerPaused()" (indexChange)="selectHero($event)" />
+    @for (panel of [activeHeroPanel()]; track panel.title) {
       <div class="hero-copy">
         <div><p class="eyebrow">{{ panel.eyebrow }}</p><h1 id="hero-title">{{ panel.title }} <span>{{ panel.accent }}</span></h1><p class="lead">{{ panel.description }}</p></div>
         <div class="hero-actions"><a appButton="filled" [routerLink]="panel.link">{{ panel.linkLabel }}</a>@if (!auth.isAuthenticated() && heroIndex() === 0) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>

@@ -55,6 +55,7 @@ class ProfileServiceTest {
         when(user.isActive()).thenReturn(true);
         when(user.getId()).thenReturn(4L);
         when(user.getEmail()).thenReturn("old@example.com");
+        when(user.getFirstName()).thenReturn("Ana");
         when(users.findByEmailIgnoreCase("new@example.com")).thenReturn(Optional.empty());
 
         service.confirmEmailChange("raw-token");
@@ -64,7 +65,7 @@ class ProfileServiceTest {
         verify(user).incrementSessionVersion();
         verify(refreshTokens).revokeAllByUserId(any(), any());
         verify(tokens).invalidateAll(user);
-        verify(emails).sendEmailChangedNotice("old@example.com", "new@example.com");
+        verify(emails).sendEmailChangedNotice("old@example.com", "Ana", "new@example.com");
     }
 
     @Test
@@ -78,5 +79,22 @@ class ProfileServiceTest {
                 () -> service.requestEmailChange(4L, "new@example.com", "wrong"));
 
         verify(tokens, never()).issue(any(), any(), any());
+    }
+
+    @Test
+    void emailChangeConfirmationUsesTheCustomersFirstName() {
+        when(users.findByIdForUpdate(4L)).thenReturn(Optional.of(user));
+        when(user.isActive()).thenReturn(true);
+        when(user.getEmail()).thenReturn("old@example.com");
+        when(user.getPasswordHash()).thenReturn("hash");
+        when(user.getFirstName()).thenReturn("Ana");
+        when(passwordEncoder.matches("Password1", "hash")).thenReturn(true);
+        when(users.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
+        when(tokens.issue(user, AccountActionPurpose.EMAIL_CHANGE, "new@example.com")).thenReturn("raw-token");
+
+        service.requestEmailChange(4L, "New@Example.com", "Password1");
+
+        verify(emails).sendAccountAction(
+                "new@example.com", "Ana", AccountActionPurpose.EMAIL_CHANGE, "raw-token");
     }
 }

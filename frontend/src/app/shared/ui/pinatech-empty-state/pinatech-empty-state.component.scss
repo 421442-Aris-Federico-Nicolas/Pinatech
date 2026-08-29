@@ -1,0 +1,37 @@
+:host { display: block; }
+
+.empty-state {
+  color: var(--color-text);
+  display: grid;
+  justify-items: center;
+  min-height: 390px;
+  overflow: hidden;
+  padding: clamp(var(--space-8), 6vw, var(--space-16)) var(--space-4);
+  place-content: center;
+  text-align: center;
+}
+
+.mascot-image {
+  display: block;
+  height: auto;
+  margin-bottom: var(--space-3);
+  width: clamp(10.5rem, 30vw, 16rem);
+}
+
+h2 {
+  font-size: clamp(var(--text-xl), 3vw, var(--text-2xl));
+  line-height: 1.2;
+  margin: 0;
+}
+
+p {
+  color: var(--color-text-muted);
+  line-height: var(--line-height-base);
+  margin: var(--space-3) 0 var(--space-5);
+  max-width: 34rem;
+}
+
+@media (max-width: 520px) {
+  .empty-state { min-height: 340px; }
+  .mascot-image { width: clamp(9.5rem, 55vw, 12rem); }
+}

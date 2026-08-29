@@ -49,7 +49,7 @@ export class HomeComponent {
   protected readonly featured = signal<Product[]>([]);
   protected readonly peripheralCategoryId = signal<number | null>(null);
   protected readonly heroIndex = signal(0);
-  protected readonly heroPaused = signal(false);
+  protected readonly heroPointerPaused = signal(false);
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
   protected readonly heroSlides: readonly BannerSlide[] = [
@@ -74,7 +74,7 @@ export class HomeComponent {
       linkLabel: 'Ver mi carrito',
     },
   ];
-  protected readonly activeHeroPanel = computed(() => this.heroPanels[this.heroIndex()] ?? this.heroPanels[0]);
+  protected readonly activeHeroPanel = computed<HeroPanel>(() => this.heroPanels[this.heroIndex()] ?? this.heroPanels[0]!);
   protected readonly productGroups = computed<readonly ProductShowcaseGroup[]>(() => {
     const products = this.featured();
     const peripheralCategoryId = this.peripheralCategoryId();
@@ -139,5 +139,10 @@ export class HomeComponent {
 
   protected selectHero(index: number): void {
     this.heroIndex.set(index);
+  }
+
+  protected pauseHeroOnFocus(event: FocusEvent, carousel: BannerCarouselComponent): void {
+    const hero = event.currentTarget as HTMLElement | null;
+    if (!hero?.contains(event.relatedTarget as Node | null)) carousel.pauseAutoplay();
   }
 }

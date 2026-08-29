@@ -7,11 +7,11 @@
   <p class="sr-only" aria-live="polite" aria-atomic="true">{{ feedback() }}</p>
 
   @if (cart.items().length) {
-    <div class="cart-layout">
+    <div class="cart-layout" data-cart-motion="layout">
        <section appCard class="items" aria-labelledby="cart-items-title">
          <h2 id="cart-items-title" class="sr-only">Productos en el carrito</h2>
         @for (item of cart.items(); track item.variant.id) {
-          <article>
+          <article [attr.data-cart-motion]="'row-' + item.variant.id">
             @if (item.product.images[0]; as image) {
                <img class="item-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="64" height="64" loading="lazy">
             } @else { <div class="placeholder" aria-hidden="true"><span>PIN</span></div> }
@@ -19,7 +19,7 @@
                <small><span translate="no">{{ item.product.brandName }}</span> · {{ item.product.categoryName }}</small>
                <a [routerLink]="['/products', item.product.id]" [queryParams]="{ variant: item.variant.id }" translate="no">{{ item.product.name }}</a>
               <span>Color: {{ item.variant.colorName }}</span>
-              <span>{{ item.product.price | currency:'ARS':'symbol-narrow':'1.2-2' }} por unidad</span>
+              <span>{{ transferSelected() ? 'Precio por transferencia' : 'Precio de lista' }}: {{ unitPrice(item) | currency:'ARS':'symbol-narrow':'1.2-2' }} por unidad</span>
               <span class="stock-note">Stock disponible: {{ cart.stockLimit(item.variant) }}</span>
             </div>
              <div class="quantity" role="group" aria-label="Cantidad de {{ item.product.name }}">
@@ -27,32 +27,38 @@
               <span aria-live="polite">{{ item.quantity }}</span>
                 <button type="button" [disabled]="item.quantity >= cart.stockLimit(item.variant)" (click)="cart.setQuantity(item.variant.id, item.quantity + 1)" [attr.aria-label]="item.quantity >= cart.stockLimit(item.variant) ? 'Alcanzaste el stock disponible de ' + item.product.name : 'Agregar una unidad de ' + item.product.name">+</button>
             </div>
-            <strong class="subtotal">{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
+            <strong class="subtotal">{{ itemTotal(item) | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
               <button class="remove" appButton="text" tone="danger" type="button" (click)="removeItem(item)" [attr.aria-label]="'Eliminar ' + item.product.name + ', color ' + item.variant.colorName + ', del carrito'">Eliminar</button>
           </article>
         }
-        <button class="clear" appButton="text" tone="danger" type="button" (click)="clear()">Vaciar carrito</button>
+        <button class="clear" data-cart-motion="clear" appButton="text" tone="danger" type="button" (click)="clear()">Vaciar carrito</button>
       </section>
 
-      <aside appCard class="summary">
+      <aside appCard class="summary" data-cart-motion="summary">
         <h2>Resumen</h2>
-        <div><span>Productos ({{ cart.count() }})</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <div class="total"><span>Total de productos</span><strong>{{ cart.total() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
-        <p>En el próximo paso vas a revisar el pedido y, si está disponible, continuar el pago en Mercado Pago.</p>
+        @if (transferSelected()) {
+          <div><span>Precio de lista</span><strong>{{ selectedPricing().subtotal | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+          <div><span>Descuento por transferencia (10%)</span><strong>− {{ selectedPricing().discount | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        }
+        <div class="total"><span>{{ transferSelected() ? 'Precio por transferencia' : 'Precio de lista' }}</span><strong>{{ selectedPricing().total | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div>
+        <label class="transfer-option">
+          <input type="checkbox" [checked]="transferSelected()" (change)="setTransferSelected($event)">
+          <span><strong>Preseleccionar transferencia</strong><small>Aplicá el 10% de descuento. Podés cambiarlo en el próximo paso.</small></span>
+        </label>
         @if (reconciling()) {
           <button appButton="filled" type="button" disabled aria-busy="true">Verificando disponibilidad…</button>
         } @else if (reconcileError()) {
           <button appButton="filled" type="button" disabled>Verificá la disponibilidad para continuar</button>
         } @else if (auth.isAuthenticated()) {
-           <a appButton="filled" routerLink="/checkout">Revisar pedido y pago</a>
+           <a appButton="filled" routerLink="/checkout" [queryParams]="checkoutQueryParams()">Revisar pedido y pago</a>
         } @else {
-           <a appButton="filled" routerLink="/login" [queryParams]="{ returnUrl: '/checkout' }" aria-label="Ingresar para continuar al checkout">Ingresar para continuar</a>
+           <a appButton="filled" routerLink="/login" [queryParams]="{ returnUrl: checkoutReturnUrl() }" aria-label="Ingresar para continuar al checkout">Ingresar para continuar</a>
           <small>Tu carrito se conservará al iniciar sesión.</small>
         }
       </aside>
     </div>
   } @else {
-    <section appCard class="empty">
+    <section appCard class="empty" data-cart-motion="empty">
       <div class="placeholder large" aria-hidden="true"><span>PIN</span></div>
       <h2>Tu carrito está vacío</h2>
       <p>Explorá el catálogo y agregá los productos que quieras comprar.</p>

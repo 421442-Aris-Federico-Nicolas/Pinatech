@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { PickupLocation } from '../../core/orders/order.service';
+import { PaymentMethod } from '../../core/orders/order.service';
 
 export const CHECKOUT_WINDOW = new InjectionToken<Pick<Window, 'location'>>('Checkout window', {
   providedIn: 'root',
@@ -13,7 +14,8 @@ export interface CheckoutCapabilities {
   orderRequestsEnabled: boolean;
   onlinePaymentsEnabled: boolean;
   deliveryQuotesEnabled: boolean;
-  paymentMethods: string[];
+  paymentMethods: PaymentMethod[];
+  bankTransferDiscountRate: number;
   deliveryMethods: string[];
   fulfillmentMethods: string[];
   pickupLocations: PickupLocation[];
