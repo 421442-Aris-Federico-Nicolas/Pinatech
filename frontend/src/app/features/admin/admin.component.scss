@@ -561,7 +561,6 @@ main {
   transform-origin: top;
   transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
-.order-detail-enter,
 .order-detail-leave {
   opacity: 0;
   transform: scale(.97);
@@ -1096,9 +1095,8 @@ main {
     transform: none !important;
   }
   .chevron { transition: none; }
-  .order-detail { transform: none; transition: opacity 200ms var(--ease-out) !important; }
-  .order-detail-enter,
-  .order-detail-leave { transform: none; }
+  .order-detail { transform: none; transition: none !important; }
+  .order-detail-leave { opacity: 0; transform: none; }
 }
 @media (max-width: 760px) {
   .section-label {

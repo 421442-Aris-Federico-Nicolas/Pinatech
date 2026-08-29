@@ -90,7 +90,7 @@
         } @empty { <p class="empty-row">No hay comprobantes pendientes de revisión.</p> }
       </section>
       <section class="sales-toolbar">
-        <div class="filter-tabs" aria-label="Filtrar pedidos">@for(filter of [['ALL','Todos'],['PENDING_PAYMENT','Pendientes'],['PAID','Pagados'],['PREPARING','Preparando'],['DELIVERED','Entregados'],['CANCELLED','Cancelados']];track filter[0]){<button type="button" [class.active]="orderFilter() === filter[0]" [attr.aria-pressed]="orderFilter() === filter[0]" (click)="filterOrders(filter[0])">{{ filter[1] }} <span>{{ filter[0] === 'ALL' ? orders().length : statusCount(filter[0]) }}</span></button>}</div>
+        <div class="filter-tabs" aria-label="Filtrar pedidos">@for(filter of [['ALL','Todos'],['PENDING_PAYMENT','Pendientes'],['PAID','Pagados'],['PREPARING','Preparando'],['READY','Listos'],['DELIVERED','Entregados'],['CANCELLED','Cancelados']];track filter[0]){<button type="button" [class.active]="orderFilter() === filter[0]" [attr.aria-pressed]="orderFilter() === filter[0]" (click)="filterOrders(filter[0])">{{ filter[1] }} <span>{{ filter[0] === 'ALL' ? orders().length : statusCount(filter[0]) }}</span></button>}</div>
       </section>
       <section class="orders-list">
         @for(order of filteredOrders(); track order.id){
@@ -105,7 +105,7 @@
               <iconify-icon aria-hidden="true" class="chevron" icon="line-md:chevron-small-down"></iconify-icon>
             </button>
             @if(expandedOrder() === order.id){
-              <div class="order-detail" [id]="'order-detail-' + order.id" animate.enter="order-detail-enter" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
+              <div class="order-detail" [id]="'order-detail-' + order.id" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
                 <div class="order-items"><h3>Detalle del pedido</h3>@for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}</div>
                 <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
               </div>
