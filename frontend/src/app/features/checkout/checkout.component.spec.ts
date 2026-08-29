@@ -340,6 +340,8 @@ describe('CheckoutComponent', () => {
     expect(cart.checkout).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Verificá tu email para comprar');
     expect(fixture.nativeElement.querySelector('.verification-required a')?.getAttribute('href')).toBe('/profile');
+    expect(getComputedStyle(fixture.nativeElement.querySelector('.verification-required')).getPropertyValue('--feedback-actions-column').trim()).toBe('2 / -1');
+    expect(getComputedStyle(fixture.nativeElement.querySelector('.verification-actions')).width).not.toBe('0px');
     expect((fixture.nativeElement.querySelector('button[aria-label="Pagar con Mercado Pago"]') as HTMLButtonElement).disabled).toBe(true);
     const resend = [...fixture.nativeElement.querySelectorAll('.verification-required button')]
       .find((button: HTMLButtonElement) => button.textContent?.includes('Reenviar verificación')) as HTMLButtonElement;
