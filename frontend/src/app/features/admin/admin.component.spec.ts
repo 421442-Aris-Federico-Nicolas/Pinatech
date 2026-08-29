@@ -143,10 +143,47 @@ describe('AdminComponent payments', () => {
     expect(summary.getAttribute('aria-expanded')).toBe('true');
     expect(detail.textContent).toContain('2 × Mouse');
     expect(detail.textContent).toContain('Ajuste histórico de pago');
+    expect(detail.textContent).toContain('Preparar pedido');
     expect(detail.textContent).not.toContain('recargo');
     expect(detail.getAttribute('aria-hidden')).toBeNull();
     expect(detail.hasAttribute('inert')).toBe(false);
+    expect(fixture.nativeElement.querySelector('.filter-tabs')?.textContent).toContain('Listos');
     expect(document.activeElement).toBe(summary);
+  });
+
+  it('advances a paid order to preparing from its expanded detail', async () => {
+    const inventories = vi.fn(() => of([]));
+    const updateOrderStatus = vi.fn(() => of({
+      ...renderedOrder,
+      status: 'PREPARING',
+      fulfillmentStatus: 'PREPARING',
+    }));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]),
+          inventories, orders: () => of([renderedOrder]), pendingBankTransferProofs: () => of([]),
+          updateOrderStatus,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    fixture.componentInstance.section.set('sales');
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const action = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.order-detail button'))
+      .find((button) => button.textContent?.includes('Preparar pedido'));
+    action?.click();
+    fixture.detectChanges();
+
+    expect(action).toBeTruthy();
+    expect(updateOrderStatus).toHaveBeenCalledWith(41, 'PREPARING');
+    expect(fixture.componentInstance.orders()[0].status).toBe('PREPARING');
+    expect(inventories).toHaveBeenCalledTimes(2);
   });
 
   it('settles rapid order toggles on the final expanded state', async () => {
