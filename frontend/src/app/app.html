@@ -52,7 +52,22 @@
     }
   </div>
 </div>
-<div class="utility-bar"><span>Catálogo de tecnología</span><span>Servicio técnico · Córdoba, Argentina</span></div>
+<aside class="utility-bar" aria-label="Información comercial">
+  <div class="marquee-viewport">
+    <div class="marquee-track">
+      <ul class="marquee-group">
+        <li><iconify-icon icon="line-md:computer" aria-hidden="true"></iconify-icon> Catálogo de tecnología</li>
+        <li><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon> Servicio técnico en Córdoba</li>
+        <li><iconify-icon icon="mdi:shield-check-outline" aria-hidden="true"></iconify-icon> Pagá online de forma segura con <span translate="no">Mercado Pago</span></li>
+      </ul>
+      <ul class="marquee-group" aria-hidden="true">
+        <li><iconify-icon icon="line-md:computer" aria-hidden="true"></iconify-icon> Catálogo de tecnología</li>
+        <li><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon> Servicio técnico en Córdoba</li>
+        <li><iconify-icon icon="mdi:shield-check-outline" aria-hidden="true"></iconify-icon> Pagá online de forma segura con <span translate="no">Mercado Pago</span></li>
+      </ul>
+    </div>
+  </div>
+</aside>
 <header>
 <mat-toolbar aria-label="Navegación principal" (keydown.escape)="closeMenuFromEscape($event)">
   <a class="brand" routerLink="/">
@@ -87,15 +102,27 @@
 <div id="main-content" tabindex="-1"><router-outlet /></div>
 <footer class="site-footer">
   <div class="footer-content">
-    <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">
-      <img src="/pinatech-favicon.png" alt="" width="48" height="48">
-      <span>
-        <strong translate="no">Pinatech</strong>
-        <small>Tecnología y servicio técnico</small>
-      </span>
-    </a>
-    <div class="footer-contact">
-      <span>Contacto</span>
+    <section class="footer-intro" aria-labelledby="footer-brand-name">
+      <a class="footer-brand" routerLink="/" aria-label="Ir al inicio de Pinatech">
+        <img src="/pinatech-favicon.png" alt="" width="56" height="56">
+        <span>
+          <strong id="footer-brand-name" translate="no">Pinatech</strong>
+          <small>Tecnología que te acompaña</small>
+        </span>
+      </a>
+      <p>Hardware, tecnología y servicio técnico con atención local en Córdoba.</p>
+    </section>
+
+    <nav class="footer-nav" aria-label="Enlaces del pie de página">
+      <h2>Explorar</h2>
+      <a routerLink="/">Inicio</a>
+      <a routerLink="/catalog">Catálogo</a>
+      <a routerLink="/cart">Carrito</a>
+    </nav>
+
+    <section class="footer-contact" aria-labelledby="footer-contact-title">
+      <h2 id="footer-contact-title">Contacto</h2>
+      <p><iconify-icon icon="line-md:map-marker" aria-hidden="true"></iconify-icon> Córdoba, Argentina</p>
       <a
         href="https://www.instagram.com/pinatech.cba/"
         target="_blank"
@@ -105,9 +132,10 @@
         <iconify-icon icon="mdi:instagram" aria-hidden="true"></iconify-icon>
         <span translate="no">@pinatech.cba</span>
       </a>
-    </div>
+    </section>
   </div>
   <div class="footer-legal">
     <small>&copy; {{ currentYear }} Pinatech. Todos los derechos reservados.</small>
+    <small>Tecnología y soporte, cerca tuyo.</small>
   </div>
 </footer>

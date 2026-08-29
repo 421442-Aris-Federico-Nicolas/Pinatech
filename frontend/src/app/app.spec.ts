@@ -55,10 +55,31 @@ describe('App', () => {
     const instagram = footer.querySelector('a[href="https://www.instagram.com/pinatech.cba/"]') as HTMLAnchorElement;
 
     expect(footer.textContent).toContain('@pinatech.cba');
+    expect(footer.textContent).toContain('Córdoba, Argentina');
     expect(footer.textContent).toContain(`© ${new Date().getFullYear()} Pinatech`);
+    expect(footer.querySelector('.footer-nav a[href="/"]')?.textContent).toBe('Inicio');
+    expect(footer.querySelector('.footer-nav a[href="/catalog"]')?.textContent).toBe('Catálogo');
+    expect(footer.querySelector('.footer-nav a[href="/cart"]')?.textContent).toBe('Carrito');
     expect(instagram.target).toBe('_blank');
     expect(instagram.rel).toContain('noopener');
     expect(instagram.querySelector('iconify-icon')?.getAttribute('icon')).toBe('mdi:instagram');
+  });
+
+  it('renders a continuous commercial marquee with an inaccessible visual duplicate', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const marquee = fixture.nativeElement.querySelector('.utility-bar') as HTMLElement;
+    const groups = marquee.querySelectorAll('.marquee-group');
+
+    expect(marquee.getAttribute('aria-label')).toBe('Información comercial');
+    expect(groups).toHaveLength(2);
+    expect(groups[0].textContent).toContain('Catálogo de tecnología');
+    expect(groups[0].textContent).toContain('Servicio técnico en Córdoba');
+    expect(groups[0].textContent).toContain('Mercado Pago');
+    expect(groups[0].hasAttribute('aria-hidden')).toBe(false);
+    expect(groups[1].getAttribute('aria-hidden')).toBe('true');
+    expect(marquee.querySelector('.marquee-toggle')).toBeNull();
   });
 
   it('renders and dismisses global interaction feedback', () => {
