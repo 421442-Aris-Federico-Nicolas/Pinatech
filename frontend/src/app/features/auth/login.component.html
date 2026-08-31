@@ -7,7 +7,7 @@
        <app-feedback tone="warning">Tu sesión venció. Ingresá nuevamente para continuar donde estabas.</app-feedback>
     } @else if (route.snapshot.queryParamMap.get('reason') === 'email-changed') {
        <app-feedback tone="success">Tu email se actualizó y cerramos la sesión para proteger tu cuenta. Ingresá con el email nuevo.</app-feedback>
-    } @else if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl') === '/checkout') {
+    } @else if (route.snapshot.queryParamMap.get('returnUrl') === '/cart' || route.snapshot.queryParamMap.get('returnUrl')?.startsWith('/checkout')) {
        <app-feedback>Ingresá para continuar con tu carrito. Tus productos se conservarán.</app-feedback>
     }
     <form [formGroup]="form" (ngSubmit)="submit()">

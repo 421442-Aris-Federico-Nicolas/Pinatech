@@ -34,13 +34,19 @@
                 <a appButton="outlined" routerLink="/catalog" [queryParams]="group.queryParams">{{ group.linkLabel }}</a>
               </div>
             </article>
-            <ul class="products" [attr.aria-label]="'Productos de ' + group.eyebrow">
-              @for (product of group.products; track product.id) {
-                <li><app-product-card [product]="product" mode="featured" /></li>
-              } @empty {
-                <li class="status"><p>No hay productos publicados en {{ group.eyebrow.toLowerCase() }} por el momento.</p><a appButton="text" routerLink="/catalog" [queryParams]="group.queryParams">Revisar catálogo</a></li>
-              }
-            </ul>
+            <div class="product-track-shell">
+              <div class="product-track-controls" role="group" [attr.aria-label]="'Controles de productos de ' + group.eyebrow">
+                <button appButton="text" type="button" [disabled]="productTrackPosition(index).atStart" [attr.aria-controls]="'product-track-' + index" [attr.aria-label]="'Ver productos anteriores de ' + group.eyebrow" (click)="scrollProductTrack(track, -1)">←</button>
+                <button appButton="text" type="button" [disabled]="productTrackPosition(index).atEnd" [attr.aria-controls]="'product-track-' + index" [attr.aria-label]="'Ver productos siguientes de ' + group.eyebrow" (click)="scrollProductTrack(track, 1)">→</button>
+              </div>
+              <ul #track class="products" tabindex="0" [id]="'product-track-' + index" [attr.data-product-track]="index" [attr.aria-label]="'Productos de ' + group.eyebrow + '. Usá las flechas izquierda y derecha, Inicio o Fin para recorrerlos.'" (scroll)="updateProductTrackPosition(index, track)" (keydown)="productTrackKeydown($event, track)">
+                @for (product of group.products; track product.id) {
+                  <li><app-product-card [product]="product" mode="featured" /></li>
+                } @empty {
+                  <li class="status"><p>No hay productos publicados en {{ group.eyebrow.toLowerCase() }} por el momento.</p><a appButton="text" routerLink="/catalog" [queryParams]="group.queryParams">Revisar catálogo</a></li>
+                }
+              </ul>
+            </div>
           </section>
         }
       </div>

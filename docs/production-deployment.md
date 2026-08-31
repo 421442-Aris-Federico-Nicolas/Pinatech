@@ -109,7 +109,9 @@ unset REGISTRY_TOKEN
 
 ## 4. Validar y desplegar por digest
 
-Definir `APP_DOMAIN` sin esquema ni ruta. Si se habilita Resend, definir
+Definir `APP_DOMAIN` sin esquema ni ruta. Si se habilita Resend, definir un unico
+destinatario valido en `SELLER_NOTIFICATION_EMAIL`; recibe una notificacion al crear el
+pedido y otra al aprobar el pago. Definir tambien
 `EMAIL_LOGO_URL` como una URL HTTPS publica y absoluta, con host y sin credenciales,
 query ni fragmento. Esta URL es independiente de los enlaces de cuenta y el cliente de
 correo carga la imagen publica directamente, sin un adjunto CID. Antes de habilitar

@@ -23,6 +23,7 @@ decision, not an automatic claim that the application is production-ready.
 - Dependency, container and secret scanning run in CI.
 - SSH is key-only, root login is disabled and the firewall exposes only approved SSH, 80/443.
 - Resend uses a verified sending domain and account-action links point only to the canonical storefront.
+- `SELLER_NOTIFICATION_EMAIL` contains exactly one monitored, valid mailbox; order-created and payment-approved notifications were tested for Mercado Pago and bank transfer.
 - `EMAIL_LOGO_URL` is a public HTTPS image without credentials, query parameters or fragments, and returns `200` with an image content type.
 - Email verification, password reset and email change are tested without leaking account existence.
 - Password reset and email change invalidate existing sessions.
@@ -55,6 +56,7 @@ decision, not an automatic claim that the application is production-ready.
 - Container images build successfully.
 - Desktop and mobile checkout tests pass.
 - Duplicate order and duplicate webhook scenarios are safe.
+- Customer and seller email outbox events retry independently without duplicate notifications.
 - Payment rejection, expiration, cancellation and refund scenarios are verified.
 - Registration, email verification, password recovery and email change pass end-to-end.
 - An open tab detects a new frontend version and offers an explicit update without discarding unsaved work automatically.

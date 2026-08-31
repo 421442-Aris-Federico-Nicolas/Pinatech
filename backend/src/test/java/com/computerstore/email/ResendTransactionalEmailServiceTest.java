@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.computerstore.user.domain.AccountActionPurpose;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -184,7 +185,8 @@ class ResendTransactionalEmailServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(OrderEmailEventType.class)
+    @EnumSource(value = OrderEmailEventType.class, names = {"SELLER_ORDER_CREATED", "SELLER_PAYMENT_APPROVED"},
+            mode = EnumSource.Mode.EXCLUDE)
     void orderEventsUseTheBrandedTemplate(OrderEmailEventType eventType) {
         ResendTransactionalEmailService service = new ResendTransactionalEmailService(
                 true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
@@ -208,6 +210,45 @@ class ResendTransactionalEmailServiceTest {
             assertFalse(content.html().contains(reason));
             assertTrue(content.text().contains("Motivo: " + reason));
         }
+    }
+
+    @Test
+    void sellerOrderTemplateContainsCompleteEscapedSnapshotAndAdminLink() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+        SellerOrderSnapshot snapshot = new SellerOrderSnapshot(
+                42L, java.time.Instant.parse("2026-08-29T10:00:00Z"),
+                java.time.Instant.parse("2026-08-29T10:05:00Z"), "PAID", "BANK_TRANSFER", "APPROVED", "ARS",
+                new java.math.BigDecimal("1000.00"), new java.math.BigDecimal("100.00"),
+                java.math.BigDecimal.ZERO, new java.math.BigDecimal("900.00"),
+                "Ana <Admin>", "ana&ventas@example.com", "351<555>", "PICKUP", "PENDING", null,
+                new SellerOrderSnapshot.Pickup("CENTRO", "Local & Centro", List.of("San <Martin> 123", "Local 4"),
+                        "Cordoba", "X", "5000", "Traer DNI", "Lun a Vie"),
+                List.of(new SellerOrderSnapshot.Item("Teclado <Pro>", "Negro & rojo", "#000000", 2,
+                        new java.math.BigDecimal("500.00"), new java.math.BigDecimal("1000.00"))));
+        String adminUrl = "https://store.example.com/admin?section=sales&order=42";
+
+        ResendTransactionalEmailService.EmailContent content = service.contentForSellerOrderEvent(
+                OrderEmailEventType.SELLER_PAYMENT_APPROVED, snapshot, adminUrl);
+
+        assertTrue(content.subject().contains("#42"));
+        assertTrue(content.text().contains("Fecha del pedido: 2026-08-29T10:00:00Z"));
+        assertTrue(content.text().contains("Fecha del evento: 2026-08-29T10:05:00Z"));
+        assertTrue(content.text().contains("Estado: PAID"));
+        assertTrue(content.text().contains("Metodo: BANK_TRANSFER"));
+        assertTrue(content.text().contains("Subtotal: 1000.00"));
+        assertTrue(content.text().contains("Descuento: 100.00"));
+        assertTrue(content.text().contains("Recargo: 0"));
+        assertTrue(content.text().contains("Total: 900.00"));
+        assertTrue(content.text().contains("Email: ana&ventas@example.com"));
+        assertTrue(content.text().contains("Retiro - direccion: San <Martin> 123, Local 4"));
+        assertTrue(content.text().contains("Teclado <Pro> | Color: Negro & rojo (#000000) | Cantidad: 2"));
+        assertTrue(content.text().contains(adminUrl));
+        assertTrue(content.html().contains("Ana &lt;Admin&gt;"));
+        assertTrue(content.html().contains("Teclado &lt;Pro&gt;"));
+        assertFalse(content.html().contains("Teclado <Pro>"));
+        assertTrue(content.html().contains(adminUrl.replace("&", "&amp;")));
     }
 
     @Test

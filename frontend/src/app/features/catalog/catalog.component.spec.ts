@@ -35,4 +35,39 @@ describe('CatalogComponent', () => {
     expect(fixture.componentInstance.filters.categoryId).toBeNull();
     expect(navigate).toHaveBeenCalled();
   });
+
+  it('converts displayed transfer-price filters to exact list-price API boundaries', async () => {
+    const emptyPage: Page<Product> = { content: [], totalPages: 0, totalElements: 0, number: 0, size: 12 };
+    const getProducts = vi.fn(() => of(emptyPage));
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ minPrice: '36.13', maxPrice: '36.13', sort: 'price,desc' })) } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts } },
+      ],
+    }).compileComponents();
+
+    TestBed.createComponent(CatalogComponent).detectChanges();
+
+    expect(getProducts).toHaveBeenCalledWith(expect.objectContaining({ minPrice: 40.14, maxPrice: 40.15 }), 0, 'price,desc');
+  });
+
+  it('does not query the API with invalid price bounds from the URL', async () => {
+    const getProducts = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ minPrice: '100.001', maxPrice: '50' })) } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+
+    expect(getProducts).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.priceError()).toBe('Ingresá precios válidos, con hasta dos decimales.');
+  });
 });
