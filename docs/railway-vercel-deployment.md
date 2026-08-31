@@ -29,7 +29,7 @@ Keep `MP_ENABLED=false` until all Mercado Pago production values are ready. Neve
 
 Keep `BANK_TRANSFER_ENABLED=false` until every `BANK_TRANSFER_*` value has been reviewed, the volume is attached and an administrator is assigned to the proof queue. The CBU must contain exactly 22 digits. Bank data are returned only from authenticated order endpoints and are never included in email.
 
-Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_BASE_URL` and `EMAIL_LOGO_URL` are correct and the sender domain is verified. `EMAIL_LOGO_URL` must be a public HTTPS image URL without credentials, query parameters or a fragment; it is independent of the storefront URL and is loaded directly by email clients rather than attached as CID content. Enable pickup only after every `PICKUP_*` public field has been reviewed.
+Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_BASE_URL`, `EMAIL_LOGO_URL` and the single `SELLER_NOTIFICATION_EMAIL` recipient are correct and the sender domain is verified. `EMAIL_LOGO_URL` must be a public HTTPS image URL without credentials, query parameters or a fragment; it is independent of the storefront URL and is loaded directly by email clients rather than attached as CID content. Enable pickup only after every `PICKUP_*` public field has been reviewed.
 
 ### Attach persistent storage
 
@@ -111,7 +111,7 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version 21 in Railway logs.
+6. Flyway reports schema version 24 in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
 8. A Mercado Pago webhook test returns `200` from
    `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.
@@ -123,3 +123,4 @@ Run these checks after both DNS records have valid TLS certificates:
 14. `index.html` and application routes are not cached, while generated JS/CSS bundles with a content hash are immutable.
 15. A nonexistent old chunk returns `404` instead of the Angular HTML shell.
 16. An open tab detects a later frontend deployment and keeps the `Actualizar` action visible until the user activates it.
+17. Creating an order and approving Mercado Pago or bank-transfer payment sends the expected seller notifications to `SELLER_NOTIFICATION_EMAIL` with a working admin order link.

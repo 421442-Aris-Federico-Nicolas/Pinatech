@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
+import { listPriceForTransferMaximum, listPriceForTransferMinimum } from '../../core/payments/payment-pricing';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
@@ -12,6 +13,7 @@ import { AppProductCardComponent } from '../../shared/ui/product-card/app-produc
 import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
+const MAX_FILTER_PRICE = 80_000_000_000_000;
 
 @Component({
   imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppProductCardComponent, FormsModule, PinatechEmptyStateComponent, RouterLink],
@@ -27,6 +29,7 @@ export class CatalogComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
+  private invalidPriceParams = false;
 
   readonly filters: CatalogFilters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<Product> | null>(null);
@@ -49,13 +52,20 @@ export class CatalogComponent {
 
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readParams(params);
-      this.loadPage(this.pageNumber(params));
+      if (this.validatePrices()) {
+        this.loadPage(this.pageNumber(params));
+      } else {
+        this.request?.unsubscribe();
+        this.page.set(null);
+        this.loading.set(false);
+      }
     });
   }
 
   searchChanged(value: string): void { this.searchChanges.next(value); }
 
   applyFilters(page = 1, replaceUrl = false): void {
+    this.invalidPriceParams = false;
     if (!this.validatePrices()) return;
     this.resultsAnnounce.set(true);
     const queryParams: Record<string, string | number> = {};
@@ -98,17 +108,23 @@ export class CatalogComponent {
     this.loading.set(true);
     this.error.set(false);
     this.page.set(null);
-    this.request = this.service.getProducts(this.filters, page, this.sort())
+    const queryFilters: CatalogFilters = {
+      ...this.filters,
+      minPrice: this.filters.minPrice === null ? null : listPriceForTransferMinimum(this.filters.minPrice),
+      maxPrice: this.filters.maxPrice === null ? null : listPriceForTransferMaximum(this.filters.maxPrice),
+    };
+    this.request = this.service.getProducts(queryFilters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
   }
 
   private readParams(params: ParamMap): void {
+    this.invalidPriceParams = false;
     this.filters.search = params.get('search') ?? '';
     this.filters.categoryId = this.positiveNumber(params.get('category'));
     this.filters.brandId = this.positiveNumber(params.get('brand'));
-    this.filters.minPrice = this.nonNegativeNumber(params.get('minPrice'));
-    this.filters.maxPrice = this.nonNegativeNumber(params.get('maxPrice'));
+    this.filters.minPrice = this.priceParam(params.get('minPrice'));
+    this.filters.maxPrice = this.priceParam(params.get('maxPrice'));
     const sort = params.get('sort');
     this.sort.set(SORTS.includes(sort as CatalogSort) ? sort as CatalogSort : 'name,asc');
   }
@@ -123,16 +139,27 @@ export class CatalogComponent {
     return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
-  private nonNegativeNumber(value: string | null): number | null {
+  private priceParam(value: string | null): number | null {
+    if (value === null) return null;
+    if (!/^\d+(?:\.\d{1,2})?$/.test(value)) {
+      this.invalidPriceParams = true;
+      return null;
+    }
     const parsed = Number(value);
-    return value !== null && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+    if (!Number.isFinite(parsed) || parsed > MAX_FILTER_PRICE) {
+      this.invalidPriceParams = true;
+      return null;
+    }
+    return parsed;
   }
 
   private validatePrices(): boolean {
     const minimum = this.filters.minPrice;
     const maximum = this.filters.maxPrice;
-    const message = minimum !== null && minimum < 0 || maximum !== null && maximum < 0
-      ? 'Los precios deben ser mayores o iguales a cero.'
+    const invalidValue = (value: number | null) => value !== null && (!Number.isFinite(value)
+      || value < 0 || value > MAX_FILTER_PRICE || Math.abs(value * 100 - Math.round(value * 100)) > 1e-7);
+    const message = this.invalidPriceParams || invalidValue(minimum) || invalidValue(maximum)
+      ? 'Ingresá precios válidos, con hasta dos decimales.'
       : minimum !== null && maximum !== null && minimum > maximum
         ? 'El precio desde no puede superar el precio hasta.'
         : '';

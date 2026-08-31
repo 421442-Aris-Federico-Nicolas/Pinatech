@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService } from '../../core/cart/cart.service';
-import { bankTransferPrice, listPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
+import { bankTransferPrice } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
@@ -27,12 +27,9 @@ export class CartComponent {
   readonly feedback = signal('');
   readonly reconciling = signal(false);
   readonly reconcileError = signal(false);
-  readonly transferSelected = signal(false);
-  readonly transferPricing = computed(() => bankTransferPrice(this.cart.total()));
-  readonly selectedPricing = computed(() => this.transferSelected() ? this.transferPricing() : listPrice(this.cart.total()));
-  readonly checkoutQueryParams = computed(() => this.transferSelected() ? { paymentMethod: 'BANK_TRANSFER' } : undefined);
-  readonly checkoutReturnUrl = computed(() => this.transferSelected() ? '/checkout?paymentMethod=BANK_TRANSFER' : '/checkout');
-  readonly priceWithoutTax = priceWithoutNationalTax;
+  readonly displayedTotal = computed(() => bankTransferPrice(this.cart.total()).total);
+  readonly checkoutQueryParams = { paymentMethod: 'BANK_TRANSFER' } as const;
+  readonly checkoutReturnUrl = '/checkout?paymentMethod=BANK_TRANSFER';
   private readonly destroyRef = inject(DestroyRef);
   private readonly document = inject(DOCUMENT);
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
@@ -65,17 +62,13 @@ export class CartComponent {
     this.offerUndo('Se vació el carrito.', items);
   }
 
-  setTransferSelected(event: Event): void {
-    this.transferSelected.set((event.target as HTMLInputElement).checked);
-  }
-
   unitPrice(item: CartItem): number {
-    return this.transferSelected() ? bankTransferPrice(item.product.price).total : item.product.price;
+    return bankTransferPrice(item.product.price).total;
   }
 
   itemTotal(item: CartItem): number {
     const subtotal = item.product.price * item.quantity;
-    return this.transferSelected() ? bankTransferPrice(subtotal).total : subtotal;
+    return bankTransferPrice(subtotal).total;
   }
 
   removeItem(item: CartItem): void {

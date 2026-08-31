@@ -176,6 +176,14 @@ describe('CartService', () => {
     expect(capped).toEqual({ requested: 2, added: 0, quantity: 99, limit: 99, capped: true });
   });
 
+  it('keeps Product.price and the cart total list-based for backend discounting', () => {
+    const cart = TestBed.inject(CartService);
+    cart.add(product, variant, 2);
+
+    expect(cart.items()[0].product.price).toBe(1000);
+    expect(cart.total()).toBe(2000);
+  });
+
   it('reports the actual amount added when a request reaches the quantity cap', () => {
     const cart = TestBed.inject(CartService);
     cart.add(product, variant, 98);

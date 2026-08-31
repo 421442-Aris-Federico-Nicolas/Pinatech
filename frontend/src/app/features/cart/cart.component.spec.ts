@@ -15,7 +15,7 @@ describe('CartComponent', () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it('offers authenticated customers a link to checkout without creating an order', async () => {
+  it('always shows discounted cart prices and preselects bank transfer without discount wording', async () => {
     const cart = {
       items: signal([item]),
       count: signal(2),
@@ -43,30 +43,47 @@ describe('CartComponent', () => {
 
     const fixture = TestBed.createComponent(CartComponent);
     fixture.detectChanges();
-    const link = fixture.nativeElement.querySelector('a[href="/checkout"]') as HTMLAnchorElement;
+    const link = fixture.nativeElement.querySelector('a[href^="/checkout"]') as HTMLAnchorElement;
 
     expect(link?.textContent).toContain('Revisar pedido y pago');
     expect(link.classList).toContain('app-button');
     expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
     expect(fixture.nativeElement.textContent).not.toContain('Confirmar pedido');
     expect(fixture.nativeElement.textContent).not.toContain('Descuento por transferencia');
+    expect(fixture.nativeElement.textContent).not.toContain('transferencia');
+    expect(fixture.nativeElement.textContent).not.toContain('Precio de lista');
+    expect(fixture.nativeElement.querySelector('input[type="checkbox"]')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('recargo');
-    expect(fixture.componentInstance.selectedPricing()).toEqual({ subtotal: 3000, discount: 0, total: 3000 });
-    expect(fixture.componentInstance.unitPrice(item)).toBe(1500);
-    expect(fixture.componentInstance.itemTotal(item)).toBe(3000);
-
-    (fixture.nativeElement.querySelector('.transfer-option input') as HTMLInputElement).click();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Descuento por transferencia');
-    expect(fixture.nativeElement.textContent).toContain('10%');
-    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
-    expect(fixture.componentInstance.selectedPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
+    expect(fixture.componentInstance.displayedTotal()).toBe(2700);
     expect(fixture.componentInstance.unitPrice(item)).toBe(1350);
     expect(fixture.componentInstance.itemTotal(item)).toBe(2700);
-    expect((fixture.nativeElement.querySelector('a[href^="/checkout"]') as HTMLAnchorElement).getAttribute('href'))
-      .toBe('/checkout?paymentMethod=BANK_TRANSFER');
+    expect(link.getAttribute('href')).toBe('/checkout?paymentMethod=BANK_TRANSFER');
     expect(cart.checkout).not.toHaveBeenCalled();
+  });
+
+  it('preserves the bank-transfer checkout selection through login', async () => {
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
+      setQuantity: vi.fn(), add: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
+      reconcile: vi.fn(() => of(true)), legacyCartDiscarded: signal(false), dismissLegacyCartWarning: vi.fn(),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CartComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: AuthService, useValue: { isAuthenticated: () => false } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CartComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.checkoutReturnUrl).toBe('/checkout?paymentMethod=BANK_TRANSFER');
+    expect((fixture.nativeElement.querySelector('a[href^="/login"]') as HTMLAnchorElement).getAttribute('href'))
+      .toContain('returnUrl=%2Fcheckout%3FpaymentMethod%3DBANK_TRANSFER');
   });
 
   it('offers undo after removing an item and restores its quantity', async () => {

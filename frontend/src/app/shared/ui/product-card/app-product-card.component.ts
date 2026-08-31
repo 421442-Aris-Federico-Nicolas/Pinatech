@@ -1,6 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { bankTransferPrice } from '../../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../../core/utils/api-content-url';
 import { AppButtonDirective } from '../app-button.directive';
 import { AppCardDirective } from '../app-card.directive';
@@ -48,4 +49,5 @@ export class AppProductCardComponent {
   readonly imagePriority = input(false);
   protected readonly imageUrl = resolveApiContentUrl;
   protected readonly hasStock = computed(() => this.product().variants.some((variant) => variant.inStock));
+  protected readonly displayedPrice = computed(() => bankTransferPrice(this.product().price).total);
 }
