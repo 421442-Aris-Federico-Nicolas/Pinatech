@@ -6,6 +6,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -117,6 +119,19 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                 idempotencyKey);
     }
 
+    @Override
+    public void sendSellerOrderEvent(UUID idempotencyKey, String recipient, OrderEmailEventType eventType,
+                                     SellerOrderSnapshot snapshot) {
+        if (!enabled) {
+            LOGGER.info("Transactional email disabled; completed outbox event={}", eventType);
+            return;
+        }
+        String adminUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl)
+                .path("/admin").queryParam("section", "sales").queryParam("order", snapshot.orderId())
+                .build().encode().toUriString();
+        send(recipient, contentForSellerOrderEvent(eventType, snapshot, adminUrl), idempotencyKey);
+    }
+
     EmailContent contentFor(AccountActionPurpose purpose, String firstName, String actionUrl) {
         return switch (purpose) {
             case EMAIL_VERIFICATION -> renderEmailVerification(firstName, actionUrl, emailLogoUrl);
@@ -203,8 +218,100 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     "Ver mi pedido",
                     orderUrl,
                     "Conserva este email como confirmacion de la entrega.");
+            case SELLER_ORDER_CREATED, SELLER_PAYMENT_APPROVED ->
+                    throw new IllegalArgumentException("Seller events require a seller order snapshot.");
         };
         return renderBrandedEmail(template, emailLogoUrl);
+    }
+
+    EmailContent contentForSellerOrderEvent(OrderEmailEventType eventType, SellerOrderSnapshot snapshot,
+                                             String adminUrl) {
+        String orderNumber = "#" + snapshot.orderId();
+        String subject;
+        String preheader;
+        String title;
+        String notice;
+        if (eventType == OrderEmailEventType.SELLER_ORDER_CREATED) {
+            subject = "Nuevo pedido Pinatech " + orderNumber;
+            preheader = "Se registro el pedido " + orderNumber + ".";
+            title = "Nuevo pedido recibido";
+            notice = "Este detalle es una instantanea del momento en que se creo el pedido.";
+        } else if (eventType == OrderEmailEventType.SELLER_PAYMENT_APPROVED) {
+            subject = "Pago aprobado para el pedido " + orderNumber;
+            preheader = "Se aprobo el pago del pedido " + orderNumber + ".";
+            title = "Pago aprobado";
+            notice = "Este detalle es una instantanea del momento en que se aprobo el pago.";
+        } else {
+            throw new IllegalArgumentException("A seller email requires a seller event type.");
+        }
+
+        List<String> paragraphs = new ArrayList<>();
+        paragraphs.add("Pedido: " + orderNumber
+                + "\nFecha del pedido: " + instant(snapshot.orderDate())
+                + "\nFecha del evento: " + instant(snapshot.eventDate())
+                + "\nEstado: " + display(snapshot.orderStatus()));
+        paragraphs.add("Pago\nMetodo: " + display(snapshot.paymentMethod())
+                + "\nEstado: " + display(snapshot.paymentStatus()));
+        paragraphs.add("Importes\nMoneda: " + display(snapshot.currency())
+                + "\nSubtotal: " + amount(snapshot.subtotal())
+                + "\nDescuento: " + amount(snapshot.discount())
+                + "\nRecargo: " + amount(snapshot.surcharge())
+                + "\nTotal: " + amount(snapshot.total()));
+        paragraphs.add("Cliente\nNombre: " + display(snapshot.customerName())
+                + "\nEmail: " + display(snapshot.customerEmail())
+                + "\nTelefono: " + display(snapshot.customerPhone()));
+        paragraphs.add(fulfillmentDetails(snapshot));
+        paragraphs.add(itemDetails(snapshot.items()));
+
+        return renderBrandedEmail(new EmailTemplate(
+                subject, preheader, title, "Hola equipo de ventas", paragraphs, null,
+                "Abrir venta en administracion", adminUrl, notice), emailLogoUrl);
+    }
+
+    private static String fulfillmentDetails(SellerOrderSnapshot snapshot) {
+        StringBuilder details = new StringBuilder("Entrega")
+                .append("\nMetodo de fulfillment: ").append(display(snapshot.fulfillmentMethod()))
+                .append("\nEstado de fulfillment: ").append(display(snapshot.fulfillmentStatus()))
+                .append("\nMetodo de entrega: ").append(display(snapshot.deliveryMethod()));
+        SellerOrderSnapshot.Pickup pickup = snapshot.pickup();
+        if (pickup == null) return details.append("\nRetiro: No aplica").toString();
+        return details.append("\nRetiro - codigo: ").append(display(pickup.code()))
+                .append("\nRetiro - nombre: ").append(display(pickup.name()))
+                .append("\nRetiro - direccion: ").append(display(String.join(", ", pickup.addressLines())))
+                .append("\nRetiro - localidad: ").append(display(pickup.locality()))
+                .append("\nRetiro - provincia: ").append(display(pickup.provinceCode()))
+                .append("\nRetiro - codigo postal: ").append(display(pickup.postalCode()))
+                .append("\nRetiro - instrucciones: ").append(display(pickup.instructions()))
+                .append("\nRetiro - horarios: ").append(display(pickup.hours()))
+                .toString();
+    }
+
+    private static String itemDetails(List<SellerOrderSnapshot.Item> items) {
+        StringBuilder details = new StringBuilder("Productos");
+        for (int index = 0; index < items.size(); index++) {
+            SellerOrderSnapshot.Item item = items.get(index);
+            String color = display(item.color());
+            if (item.colorHex() != null && !item.colorHex().isBlank()) color += " (" + item.colorHex() + ")";
+            details.append("\n").append(index + 1).append(". ").append(display(item.product()))
+                    .append(" | Color: ").append(color)
+                    .append(" | Cantidad: ").append(item.quantity())
+                    .append(" | Unitario: ").append(amount(item.unitPrice()))
+                    .append(" | Subtotal: ").append(amount(item.subtotal()));
+        }
+        if (items.isEmpty()) details.append("\nSin productos informados");
+        return details.toString();
+    }
+
+    private static String amount(java.math.BigDecimal value) {
+        return value == null ? "No informado" : value.toPlainString();
+    }
+
+    private static String instant(java.time.Instant value) {
+        return value == null ? "No informada" : DateTimeFormatter.ISO_INSTANT.format(value);
+    }
+
+    private static String display(String value) {
+        return value == null || value.isBlank() ? "No informado" : value;
     }
 
     static EmailContent renderEmailVerification(String firstName, String actionUrl, String logoUrl) {
@@ -231,7 +338,7 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
         for (String paragraph : template.paragraphs()) {
             text.append(paragraph).append("\n\n");
             paragraphs.append("<p style=\"margin:0 0 16px;font-size:16px;line-height:25px;color:#33465f;\">")
-                    .append(escapeHtml(paragraph)).append("</p>");
+                    .append(escapeHtml(paragraph).replace("\n", "<br>")).append("</p>");
         }
         String calloutHtml = "";
         if (template.callout() != null) {

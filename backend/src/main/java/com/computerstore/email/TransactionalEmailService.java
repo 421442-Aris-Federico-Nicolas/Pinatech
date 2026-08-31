@@ -13,4 +13,7 @@ public interface TransactionalEmailService {
 
     void sendOrderEvent(UUID idempotencyKey, String recipient, String customerName,
                         OrderEmailEventType eventType, Long orderId, String rejectionReason);
+
+    void sendSellerOrderEvent(UUID idempotencyKey, String recipient, OrderEmailEventType eventType,
+                              SellerOrderSnapshot snapshot);
 }

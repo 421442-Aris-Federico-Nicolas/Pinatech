@@ -47,9 +47,13 @@ main {
 .product-promo__copy h3 { font-size: clamp(1.8rem, 3vw, 2.8rem); letter-spacing: -.045em; line-height: var(--line-height-tight); margin: var(--space-2) 0 var(--space-3); }
 .product-promo__copy > p:not(.eyebrow) { color: var(--color-text-muted); line-height: var(--line-height-relaxed); margin: 0 0 var(--space-6); }
 .product-promo__copy .app-button { align-self: flex-start; margin-top: auto; }
-.products { align-items: stretch; display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; margin: 0; min-width: 0; padding: 0; position: relative; z-index: 1; }
-.products > li { border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); min-width: 0; }
-.products:has(> li:only-child app-product-card) { grid-template-columns: minmax(280px, 420px); }
+.product-track-shell { align-self: center; min-width: 0; position: relative; z-index: 1; }
+.product-track-controls { display: flex; gap: var(--space-2); justify-content: flex-end; margin-bottom: var(--space-3); }
+.product-track-controls .app-button { min-width: var(--control-min-height); padding-inline: var(--space-3); }
+.products { align-items: stretch; display: flex; gap: var(--space-4); list-style: none; margin: 0; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; padding: 2px 2px var(--space-3); scroll-behavior: smooth; scroll-padding-inline: 2px; scroll-snap-type: inline mandatory; scrollbar-color: var(--color-border-strong) transparent; touch-action: pan-x pan-y; }
+.products:focus-visible { border-radius: var(--radius-md); outline: 2px solid var(--color-cyan); outline-offset: 3px; }
+.products > li { border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); flex: 0 0 calc((100% - var(--space-4)) / 2); min-width: 0; scroll-snap-align: start; }
+.products > li.status { flex-basis: 100%; }
 .status { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text-muted); display: grid; grid-column: 1 / -1; justify-items: center; min-height: 240px; padding: var(--space-8); text-align: center; }
 .loader { animation: spin .8s linear infinite; border: 3px solid var(--color-border); border-radius: 50%; border-top-color: var(--color-cyan); height: 36px; width: 36px; }
 
@@ -70,8 +74,7 @@ main {
 }
 
 @media (min-width: 851px) {
-  .products:has(app-product-card) { align-self: center; justify-self: end; max-width: calc(38rem + var(--space-4)); width: 100%; }
-  .products:has(> li:only-child app-product-card) { grid-template-columns: 1fr; max-width: 19rem; }
+  .product-track-shell { justify-self: end; max-width: calc(38rem + var(--space-4)); width: 100%; }
 }
 
 @media (max-width: 850px) {
@@ -80,6 +83,7 @@ main {
   .product-showcase { background-image: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 88%, transparent) 34%, var(--color-bg-chrome) 100%), var(--product-banner); background-position: center top; grid-template-columns: 1fr; padding: var(--space-4); }
   .product-promo { min-height: 250px; }
   .product-promo__copy { max-width: 420px; }
+  .products > li { flex-basis: 86%; }
   .service { background-image: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-deep) 48%, color-mix(in srgb, var(--color-bg-deep) 60%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.jpg'); background-position: center, center bottom; background-size: 100% 100%, 100% auto; grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(14rem, 46vw, 21rem); }
 }
 
@@ -92,8 +96,6 @@ main {
   .hero h1 { font-size: clamp(2.25rem, 11vw, 3.25rem); }
   .hero-actions, .hero-actions .app-button { width: 100%; }
   .paths { grid-template-columns: 1fr; margin-bottom: var(--space-16); }
-  .products { grid-template-columns: 1fr; }
-  .products:has(> li:only-child) { grid-template-columns: 1fr; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
   .service { padding: var(--space-6) var(--space-5) clamp(12rem, 48vw, 15rem); }
 }
@@ -102,4 +104,5 @@ main {
   .hero-copy > div:first-child, .hero-actions { animation: hero-copy-fade-in 200ms var(--ease-out) both; }
   .loader { animation: none; }
   .paths a:hover { transform: none; }
+  .products { scroll-behavior: auto; }
 }

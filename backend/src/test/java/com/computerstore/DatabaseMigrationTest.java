@@ -206,7 +206,17 @@ class DatabaseMigrationTest {
                   AND tablename = 'customer_orders'
                   AND indexname = 'uq_customer_orders_one_pending_transfer_per_user'
                 """, Integer.class));
-        assertEquals("23", jdbc.queryForObject(
+        assertEquals("YES", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'email_outbox'
+                  AND column_name = 'seller_payload'
+                """, String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conrelid = 'email_outbox'::regclass
+                  AND conname = 'chk_email_outbox_seller_payload'
+                """, Integer.class));
+        assertEquals("24", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

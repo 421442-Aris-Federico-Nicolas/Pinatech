@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService, OrderConfirmation } from '../../core/cart/cart.service';
@@ -112,6 +112,30 @@ describe('CheckoutComponent', () => {
     expect(cart.completeCheckout).toHaveBeenCalledWith(order);
     expect(assign).toHaveBeenCalledWith(payment.checkoutUrl);
     expect(calls).toEqual(['order', 'payment', 'complete', 'redirect']);
+  });
+
+  it('keeps bank transfer preselected when requested by the cart', async () => {
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ paymentMethod: 'BANK_TRANSFER' }) } } },
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'] }) } },
+        { provide: CHECKOUT_WINDOW, useValue: { location: { assign: vi.fn() } } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedPaymentMethod()).toBe('BANK_TRANSFER');
+    expect((fixture.nativeElement.querySelector('input[value="BANK_TRANSFER"]') as HTMLInputElement).checked).toBe(true);
   });
 
   it('keeps the cart and checkout state when preference creation fails', async () => {

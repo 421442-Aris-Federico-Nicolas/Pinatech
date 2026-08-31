@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +26,8 @@ import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.BusinessRuleException;
 import com.computerstore.common.exception.EmailVerificationRequiredException;
+import com.computerstore.email.OrderEmailEventType;
+import com.computerstore.email.OrderEmailOutboxService;
 import com.computerstore.order.config.FulfillmentProperties;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.FulfillmentMethod;
@@ -60,11 +63,12 @@ class PaymentAttemptTransactionalServiceTest {
     private final PaymentEventRepository events = Mockito.mock(PaymentEventRepository.class);
     private final CustomerOrderRepository orders = Mockito.mock(CustomerOrderRepository.class);
     private final OrderStockService stock = Mockito.mock(OrderStockService.class);
+    private final OrderEmailOutboxService outbox = Mockito.mock(OrderEmailOutboxService.class);
     private final Map<String, ProviderPaymentRecord> records = new HashMap<>();
     private final FulfillmentPolicy fulfillment = new FulfillmentPolicy(fulfillmentProperties());
     private final PaymentAttemptTransactionalService service = new PaymentAttemptTransactionalService(
             attempts, providerPayments, events, orders, stock, properties(), fulfillment,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC), outbox);
 
     @BeforeEach
     void setUp() {
@@ -99,6 +103,7 @@ class PaymentAttemptTransactionalServiceTest {
         assertFalse(records.get("124").isFundsOrder());
         assertTrue(duplicate.isPresent());
         assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        verify(outbox, times(1)).enqueue(order, OrderEmailEventType.PAYMENT_APPROVED);
 
         service.applyRefundResult(duplicate.get(),
                 new RefundResult("refund-124", "approved", new BigDecimal("100.00")));

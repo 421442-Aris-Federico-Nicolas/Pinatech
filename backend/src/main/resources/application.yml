@@ -67,6 +67,7 @@ app:
     base-url: ${STOREFRONT_BASE_URL:http://localhost:4200}
   email:
     logo-url: ${EMAIL_LOGO_URL:}
+    seller-recipient: ${SELLER_NOTIFICATION_EMAIL:}
     outbox-interval-ms: ${EMAIL_OUTBOX_INTERVAL_MS:10000}
     resend:
       enabled: ${RESEND_ENABLED:false}

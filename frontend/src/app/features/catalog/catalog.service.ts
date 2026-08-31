@@ -16,8 +16,9 @@ export type CatalogSort = 'name,asc' | 'name,desc' | 'price,asc' | 'price,desc';
 export class CatalogService {
   private readonly http = inject(HttpClient);
 
-  getProducts(filters: CatalogFilters, page: number, sort: CatalogSort = 'name,asc') {
-    let params = new HttpParams().set('page', page).set('size', 12).set('sort', sort);
+  getProducts(filters: CatalogFilters, page: number, sort: CatalogSort = 'name,asc', pageSize = 12) {
+    const size = Math.min(100, Math.max(1, Math.floor(pageSize)));
+    let params = new HttpParams().set('page', page).set('size', size).set('sort', sort);
     if (filters.search.trim()) params = params.set('search', filters.search.trim());
     if (filters.categoryId !== null) params = params.set('categoryId', filters.categoryId);
     if (filters.brandId !== null) params = params.set('brandId', filters.brandId);
