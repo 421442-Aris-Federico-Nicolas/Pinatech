@@ -33,6 +33,6 @@ class ProductSpecificationRequestValidationTest {
 
     private CreateProductRequest product(List<ProductSpecificationRequest> specifications) {
         return new CreateProductRequest("Mouse", "mouse", "Mouse gamer", BigDecimal.TEN, 1L, 1L, specifications,
-                List.of(new ProductVariantRequest(null, "Black", "#000000")));
+                List.of(new ProductVariantRequest(null, "Black", "#000000", null)));
     }
 }

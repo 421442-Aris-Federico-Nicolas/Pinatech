@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 
 export interface BannerSlide {
   readonly src: string;
+  readonly mobileSrc?: string;
   readonly alt: string;
   readonly width: number;
   readonly height: number;
@@ -19,7 +20,6 @@ export class BannerCarouselComponent {
   private readonly document = inject(DOCUMENT);
   private readonly documentHidden = signal(this.document.hidden);
   private readonly timerReset = signal(0);
-  private pointerAutoplayValue: boolean | null = null;
 
   readonly slides = input.required<readonly BannerSlide[]>();
   readonly ariaLabel = input('Banners destacados');
@@ -29,8 +29,7 @@ export class BannerCarouselComponent {
   readonly indexChange = output<number>();
   readonly activeIndex = signal(0);
   readonly reducedMotion = signal(false);
-  readonly userPaused = signal(false);
-  readonly autoplayPaused = computed(() => this.paused() || this.userPaused());
+  readonly autoplayPaused = computed(() => this.paused());
   readonly driftDuration = computed(() => `${Math.max(this.autoplayDelay(), 6000)}ms`);
 
   constructor() {
@@ -70,22 +69,6 @@ export class BannerCarouselComponent {
     const slides = this.slides();
     if (!slides.length || index < 0 || index >= slides.length || index === this.activeIndex()) return;
     this.activate(index, true);
-  }
-
-  prepareAutoplayToggle(): void {
-    this.pointerAutoplayValue = !this.userPaused();
-  }
-
-  toggleAutoplay(event?: MouseEvent): void {
-    const nextValue = event && event.detail > 0 && this.pointerAutoplayValue !== null
-      ? this.pointerAutoplayValue
-      : !this.userPaused();
-    this.pointerAutoplayValue = null;
-    this.userPaused.set(nextValue);
-  }
-
-  pauseAutoplay(): void {
-    this.userPaused.set(true);
   }
 
   private move(change: number, manual = true): void {

@@ -1,10 +1,12 @@
 package com.computerstore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -184,6 +186,16 @@ class DatabaseMigrationTest {
                 WHERE conrelid = 'customer_orders'::regclass
                   AND conname IN ('chk_customer_orders_payment_adjustments', 'chk_customer_orders_amounts')
                 """, Integer.class));
+        assertEquals("YES", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'product_variants'
+                  AND column_name = 'image_id'
+                """, String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conrelid = 'product_variants'::regclass
+                  AND conname = 'fk_product_variants_image_product'
+                """, Integer.class));
         assertEquals(3, jdbc.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = 'public'
@@ -194,9 +206,42 @@ class DatabaseMigrationTest {
                   AND tablename = 'customer_orders'
                   AND indexname = 'uq_customer_orders_one_pending_transfer_per_user'
                 """, Integer.class));
-        assertEquals("22", jdbc.queryForObject(
+        assertEquals("23", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
+    }
+
+    @Test
+    void variantImagesMustBelongToTheProductAndAreClearedWhenDeleted() {
+        List<Long> productIds = jdbc.queryForList("SELECT id FROM products ORDER BY id LIMIT 2", Long.class);
+        Long productId = productIds.get(0);
+        Long otherProductId = productIds.get(1);
+        Long variantId = jdbc.queryForObject(
+                "SELECT id FROM product_variants WHERE product_id = ? ORDER BY id LIMIT 1",
+                Long.class, productId);
+        Long otherVariantId = jdbc.queryForObject(
+                "SELECT id FROM product_variants WHERE product_id = ? ORDER BY id LIMIT 1",
+                Long.class, otherProductId);
+        Long imageId = jdbc.queryForObject("""
+                INSERT INTO product_images (product_id, image_url, alt_text, display_order)
+                VALUES (?, ?, 'Variant migration test',
+                    (SELECT COALESCE(MAX(display_order), -1) + 1 FROM product_images WHERE product_id = ?))
+                RETURNING id
+                """, Long.class, productId, "/migration-test-" + UUID.randomUUID(), productId);
+        try {
+            assertThrows(DataIntegrityViolationException.class,
+                    () -> jdbc.update("UPDATE product_variants SET image_id = ? WHERE id = ?", imageId, otherVariantId));
+
+            jdbc.update("UPDATE product_variants SET image_id = ? WHERE id = ?", imageId, variantId);
+            jdbc.update("DELETE FROM product_images WHERE id = ?", imageId);
+
+            assertNull(jdbc.queryForObject("SELECT image_id FROM product_variants WHERE id = ?", Long.class, variantId));
+            assertEquals(productId,
+                    jdbc.queryForObject("SELECT product_id FROM product_variants WHERE id = ?", Long.class, variantId));
+        } finally {
+            jdbc.update("UPDATE product_variants SET image_id = NULL WHERE image_id = ?", imageId);
+            jdbc.update("DELETE FROM product_images WHERE id = ?", imageId);
+        }
     }
 
     @Test

@@ -60,7 +60,8 @@ h1 { font-size: clamp(1.9rem, 3vw, 3rem); font-weight: var(--font-weight-medium)
 .stock-status > span { font-size: var(--text-lg); font-weight: var(--font-weight-black); }
 .stock-status.unavailable { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
 .pickup-note { align-items: start; border-top: 1px solid var(--color-border); display: flex; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-5); }
-.pickup-note > span { align-items: center; background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 50%; color: var(--color-info-text); display: flex; flex: 0 0 42px; font-size: .58rem; font-weight: var(--font-weight-black); height: 42px; justify-content: center; }
+.pickup-note > span { align-items: center; background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 50%; color: var(--color-info-text); display: flex; flex: 0 0 42px; height: 42px; justify-content: center; }
+.pickup-note svg { fill: none; height: 22px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; width: 22px; }
 .pickup-note h2 { color: var(--color-text); margin-bottom: var(--space-1); }
 .pickup-note p { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; margin: 0; }
 .purchase { align-items: end; display: grid; gap: var(--space-3); grid-template-columns: auto minmax(0, 1fr); margin-top: var(--space-6); }

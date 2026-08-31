@@ -106,6 +106,10 @@ export class AdminComponent {
   });
   readonly categoryOptions = computed<readonly AppSelectOption[]>(() => this.categories().map((category) => ({ value: category.id, label: category.name })));
   readonly brandOptions = computed<readonly AppSelectOption[]>(() => this.brands().map((brand) => ({ value: brand.id, label: brand.name })));
+  readonly productImageOptions = computed<readonly AppSelectOption[]>(() => [
+    { value: null, label: 'Sin imagen específica' },
+    ...(this.selected()?.images ?? []).map((image, index) => ({ value: image.id, label: this.imageLabel(image, index) })),
+  ]);
   readonly estadoTono = estadoTono;
 
   constructor() {
@@ -327,7 +331,7 @@ export class AdminComponent {
 
   addVariant(): void {
     if (this.form.variants.length >= 20) return this.fail('Podés agregar hasta 20 colores por producto.');
-    this.form.variants = [...this.form.variants, { colorName: '', colorHex: '#7D8798' }];
+    this.form.variants = [...this.form.variants, { colorName: '', colorHex: '#7D8798', imageId: null }];
     this.clearMessages();
   }
 
@@ -354,14 +358,18 @@ export class AdminComponent {
 
   deleteImage(image: ProductImage): void {
     const product = this.selected();
-    if (!product || this.deletingImage() !== null || !confirm(`¿Eliminar la imagen "${image.altText || image.id}"?`)) return;
+    if (!product || this.deletingImage() !== null || !confirm(`¿Eliminar la imagen "${this.imageLabel(image)}"?`)) return;
     this.deletingImage.set(image.id);
     this.clearMessages();
     this.service.deleteProductImage(product.id, image.id).pipe(finalize(() => this.deletingImage.set(null))).subscribe({
       next: () => {
-        const updated = { ...product, images: product.images.filter((current) => current.id !== image.id) };
+        const formWasClean = this.productState() === this.productSnapshot && !this.pendingImages().length;
+        const variants = product.variants.map((variant) => variant.imageId === image.id ? { ...variant, imageId: null } : variant);
+        const updated = { ...product, images: product.images.filter((current) => current.id !== image.id), variants };
+        this.form.variants = this.form.variants.map((variant) => variant.imageId === image.id ? { ...variant, imageId: null } : variant);
         this.products.update((products) => products.map((current) => current.id === product.id ? updated : current));
         this.selected.set(updated);
+        if (formWasClean) this.productSnapshot = this.productState();
         this.succeed('Imagen eliminada.');
       },
       error: () => this.fail('No se pudo eliminar la imagen.'),
@@ -553,6 +561,8 @@ export class AdminComponent {
     this.syncUrl({ order: expanded });
   }
   stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }
+  imageLabel(image: ProductImage, index?: number): string { return image.originalFilename || image.altText || (index === undefined ? `Imagen ${image.id}` : `Imagen ${index + 1}`); }
+  variantImage(imageId: number | null | undefined): ProductImage | undefined { return this.selected()?.images.find((image) => image.id === imageId); }
   totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
   approveProof(proof: PendingBankTransferProof): void {
@@ -659,14 +669,14 @@ export class AdminComponent {
     this.proofPreviewUrls.set({});
   }
 
-  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null }] }; }
+  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null, imageId: null }] }; }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
     this.products.update((products) => products.some((current) => current.id === product.id)
       ? products.map((current) => current.id === product.id ? product : current)
       : [...products, product]);
     if (preservePendingImages) {
       this.selected.set(product);
-      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) });
+      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })) });
       this.productSnapshot = this.productState();
       this.selectedVariantId.set(product.variants[0]?.id ?? null);
       this.inventory.set(this.inventories().find((item) => item.variantId === this.selectedVariantId()) ?? null);
@@ -705,7 +715,7 @@ export class AdminComponent {
     return Number.isInteger(value) && value > 0 && items.some((item) => item.id === value);
   }
   private productForm(product: Product): ProductForm {
-    return { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex }) => ({ id, colorName, colorHex })) };
+    return { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })) };
   }
   private productState(): string { return JSON.stringify(this.form); }
   private confirmDiscardProductChanges(): boolean {

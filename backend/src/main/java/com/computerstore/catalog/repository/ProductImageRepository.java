@@ -15,5 +15,6 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
     @EntityGraph(attributePaths = "product")
     List<ProductImage> findByProductIdInOrderByProductIdAscDisplayOrderAsc(Collection<Long> productIds);
     Optional<ProductImage> findByIdAndProductId(Long id, Long productId);
+    long countByProductIdAndIdIn(Long productId, Collection<Long> ids);
     Optional<ProductImage> findByIdAndProductActiveTrue(Long id);
 }
