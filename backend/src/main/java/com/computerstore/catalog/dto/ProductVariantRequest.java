@@ -8,5 +8,6 @@ import jakarta.validation.constraints.Size;
 public record ProductVariantRequest(
         @Positive Long id,
         @NotBlank @Size(max = 100) String colorName,
-        @Pattern(regexp = "^#[0-9A-Fa-f]{6}$") String colorHex
+        @Pattern(regexp = "^#[0-9A-Fa-f]{6}$") String colorHex,
+        @Positive Long imageId
 ) {}

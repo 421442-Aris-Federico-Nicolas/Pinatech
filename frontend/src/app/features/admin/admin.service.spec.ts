@@ -31,6 +31,21 @@ describe('AdminService product images', () => {
     request.flush(null);
   });
 
+  it('includes the associated image in product variant updates', () => {
+    const service = TestBed.inject(AdminService);
+    const payload = {
+      name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 100, categoryId: 2, brandId: 3, specifications: [],
+      variants: [{ id: 7, colorName: 'Negro', colorHex: '#000000', imageId: 8 }],
+    };
+
+    service.updateProduct(3, payload).subscribe();
+
+    const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/admin/catalog/products/3`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body.variants[0].imageId).toBe(8);
+    request.flush({});
+  });
+
   it('updates and deletes categories through admin catalog endpoints', () => {
     const service = TestBed.inject(AdminService);
     const http = TestBed.inject(HttpTestingController);

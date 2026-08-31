@@ -1,15 +1,13 @@
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { CartService } from '../../core/cart/cart.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
+import { CatalogService, Product } from '../catalog/catalog.service';
 
 interface ProductShowcaseGroup {
   readonly eyebrow: string;
@@ -41,20 +39,18 @@ interface HeroPanel {
 export class HomeComponent {
   private readonly catalog = inject(CatalogService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly notifications = inject(NotificationService);
-  private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
-  protected readonly cart = inject(CartService);
 
   protected readonly featured = signal<Product[]>([]);
   protected readonly peripheralCategoryId = signal<number | null>(null);
   protected readonly heroIndex = signal(0);
   protected readonly heroPointerPaused = signal(false);
+  protected readonly heroFocusPaused = signal(false);
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
   protected readonly heroSlides: readonly BannerSlide[] = [
-    { src: '/pinatech-banner-home.jpg', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
-    { src: '/pinatech-banner-cart.jpg', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
+    { src: '/pinatech-banner-home.jpg', mobileSrc: '/pinatech-banner-home-mobile.jpg', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
+    { src: '/pinatech-banner-cart.jpg', mobileSrc: '/pinatech-banner-cart-mobile.jpg', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
   ];
   protected readonly heroPanels: readonly HeroPanel[] = [
     {
@@ -128,21 +124,12 @@ export class HomeComponent {
       });
   }
 
-  protected add(product: Product, variant: ProductVariant): void {
-    if (!variant.inStock) { this.notifications.warning('El color seleccionado no tiene stock disponible.'); return; }
-    const result = this.cart.add(product, variant);
-    const notification = result.added === 0
-      ? this.notifications.warning(`Ya tenés las ${result.limit} ${result.limit === 1 ? 'unidad disponible' : 'unidades disponibles'} para este color en el carrito.`, 'Ver carrito')
-      : this.notifications.success(`${product.name} en color ${variant.colorName} se agregó al carrito.`, 'Ver carrito');
-    notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
-  }
-
   protected selectHero(index: number): void {
     this.heroIndex.set(index);
   }
 
-  protected pauseHeroOnFocus(event: FocusEvent, carousel: BannerCarouselComponent): void {
+  protected resumeHeroAfterFocus(event: FocusEvent): void {
     const hero = event.currentTarget as HTMLElement | null;
-    if (!hero?.contains(event.relatedTarget as Node | null)) carousel.pauseAutoplay();
+    if (!hero?.contains(event.relatedTarget as Node | null)) this.heroFocusPaused.set(false);
   }
 }

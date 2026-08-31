@@ -36,7 +36,7 @@
       } @else if (page()?.content?.length) {
          <ul class="grid" aria-label="Resultados del catálogo">
            @for (product of page()?.content ?? []; track product.id; let index = $index) {
-             <li><app-product-card [product]="product" mode="catalog" [imagePriority]="index === 0" (addToCart)="add(product, $event)" /></li>
+              <li><app-product-card [product]="product" mode="catalog" [imagePriority]="index === 0" /></li>
            }
          </ul>
       } @else {

@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -77,7 +78,8 @@ class ProductImageServiceTest {
         });
         TransactionSynchronizationManager.initSynchronization();
 
-        service.upload(1L, file, null);
+        var response = service.upload(1L, file, null);
+        assertEquals("image.png", response.originalFilename());
         verify(storage, never()).delete(STORAGE_KEY);
 
         synchronizations().forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));

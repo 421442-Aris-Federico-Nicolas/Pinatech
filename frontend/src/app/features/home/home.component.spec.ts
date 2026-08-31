@@ -3,8 +3,6 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { CartService } from '../../core/cart/cart.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { BannerCarouselComponent } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { CatalogService, Product } from '../catalog/catalog.service';
 import { HomeComponent } from './home.component';
@@ -22,7 +20,7 @@ describe('HomeComponent', () => {
     brandName: 'Pinatech',
     images: [],
     specifications: [],
-    variants: [{ id: id * 10, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 4 }],
+    variants: [{ id: id * 10, colorName: 'Negro', colorHex: '#000000', imageId: null, inStock: true, availableQuantity: 4 }],
   });
   const mouse = product(1, 'Mouse Pro', 5, 'Periféricos');
   const processor = product(2, 'Ryzen Pro', 1, 'Procesadores');
@@ -37,8 +35,6 @@ describe('HomeComponent', () => {
           getProducts: () => of({ content: [mouse, processor], totalPages: 1, totalElements: 2, number: 0, size: 12 }),
         } },
         { provide: AuthService, useValue: { isAuthenticated: () => false } },
-        { provide: CartService, useValue: { add: () => ({ requested: 1, added: 1, quantity: 1, limit: 4, capped: false }) } },
-        { provide: NotificationService, useValue: {} },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HomeComponent);
@@ -72,7 +68,7 @@ describe('HomeComponent', () => {
     expect(fixture.nativeElement.querySelector('.service a').getAttribute('href')).toBe('/tickets');
   });
 
-  it('keeps autoplay paused after focus leaves the hero until explicit resume', async () => {
+  it('pauses autoplay temporarily while pointer or focus remain inside the hero', async () => {
     const fixture = await createHome();
     const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
     const hero = fixture.nativeElement.querySelector('.hero') as HTMLElement;
@@ -82,28 +78,17 @@ describe('HomeComponent', () => {
     hero.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
     fixture.detectChanges();
     expect(carousel.paused()).toBe(true);
-    expect(carousel.userPaused()).toBe(true);
+    expect(carousel.autoplayPaused()).toBe(true);
 
     hero.dispatchEvent(new Event('pointerleave'));
     fixture.detectChanges();
-    expect(carousel.paused()).toBe(false);
+    expect(carousel.paused()).toBe(true);
     expect(carousel.autoplayPaused()).toBe(true);
 
     hero.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outsideAction }));
     fixture.detectChanges();
-    expect(carousel.userPaused()).toBe(true);
-    expect(carousel.autoplayPaused()).toBe(true);
-
-    const autoplayButton = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
-    autoplayButton.click();
-    fixture.detectChanges();
-    expect(carousel.userPaused()).toBe(false);
+    expect(carousel.paused()).toBe(false);
     expect(carousel.autoplayPaused()).toBe(false);
-
-    const nextControl = fixture.nativeElement.querySelector('.banner-carousel__control.next') as HTMLButtonElement;
-    nextControl.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: autoplayButton }));
-    fixture.detectChanges();
-    expect(carousel.userPaused()).toBe(false);
-    expect(carousel.autoplayPaused()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).toBeNull();
   });
 });

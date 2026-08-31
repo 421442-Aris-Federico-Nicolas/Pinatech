@@ -97,6 +97,6 @@ public class ProductController {
         if (productIds.isEmpty()) return Map.of();
         var activeVariants=variants.findActiveByProductIds(productIds);
         Map<Long,Inventory> stock=inventory.findAllById(activeVariants.stream().map(com.computerstore.catalog.domain.ProductVariant::getId).toList()).stream().collect(java.util.stream.Collectors.toMap(Inventory::getVariantId,item->item));
-        return activeVariants.stream().collect(java.util.stream.Collectors.groupingBy(item->item.getProduct().getId(),java.util.LinkedHashMap::new,java.util.stream.Collectors.mapping(item->{ Inventory itemStock=stock.get(item.getId()); int availableQuantity=itemStock==null?0:itemStock.getAvailableQuantity(); return new com.computerstore.catalog.dto.ProductVariantResponse(item.getId(),item.getColorName(),item.getColorHex(),availableQuantity>0,availableQuantity); },java.util.stream.Collectors.toList())));
+        return activeVariants.stream().collect(java.util.stream.Collectors.groupingBy(item->item.getProduct().getId(),java.util.LinkedHashMap::new,java.util.stream.Collectors.mapping(item->{ Inventory itemStock=stock.get(item.getId()); int availableQuantity=itemStock==null?0:itemStock.getAvailableQuantity(); return new com.computerstore.catalog.dto.ProductVariantResponse(item.getId(),item.getColorName(),item.getColorHex(),item.getImageId(),availableQuantity>0,availableQuantity); },java.util.stream.Collectors.toList())));
     }
 }

@@ -1,8 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { CartService } from '../../core/cart/cart.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { CatalogComponent } from './catalog.component';
 import { CatalogService, Page, Product } from './catalog.service';
 
@@ -16,8 +14,6 @@ describe('CatalogComponent', () => {
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ search: 'inexistente', category: '3' })) } },
         { provide: Router, useValue: { navigate, navigateByUrl: vi.fn() } },
         { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts: () => of(emptyPage) } },
-        { provide: CartService, useValue: { add: vi.fn() } },
-        { provide: NotificationService, useValue: {} },
       ],
     }).compileComponents();
 

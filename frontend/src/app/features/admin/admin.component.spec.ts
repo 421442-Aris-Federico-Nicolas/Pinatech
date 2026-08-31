@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
+import { Product } from '../catalog/catalog.service';
 import { AdminComponent } from './admin.component';
 import { AdminService } from './admin.service';
 
@@ -125,6 +126,44 @@ describe('AdminComponent payments', () => {
     expect(fixture.nativeElement.querySelector('mat-form-field')).toBeNull();
     expect(createProduct).not.toHaveBeenCalled();
     expect(component.error()).toContain('precio mayor que cero');
+  });
+
+  it('offers saved product images per color and clears associations when an image is deleted', async () => {
+    const product: Product = {
+      id: 5, name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 100,
+      categoryId: 3, categoryName: 'Periféricos', brandId: 8, brandName: 'Pina', specifications: [],
+      images: [{ id: 21, contentUrl: '/images/black.jpg', altText: 'Mouse negro', originalFilename: 'kumara-red-dragon-negro.png', displayOrder: 0 }],
+      variants: [{ id: 51, colorName: 'Negro', colorHex: '#000000', imageId: 21, inStock: true, availableQuantity: 2 }],
+    };
+    const deleteProductImage = vi.fn(() => of(void 0));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [product] }), categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]), inventories: () => of([]), orders: () => of([]), pendingBankTransferProofs: () => of([]),
+          deleteProductImage,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.select(product);
+    component.section.set('catalog');
+    fixture.detectChanges();
+
+    expect(component.form.variants[0].imageId).toBe(21);
+    expect(component.productImageOptions().map((option) => option.label)).toEqual(['Sin imagen específica', 'kumara-red-dragon-negro.png']);
+    expect(fixture.nativeElement.querySelector('.variant-image-field img')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.product-image-grid span').textContent).toContain('kumara-red-dragon-negro.png');
+
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    component.deleteImage(product.images[0]);
+
+    expect(deleteProductImage).toHaveBeenCalledWith(5, 21);
+    expect(component.form.variants[0].imageId).toBeNull();
+    expect(component.selected()?.variants[0].imageId).toBeNull();
   });
 
   it('renders an order and preserves toggle semantics and summary focus', async () => {
