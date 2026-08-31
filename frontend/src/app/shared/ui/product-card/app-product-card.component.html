@@ -17,11 +17,15 @@
 
   <header class="product-card__header">
     <p translate="no">{{ product().brandName }}</p>
-    <h2><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h2>
+    @if (mode() === 'featured') {
+      <h4><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h4>
+    } @else {
+      <h2><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h2>
+    }
   </header>
 
   <div class="product-card__content">
-    <strong>{{ product().price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
+    <strong>{{ displayedPrice() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
     @if (mode() === 'catalog') {
       <p class="product-card__stock" [class.out-of-stock]="!hasStock()"><span aria-hidden="true"></span>{{ hasStock() ? 'Disponible' : 'Sin stock' }}</p>
     }

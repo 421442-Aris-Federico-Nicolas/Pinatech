@@ -33,7 +33,21 @@ describe('AppProductCardComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('10% menos');
     expect(fixture.nativeElement.textContent).not.toContain('Lista / Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Disponible');
-    expect(fixture.nativeElement.textContent).toContain('$100.00');
+    expect(fixture.nativeElement.textContent).toContain('$90.00');
     expect(fixture.nativeElement.querySelector('.product-card__actions a').getAttribute('href')).toBe('/products/1');
+  });
+
+  it('uses the correct heading level inside a featured showcase', async () => {
+    await TestBed.configureTestingModule({
+      imports: [AppProductCardComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AppProductCardComponent);
+    fixture.componentRef.setInput('product', product);
+    fixture.componentRef.setInput('mode', 'featured');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.product-card__header h4')?.textContent).toContain('Mouse Pro');
+    expect(fixture.nativeElement.querySelector('.product-card__header h2')).toBeNull();
   });
 });

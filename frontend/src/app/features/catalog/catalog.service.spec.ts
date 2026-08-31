@@ -30,4 +30,13 @@ describe('CatalogService', () => {
     expect(request.request.params.get('sort')).toBe('price,desc');
     request.flush({ content: [], totalPages: 0, totalElements: 0, number: 1, size: 12 });
   });
+
+  it('allows larger page blocks without exceeding the endpoint limit', () => {
+    const filters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
+    service.getProducts(filters, 0, 'name,asc', 500).subscribe();
+
+    const request = httpTesting.expectOne((candidate) => candidate.url === `${environment.apiBaseUrl}/products`);
+    expect(request.request.params.get('size')).toBe('100');
+    request.flush({ content: [], totalPages: 0, totalElements: 0, number: 0, size: 100 });
+  });
 });

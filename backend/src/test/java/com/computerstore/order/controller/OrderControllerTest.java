@@ -3,6 +3,7 @@ package com.computerstore.order.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -24,6 +25,7 @@ import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.common.exception.DuplicateResourceException;
 import com.computerstore.common.exception.EmailVerificationRequiredException;
 import com.computerstore.email.OrderEmailOutboxService;
+import com.computerstore.email.OrderEmailEventType;
 import com.computerstore.order.config.FulfillmentProperties;
 import com.computerstore.order.config.OrderProperties;
 import com.computerstore.order.domain.CustomerOrder;
@@ -93,6 +95,29 @@ class OrderControllerTest {
         assertEquals("PICKUP", response.getBody().fulfillmentMethod());
         assertEquals("CORDOBA-CENTRO", response.getBody().pickupLocation().code());
         assertEquals(List.of("Street 123", "Local 4"), response.getBody().pickupLocation().addressLines());
+    }
+
+    @Test
+    void enqueuesOrderCreatedEmailEventsAfterCreatingTheOrder() {
+        Product product = product(7L, "Keyboard", "125.50");
+        ProductVariant variant = variant(7L, product);
+        when(variants.findByIdAndActiveTrueAndProduct_ActiveTrue(7L)).thenReturn(Optional.of(variant));
+        when(orders.save(any(CustomerOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<BankTransferProperties> transferProvider = Mockito.mock(ObjectProvider.class);
+        when(transferProvider.getIfAvailable(any())).thenReturn(
+                new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<OrderEmailOutboxService> outboxProvider = Mockito.mock(ObjectProvider.class);
+        OrderEmailOutboxService outbox = Mockito.mock(OrderEmailOutboxService.class);
+        when(outboxProvider.getIfAvailable()).thenReturn(outbox);
+        OrderController controllerWithEmail = new OrderController(
+                orders, variants, users, stock, new OrderProperties(Duration.ofMinutes(15), 100), fulfillment,
+                transferProvider, outboxProvider);
+
+        controllerWithEmail.create(request(1, "CORDOBA-CENTRO"), null, authenticatedUser);
+
+        verify(outbox).enqueue(any(CustomerOrder.class), eq(OrderEmailEventType.ORDER_CREATED));
     }
 
     @Test
