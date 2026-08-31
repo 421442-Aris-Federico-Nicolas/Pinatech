@@ -26,7 +26,7 @@
           <iconify-icon [icon]="notificationPresentation[notification.tone].icon"></iconify-icon>
         </span>
         <div class="notification-body">
-          @for (announcement of notificationItems(); track announcement.id) {
+          @for (announcement of [notification]; track announcement.id) {
             <div
               class="notification-announcement"
               [attr.role]="announcement.tone === 'error' ? 'alert' : 'status'"

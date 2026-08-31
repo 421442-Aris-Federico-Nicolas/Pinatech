@@ -3,15 +3,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, finalize, forkJoin, Subject, Subscription } from 'rxjs';
-import { CartService } from '../../core/cart/cart.service';
-import { NotificationService } from '../../core/notifications/notification.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { PinatechEmptyStateComponent } from '../../shared/ui/pinatech-empty-state/pinatech-empty-state.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product, ProductVariant } from './catalog.service';
+import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 
@@ -27,11 +25,9 @@ export class CatalogComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly notifications = inject(NotificationService);
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
 
-  readonly cart = inject(CartService);
   readonly filters: CatalogFilters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<Product> | null>(null);
   readonly categories = signal<Category[]>([]);
@@ -79,15 +75,6 @@ export class CatalogComponent {
     this.sort.set('name,asc');
     this.priceError.set('');
     this.applyFilters();
-  }
-
-  add(product: Product, variant: ProductVariant): void {
-    if (!variant.inStock) { this.notifications.warning('El color seleccionado no tiene stock disponible.'); return; }
-    const result = this.cart.add(product, variant);
-    const notification = result.added === 0
-      ? this.notifications.warning(`Ya tenés las ${result.limit} ${result.limit === 1 ? 'unidad disponible' : 'unidades disponibles'} para este color en el carrito.`, 'Ver carrito')
-      : this.notifications.success(`${product.name} en color ${variant.colorName} se agregó al carrito.`, 'Ver carrito');
-    notification.onAction().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.router.navigateByUrl('/cart'));
   }
 
   retry(): void { this.loadPage(this.page()?.number ?? 0); }

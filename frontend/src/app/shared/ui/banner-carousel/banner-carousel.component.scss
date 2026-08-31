@@ -3,20 +3,17 @@
 .banner-carousel:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
 .banner-carousel__stage { aspect-ratio: 2000 / 848; background: var(--color-bg-chrome); overflow: hidden; position: relative; }
 .banner-carousel__deck { inset: 0; position: absolute; }
+.banner-carousel__deck picture { display: contents; }
 .banner-carousel__deck img { box-shadow: 0 16px 38px rgb(0 0 0 / .42); height: 100%; inset: 0; object-fit: contain; opacity: 0; pointer-events: none; position: absolute; transform: scale(1); transition: opacity 420ms var(--ease-out); width: 100%; will-change: transform, opacity; }
 .banner-carousel.has-drift .banner-carousel__deck img { animation: banner-carousel-drift var(--carousel-drift-duration) linear infinite alternate both; }
 .banner-carousel__deck img.active { opacity: 1; z-index: 1; }
 .banner-carousel.is-paused .banner-carousel__deck img { animation-play-state: paused; }
-.banner-carousel__control { align-items: center; background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: 50%; color: var(--color-text-strong); cursor: pointer; display: flex; font-size: 2rem; height: var(--control-min-height); justify-content: center; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: var(--control-min-height); z-index: 2; }
+.banner-carousel__control { align-items: center; background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: 50%; color: var(--color-text-strong); cursor: pointer; display: flex; font-size: 2rem; height: var(--control-min-height); justify-content: center; padding: 0; position: absolute; top: 50%; transform: translateY(-50%); transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: var(--control-min-height); z-index: 4; }
 .banner-carousel__control:hover { background: var(--color-surface-hover); border-color: var(--color-cyan); }
 .banner-carousel__control:active:not(:disabled):not([aria-disabled="true"]) { transform: translateY(-50%) scale(.97); }
 .banner-carousel__control.previous { left: var(--space-4); }
 .banner-carousel__control.next { right: var(--space-4); }
-.banner-carousel__autoplay { align-items: center; background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: 50%; bottom: var(--space-3); color: var(--color-text-strong); cursor: pointer; display: flex; height: 44px; justify-content: center; padding: 0; position: absolute; right: var(--space-3); transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: 44px; z-index: 2; }
-.banner-carousel__autoplay:hover { background: var(--color-surface-hover); border-color: var(--color-cyan); }
-.banner-carousel__autoplay:active:not(:disabled):not([aria-disabled="true"]) { transform: scale(.97); }
-.banner-carousel__autoplay span { font-size: .8rem; line-height: 1; }
-.banner-carousel__dots { align-items: center; background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); bottom: var(--space-3); display: flex; gap: var(--space-2); left: 50%; padding: .45rem .6rem; position: absolute; transform: translateX(-50%); z-index: 2; }
+.banner-carousel__dots { align-items: center; background: var(--overlay-strong); border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); display: flex; gap: var(--space-2); padding: .45rem .6rem; position: absolute; right: var(--space-3); top: var(--space-3); z-index: 4; }
 .banner-carousel__dots button { align-items: center; background: transparent; border: 0; cursor: pointer; display: flex; height: 24px; justify-content: center; padding: 0; transition: background-color var(--duration-press) var(--ease-out), border-color var(--duration-press) var(--ease-out), opacity var(--duration-press) var(--ease-out), transform var(--duration-press) var(--ease-out); width: 24px; }
 .banner-carousel__dots button::before { background: var(--color-text-subtle); border-radius: 50%; content: ""; height: 10px; opacity: .65; transform: scale(.7); transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); width: 10px; }
 .banner-carousel__dots button.active::before { background: var(--color-orange); opacity: 1; transform: scale(1); }
@@ -26,11 +23,11 @@
 @keyframes banner-carousel-drift { from { transform: scale(1); } to { transform: scale(1.04); } }
 
 @media (max-width: 620px) {
-  .banner-carousel__control { height: 40px; width: 40px; }
+  .banner-carousel__stage { aspect-ratio: 720 / 509; }
+  .banner-carousel__control { height: var(--control-min-height); width: var(--control-min-height); }
   .banner-carousel__control.previous { left: var(--space-2); }
   .banner-carousel__control.next { right: var(--space-2); }
-  .banner-carousel__dots { bottom: var(--space-2); }
-  .banner-carousel__autoplay { bottom: var(--space-2); right: var(--space-2); }
+  .banner-carousel__dots { right: var(--space-2); top: var(--space-2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -39,5 +36,5 @@
   .banner-carousel__dots button::before { transform: none; transition: opacity 200ms var(--ease-out) !important; }
   .banner-carousel__dots button.active::before { transform: none; }
   .banner-carousel__control:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: translateY(-50%) !important; }
-  :is(.banner-carousel__autoplay, .banner-carousel__dots button):active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; }
+  .banner-carousel__dots button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; }
 }

@@ -169,6 +169,9 @@ select:focus-visible {
 :is(.collapse, .technical-sidebar nav button, .flow-list button, .recent-list > button, .panel header > button, .personal-summary button, .ticket-list > button):active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(.97);
 }
+:is(.collapse, .technical-sidebar nav button, .flow-list button, .recent-list > button, .panel header > button, .personal-summary button, .refresh, .queue-toolbar select, .search, .ticket-list > button) {
+  min-height: var(--control-min-height);
+}
 main {
   min-width: 0;
   padding: clamp(1.5rem, 3vw, 3rem);

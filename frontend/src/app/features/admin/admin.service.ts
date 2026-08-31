@@ -8,7 +8,7 @@ export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
 export interface Inventory { productId: number; variantId: number; colorName: string; colorHex: string | null; availableQuantity: number; reservedQuantity: number; }
 export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
-export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; }
+export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; imageId: number | null; }
 export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; variants: ProductVariantPayload[]; }
 export interface PendingBankTransferProof {
   id: string;

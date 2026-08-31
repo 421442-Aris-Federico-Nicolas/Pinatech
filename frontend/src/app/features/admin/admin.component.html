@@ -126,9 +126,17 @@
           <fieldset class="product-editor-fields" [disabled]="saving()">
             <div class="product-form"><app-input label="Nombre" [(ngModel)]="form.name" (ngModelChange)="updateSlug()" name="productName" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse Pinatech Pro…" required /><app-input label="Slug" [(ngModel)]="form.slug" name="productSlug" autocomplete="off" spellcheck="false" placeholder="Ej. mouse-pinatech-pro…" required /><app-input label="Precio de lista / Mercado Pago" type="number" [min]="0.01" step="0.01" [(ngModel)]="form.price" name="productPrice" inputMode="decimal" required /><app-select label="Categoría" [options]="categoryOptions()" [(ngModel)]="form.categoryId" name="productCategory" [disabled]="saving()" required /><app-select label="Marca" [options]="brandOptions()" [(ngModel)]="form.brandId" name="productBrand" [disabled]="saving()" required /><app-textarea class="wide" label="Descripción" [rows]="5" [(ngModel)]="form.description" name="productDescription" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse inalámbrico para uso profesional…" required /></div>
           <section class="variants-editor">
-             <div class="section-label"><div><h3>Colores y variantes</h3><p>Cada color tendrá su propio stock. El orden se respeta en la tienda.</p></div><button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button></div>
+             <div class="section-label"><div><h3>Colores y variantes</h3><p>Cada color tendrá su propio stock. Podés asociarlo a una imagen ya guardada del producto.</p></div><button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button></div>
             @for (variant of form.variants; track variant.id ?? $index; let index = $index) {
-              <article><label><span>Nombre del color</span><input [(ngModel)]="variant.colorName" [name]="'variantName' + index" autocomplete="off" spellcheck="true" maxlength="100" placeholder="Ej. Negro…"></label><label class="color-field"><span>Muestra</span><input type="color" [ngModel]="variant.colorHex || '#7D8798'" (ngModelChange)="variant.colorHex = $event" [name]="'variantHex' + index"></label><div class="specification-actions"><button type="button" [disabled]="index === 0" (click)="moveVariant(index, -1)" aria-label="Subir color">↑</button><button type="button" [disabled]="index === form.variants.length - 1" (click)="moveVariant(index, 1)" aria-label="Bajar color">↓</button><button type="button" class="remove-specification" [disabled]="form.variants.length === 1" (click)="removeVariant(index)">Quitar</button></div></article>
+              <article>
+                <label><span>Nombre del color</span><input [(ngModel)]="variant.colorName" [name]="'variantName' + index" autocomplete="off" spellcheck="true" maxlength="100" placeholder="Ej. Negro…"></label>
+                <label class="color-field"><span>Muestra</span><input type="color" [ngModel]="variant.colorHex || '#7D8798'" (ngModelChange)="variant.colorHex = $event" [name]="'variantHex' + index"></label>
+                <div class="variant-image-field">
+                  <app-select label="Imagen asociada" [options]="productImageOptions()" [(ngModel)]="variant.imageId" [name]="'variantImage' + index" [disabled]="!selected()?.images?.length" />
+                  @if (variantImage(variant.imageId); as image) { <img [src]="imageUrl(image.contentUrl)" alt="" width="52" height="52" loading="lazy"> }
+                </div>
+                <div class="specification-actions"><button type="button" [disabled]="index === 0" (click)="moveVariant(index, -1)" aria-label="Subir color">↑</button><button type="button" [disabled]="index === form.variants.length - 1" (click)="moveVariant(index, 1)" aria-label="Bajar color">↓</button><button type="button" class="remove-specification" [disabled]="form.variants.length === 1" (click)="removeVariant(index)">Quitar</button></div>
+              </article>
             }
           </section>
           <section class="specifications-editor">
@@ -148,7 +156,7 @@
             @if (selected()?.images?.length || pendingImages().length) {
               <div class="product-image-grid">
                 @for (image of selected()?.images ?? []; track image.id) {
-                  <article><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || selected()!.name" width="640" height="480" loading="lazy"><span>{{ image.altText || 'Sin texto alternativo' }}</span><button type="button" [disabled]="deletingImage() !== null" (click)="deleteImage(image)">{{ deletingImage() === image.id ? 'Eliminando…' : 'Eliminar' }}</button></article>
+                  <article><img [src]="imageUrl(image.contentUrl)" [alt]="image.altText || selected()!.name" width="640" height="480" loading="lazy"><span>{{ imageLabel(image, $index) }}</span><button type="button" [disabled]="deletingImage() !== null" (click)="deleteImage(image)">{{ deletingImage() === image.id ? 'Eliminando…' : 'Eliminar' }}</button></article>
                 }
                 @for (item of pendingImages(); track item.previewUrl; let index = $index) {
                   <article class="pending"><img [src]="item.previewUrl" [alt]="item.altText || 'Vista previa de ' + item.file.name" width="640" height="480" loading="lazy"><span>{{ item.file.name }}</span><input [(ngModel)]="item.altText" [name]="'imageAlt' + index" autocomplete="off" spellcheck="true" placeholder="Ej. Vista frontal del producto…" [attr.aria-label]="'Texto alternativo para ' + item.file.name"><button type="button" (click)="removePendingImage(index)">Quitar</button></article>

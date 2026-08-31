@@ -1,17 +1,14 @@
 <article appCard class="product-card">
-  <a
-    class="product-card__visual"
-    [routerLink]="['/products', product().id]"
-    [queryParams]="{ variant: selectedVariant()?.id }"
-    [attr.aria-label]="'Ver ' + product().name">
+  <a class="product-card__visual" [routerLink]="['/products', product().id]" [attr.aria-label]="'Ver ' + product().name">
     @if (product().images[0]; as image) {
       <img
         [src]="imageUrl(image.contentUrl)"
         [alt]="image.altText || product().name"
         width="640"
-        height="480"
+        height="640"
         [attr.loading]="imagePriority() ? 'eager' : 'lazy'"
-        [attr.fetchpriority]="imagePriority() ? 'high' : null">
+        [attr.fetchpriority]="imagePriority() ? 'high' : null"
+        decoding="async">
     } @else {
       <span>{{ mode() === 'catalog' ? product().brandName : product().categoryName }}</span>
       <b aria-hidden="true">PIN</b>
@@ -19,33 +16,18 @@
   </a>
 
   <header class="product-card__header">
-    <p><span translate="no">{{ product().brandName }}</span>@if (mode() === 'catalog') { · {{ product().categoryName }} }</p>
-    <h2><a [routerLink]="['/products', product().id]" [queryParams]="{ variant: selectedVariant()?.id }" translate="no">{{ product().name }}</a></h2>
+    <p translate="no">{{ product().brandName }}</p>
+    <h2><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h2>
   </header>
 
   <div class="product-card__content">
-    @if (mode() === 'catalog') { <p class="product-card__description">{{ product().description }}</p> }
-    <small class="product-card__price-label">Precio especial por transferencia · 10% menos</small>
-    <strong>{{ transferPrice() | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
-    <small>Sin impuestos: {{ transferPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
-    <small class="product-card__list-price">Precio de lista / Mercado Pago: <b>{{ product().price | currency:'ARS':'symbol-narrow':'1.2-2' }}</b></small>
-    <small>Sin impuestos: {{ listPriceWithoutTax() | currency:'ARS':'symbol-narrow':'1.2-2' }}</small>
+    <strong>{{ product().price | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
+    @if (mode() === 'catalog') {
+      <p class="product-card__stock" [class.out-of-stock]="!hasStock()"><span aria-hidden="true"></span>{{ hasStock() ? 'Disponible' : 'Sin stock' }}</p>
+    }
   </div>
 
   <footer class="product-card__actions">
-    <app-select
-      label="Color"
-      [name]="'product-variant-' + product().id"
-      [options]="variantOptions()"
-      [ngModel]="selectedVariantId()"
-      (ngModelChange)="selectedVariantId.set($event)" />
-    <button
-      appButton="filled"
-      type="button"
-      [attr.aria-label]="'Agregar ' + product().name + ' al carrito'"
-      [disabled]="!selectedVariant()?.inStock"
-      (click)="add()">
-      Agregar
-    </button>
+    <a appButton="outlined" [routerLink]="['/products', product().id]">Ver producto</a>
   </footer>
 </article>
