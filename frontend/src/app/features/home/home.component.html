@@ -1,12 +1,14 @@
 <main>
-  <section class="hero" aria-labelledby="hero-title" (pointerenter)="heroPointerPaused.set(true)" (pointerleave)="heroPointerPaused.set(false)" (focusin)="pauseHeroOnFocus($event, heroCarousel)">
-    <app-banner-carousel #heroCarousel [slides]="heroSlides" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPointerPaused()" (indexChange)="selectHero($event)" />
-    @for (panel of [activeHeroPanel()]; track panel.title) {
-      <div class="hero-copy">
-        <div><p class="eyebrow">{{ panel.eyebrow }}</p><h1 id="hero-title">{{ panel.title }} <span>{{ panel.accent }}</span></h1><p class="lead">{{ panel.description }}</p></div>
-        <div class="hero-actions"><a appButton="filled" [routerLink]="panel.link">{{ panel.linkLabel }}</a>@if (!auth.isAuthenticated() && heroIndex() === 0) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
-      </div>
-    }
+  <section class="hero" aria-labelledby="hero-title" (pointerenter)="heroPointerPaused.set(true)" (pointerleave)="heroPointerPaused.set(false)" (focusin)="heroFocusPaused.set(true)" (focusout)="resumeHeroAfterFocus($event)">
+    <div class="hero-stage">
+      <app-banner-carousel [slides]="heroSlides" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPointerPaused() || heroFocusPaused()" (indexChange)="selectHero($event)" />
+      @for (panel of [activeHeroPanel()]; track panel.title) {
+        <div class="hero-copy">
+          <div><p class="eyebrow">{{ panel.eyebrow }}</p><h1 id="hero-title">{{ panel.title }} <span>{{ panel.accent }}</span></h1><p class="lead">{{ panel.description }}</p></div>
+          <div class="hero-actions"><a appButton="filled" [routerLink]="panel.link">{{ panel.linkLabel }}</a>@if (!auth.isAuthenticated() && heroIndex() === 0) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
+        </div>
+      }
+    </div>
   </section>
 
   <section class="paths" aria-label="Secciones principales">
@@ -34,7 +36,7 @@
             </article>
             <ul class="products" [attr.aria-label]="'Productos de ' + group.eyebrow">
               @for (product of group.products; track product.id) {
-                <li><app-product-card [product]="product" mode="featured" (addToCart)="add(product, $event)" /></li>
+                <li><app-product-card [product]="product" mode="featured" /></li>
               } @empty {
                 <li class="status"><p>No hay productos publicados en {{ group.eyebrow.toLowerCase() }} por el momento.</p><a appButton="text" routerLink="/catalog" [queryParams]="group.queryParams">Revisar catálogo</a></li>
               }

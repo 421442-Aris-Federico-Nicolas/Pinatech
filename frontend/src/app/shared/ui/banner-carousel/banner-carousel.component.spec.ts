@@ -11,7 +11,7 @@ interface ControlledMediaQuery {
 
 describe('BannerCarouselComponent', () => {
   const slides: readonly BannerSlide[] = [
-    { src: '/first.jpg', alt: 'Primer banner', width: 2000, height: 848 },
+    { src: '/first.jpg', mobileSrc: '/first-mobile.jpg', alt: 'Primer banner', width: 2000, height: 848 },
     { src: '/second.jpg', alt: 'Segundo banner', width: 2000, height: 848 },
     { src: '/third.jpg', alt: 'Tercer banner', width: 2000, height: 848 },
   ];
@@ -113,6 +113,8 @@ describe('BannerCarouselComponent', () => {
     expect(images[1].getAttribute('loading')).toBe('lazy');
     expect(images[0].getAttribute('aria-hidden')).toBe('true');
     expect(images[1].getAttribute('aria-hidden')).toBeNull();
+    expect(fixture.nativeElement.querySelector('source').getAttribute('srcset')).toBe('/first-mobile.jpg');
+    expect(fixture.nativeElement.querySelector('.banner-carousel__label')).toBeNull();
   });
 
   it('autoplays, honors the paused input and restarts with a full delay', async () => {
@@ -146,7 +148,7 @@ describe('BannerCarouselComponent', () => {
     expect(carousel.classList).toContain('has-drift');
     expect(carousel.classList).not.toContain('is-paused');
 
-    fixture.componentInstance.pauseAutoplay();
+    fixture.componentRef.setInput('paused', true);
     fixture.componentRef.setInput('autoplayDelay', 8000);
     fixture.detectChanges();
 
@@ -197,7 +199,7 @@ describe('BannerCarouselComponent', () => {
     TestBed.tick();
 
     expect(fixture.componentInstance.reducedMotion()).toBe(true);
-    expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).toBeNull();
+    expect(fixture.componentInstance.autoplayPaused()).toBe(false);
     await vi.advanceTimersByTimeAsync(2000);
     expect(fixture.componentInstance.activeIndex()).toBe(0);
 
@@ -205,7 +207,7 @@ describe('BannerCarouselComponent', () => {
     fixture.detectChanges();
     TestBed.tick();
     expect(fixture.componentInstance.reducedMotion()).toBe(false);
-    expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).toBeNull();
     await vi.advanceTimersByTimeAsync(1000);
     expect(fixture.componentInstance.activeIndex()).toBe(1);
 
@@ -221,52 +223,7 @@ describe('BannerCarouselComponent', () => {
     expect(motionQuery.removeEventListener).toHaveBeenCalledWith('change', listener);
   });
 
-  it('offers an explicit pause control and resumes with a fresh full delay', async () => {
-    vi.useFakeTimers();
-    const fixture = createCarousel(slides, 1000);
-    TestBed.tick();
-    let button = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
-
-    expect(button.getAttribute('aria-label')).toBe('Pausar rotación automática');
-    expect(button.getAttribute('aria-pressed')).toBe('false');
-    await vi.advanceTimersByTimeAsync(600);
-    fixture.componentInstance.pauseAutoplay();
-    fixture.detectChanges();
-    TestBed.tick();
-
-    button = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
-    expect(button.getAttribute('aria-label')).toBe('Reanudar rotación automática');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(fixture.componentInstance.autoplayPaused()).toBe(true);
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(fixture.componentInstance.activeIndex()).toBe(0);
-
-    button.click();
-    fixture.detectChanges();
-    TestBed.tick();
-    button = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
-    expect(button.getAttribute('aria-label')).toBe('Pausar rotación automática');
-    expect(button.getAttribute('aria-pressed')).toBe('false');
-    await vi.advanceTimersByTimeAsync(999);
-    expect(fixture.componentInstance.activeIndex()).toBe(0);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fixture.componentInstance.activeIndex()).toBe(1);
-  });
-
-  it('keeps a pointer pause click stable when focus pauses autoplay first', () => {
-    const fixture = createCarousel(slides, 1000);
-    const button = fixture.nativeElement.querySelector('.banner-carousel__autoplay') as HTMLButtonElement;
-
-    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    fixture.componentInstance.pauseAutoplay();
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-    fixture.detectChanges();
-
-    expect(fixture.componentInstance.userPaused()).toBe(true);
-    expect(button.getAttribute('aria-label')).toBe('Reanudar rotación automática');
-  });
-
-  it('does not render the pause control for one slide or a disabled delay', () => {
+  it('never renders a persistent pause control', () => {
     const oneSlide = createCarousel([slides[0]]);
     const disabledAutoplay = createCarousel(slides, 0);
 

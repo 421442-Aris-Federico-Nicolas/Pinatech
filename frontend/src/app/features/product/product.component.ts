@@ -66,10 +66,12 @@ export class ProductComponent {
       const product = this.product();
       if (!product) return;
       const variantId = this.positiveNumber(params.get('variant'));
-      this.selectedVariantId.set(product.variants.find((variant) => variant.id === variantId && variant.inStock)?.id
+      const selectedVariantId = product.variants.find((variant) => variant.id === variantId && variant.inStock)?.id
         ?? product.variants.find((variant) => variant.inStock)?.id
         ?? product.variants[0]?.id
-        ?? null);
+        ?? null;
+      this.selectedVariantId.set(selectedVariantId);
+      this.selectVariantImage(selectedVariantId);
     });
     this.checkout.capabilities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (capabilities) => this.pickupLocations.set(
@@ -96,10 +98,12 @@ export class ProductComponent {
         this.product.set(product);
         this.imageIndex.set(0);
         const requestedVariant = this.positiveNumber(this.route.snapshot.queryParamMap.get('variant'));
-        this.selectedVariantId.set(product.variants.find((variant) => variant.id === requestedVariant && variant.inStock)?.id
+        const selectedVariantId = product.variants.find((variant) => variant.id === requestedVariant && variant.inStock)?.id
           ?? product.variants.find((variant) => variant.inStock)?.id
           ?? product.variants[0]?.id
-          ?? null);
+          ?? null;
+        this.selectedVariantId.set(selectedVariantId);
+        this.selectVariantImage(selectedVariantId);
         this.loading.set(false);
         this.title.setTitle(`${product.name} | Pinatech`);
         this.meta.updateTag({ name: 'description', content: product.description.slice(0, 155) || `${product.name} en Pinatech.` });
@@ -122,6 +126,7 @@ export class ProductComponent {
   selectImage(index: number): void { this.imageIndex.set(index); }
   selectVariant(variantId: number): void {
     this.selectedVariantId.set(variantId);
+    this.selectVariantImage(variantId);
     this.quantity.set(1);
     void this.router.navigate([], { relativeTo: this.route, queryParams: { variant: variantId }, queryParamsHandling: 'merge' });
   }
@@ -155,6 +160,13 @@ export class ProductComponent {
   private positiveNumber(value: string | null): number | null {
     const parsed = Number(value);
     return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  private selectVariantImage(variantId: number | null): void {
+    const product = this.product();
+    const imageId = product?.variants.find((variant) => variant.id === variantId)?.imageId;
+    const index = imageId == null ? -1 : product?.images.findIndex((image) => image.id === imageId) ?? -1;
+    this.imageIndex.set(index >= 0 ? index : 0);
   }
 
   private showError(type: 'not-found' | 'request'): void {

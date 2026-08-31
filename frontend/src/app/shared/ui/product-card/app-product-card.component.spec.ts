@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { AppProductCardComponent, ProductCardProduct, ProductCardVariant } from './app-product-card.component';
+import { AppProductCardComponent, ProductCardProduct } from './app-product-card.component';
 
 describe('AppProductCardComponent', () => {
   const product: ProductCardProduct = {
@@ -17,28 +17,23 @@ describe('AppProductCardComponent', () => {
     ],
   };
 
-  it('selects the first available variant and emits it when adding', async () => {
+  it('keeps the catalog card compact and links to the product detail', async () => {
     await TestBed.configureTestingModule({
       imports: [AppProductCardComponent],
       providers: [provideRouter([])],
     }).compileComponents();
     const fixture = TestBed.createComponent(AppProductCardComponent);
-    const added: ProductCardVariant[] = [];
-    fixture.componentInstance.addToCart.subscribe((variant) => added.push(variant));
     fixture.componentRef.setInput('product', product);
     fixture.detectChanges();
 
-    const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
-    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
-    expect(select.value).toBe('1');
-    expect(button.disabled).toBe(false);
-    expect(fixture.nativeElement.textContent).toContain('Precio especial por transferencia');
-    expect(fixture.nativeElement.textContent).toContain('10% menos');
-    expect(fixture.nativeElement.textContent).toContain('Precio de lista / Mercado Pago');
-    expect(fixture.nativeElement.textContent).toContain('$90.00');
-    expect(fixture.nativeElement.textContent).not.toContain('recargo');
-
-    button.click();
-    expect(added).toEqual([product.variants[1]]);
+    expect(fixture.nativeElement.querySelector('select')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Mouse profesional');
+    expect(fixture.nativeElement.textContent).not.toContain('Sin impuestos');
+    expect(fixture.nativeElement.textContent).not.toContain('Transferencia');
+    expect(fixture.nativeElement.textContent).not.toContain('10% menos');
+    expect(fixture.nativeElement.textContent).not.toContain('Lista / Mercado Pago');
+    expect(fixture.nativeElement.textContent).toContain('Disponible');
+    expect(fixture.nativeElement.textContent).toContain('$100.00');
+    expect(fixture.nativeElement.querySelector('.product-card__actions a').getAttribute('href')).toBe('/products/1');
   });
 });

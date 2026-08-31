@@ -110,7 +110,7 @@ public class ProductImageService {
 
     public ProductImageResponse response(ProductImage image) {
         String url = image.getStorageKey() == null ? image.getImageUrl() : contentUrl(image.getId());
-        return new ProductImageResponse(image.getId(), url, image.getAltText(), image.getDisplayOrder());
+        return new ProductImageResponse(image.getId(), url, image.getAltText(), image.getOriginalFilename(), image.getDisplayOrder());
     }
 
     private String contentUrl(Long imageId) {

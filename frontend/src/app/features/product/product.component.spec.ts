@@ -99,6 +99,45 @@ describe('ProductComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-variant-id="12"]').tabIndex).toBe(0);
   });
 
+  it('shows the image associated with a color without changing color during manual gallery navigation', async () => {
+    const productWithImages: Product = {
+      ...product,
+      images: [
+        { id: 101, contentUrl: '/images/front.jpg', altText: 'Vista frontal', displayOrder: 0 },
+        { id: 102, contentUrl: '/images/black.jpg', altText: 'Color negro', displayOrder: 1 },
+      ],
+      variants: [
+        { ...product.variants[0], imageId: 102 },
+        { ...product.variants[1], imageId: null },
+      ],
+    };
+    await TestBed.configureTestingModule({
+      imports: [ProductComponent],
+      providers: [
+        { provide: CatalogService, useValue: { product: () => of(productWithImages) } },
+        { provide: CartService, useValue: { add: vi.fn(), items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ fulfillmentMethods: [], pickupLocations: [] }) } },
+        { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ id: 1 }), queryParamMap: convertToParamMap({}) },
+            queryParamMap: of(convertToParamMap({})),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const component = TestBed.createComponent(ProductComponent).componentInstance;
+    expect(component.selectedVariantId()).toBe(11);
+    expect(component.currentImage()?.id).toBe(102);
+
+    component.selectImage(0);
+    expect(component.selectedVariantId()).toBe(11);
+    component.selectVariant(12);
+    expect(component.currentImage()?.id).toBe(101);
+  });
+
   it('warns with the actual quantity when the cart cap is reached', async () => {
     const warning = vi.fn(() => ({ onAction: () => EMPTY }));
     const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 5, limit: 5, capped: true }));
