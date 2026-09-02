@@ -12,10 +12,6 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
 .upload-field, .ticket-upload { align-items: center; background: var(--color-surface-raised); border: 1px dashed var(--color-border-strong); display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; padding: .8rem; }
 .upload-field > div, .ticket-upload > div { display: grid; gap: var(--space-1); }
 .upload-field small, .ticket-upload small { color: var(--color-text-subtle); font-size: var(--text-xs); }
-.upload-field label, .ticket-upload label { align-items: center; background: var(--color-info-bg); border: 1px solid var(--color-info-border); color: var(--color-info-text); cursor: pointer; display: inline-flex; font-size: var(--text-sm); font-weight: var(--font-weight-bold); min-height: var(--control-min-height); padding: .55rem .75rem; touch-action: manipulation; }
-.upload-field label.disabled, .ticket-upload label.disabled { cursor: not-allowed; opacity: .55; }
-.upload-field label:has(input:focus-visible), .ticket-upload label:has(input:focus-visible) { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
-.upload-field input, .ticket-upload input { height: 1px; opacity: 0; position: absolute; width: 1px; }
 
 .local-previews { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 .local-previews article { background: var(--color-surface-raised); border: 1px solid var(--color-border); display: grid; gap: .3rem; min-width: 0; padding: .35rem; }
@@ -50,6 +46,6 @@ app-input, app-select, app-textarea { display: block; min-width: 0; }
   .tickets-panel > header, .ticket-card > header { align-items: stretch; flex-direction: column; }
   .ticket-card > header .app-badge { align-self: flex-start; }
   .upload-field, .ticket-upload { align-items: stretch; flex-direction: column; }
-  .upload-field label, .ticket-upload label, .ticket-upload > .app-button { justify-content: center; margin-left: 0; width: 100%; }
+  .ticket-upload > .app-button { justify-content: center; margin-left: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .local-previews button:active:not(:disabled):not([aria-disabled="true"]), .selected-files button:active:not(:disabled):not([aria-disabled="true"]) { opacity: .8; transform: none !important; } }

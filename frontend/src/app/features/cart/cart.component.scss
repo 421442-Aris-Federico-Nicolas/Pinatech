@@ -95,7 +95,7 @@ article {
 .summary > a, .summary > button { width: 100%; }
 .summary small { color: var(--color-text-subtle); display: block; margin-top: var(--space-3); text-align: center; }
 .empty { padding: clamp(var(--space-8), 6vw, var(--space-20)); text-align: center; }
-.empty .large { height: 88px; margin: auto; width: 88px; }
+.empty-cart-image { display: block; height: auto; margin: calc(var(--space-4) * -1) auto var(--space-3); width: clamp(12rem, 28vw, 19rem); }
 .empty p { color: var(--color-text-muted); }
 
 .item-info,
@@ -121,6 +121,7 @@ article {
 
 @media (max-width: 520px) {
   :host { min-height: calc(100dvh - 72px); }
+  .empty-cart-image { width: min(68vw, 15rem); }
   article { grid-template-columns: 48px minmax(0, 1fr); }
   .placeholder, .item-image { height: 48px; width: 48px; }
   .remove, .quantity, .subtotal { grid-column: 2; grid-row: auto; justify-self: start; }

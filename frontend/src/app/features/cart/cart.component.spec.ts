@@ -15,6 +15,32 @@ describe('CartComponent', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('shows the cart mascot instead of the PIN placeholder when empty', async () => {
+    const cart = {
+      items: signal([]), count: signal(0), total: signal(0),
+      stockLimit: vi.fn(), setQuantity: vi.fn(), add: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
+      reconcile: vi.fn(() => of(true)), legacyCartDiscarded: signal(false), dismissLegacyCartWarning: vi.fn(),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CartComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: AuthService, useValue: { isAuthenticated: () => false } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CartComponent);
+    fixture.detectChanges();
+    const image = fixture.nativeElement.querySelector('.empty-cart-image') as HTMLImageElement;
+
+    expect(image.getAttribute('src')).toBe('/pinatech-carrito.png');
+    expect(image.getAttribute('aria-hidden')).toBe('true');
+    expect(image.getAttribute('width')).toBe('715');
+    expect(fixture.nativeElement.querySelector('.empty .placeholder')).toBeNull();
+  });
+
   it('always shows discounted cart prices and preselects bank transfer without discount wording', async () => {
     const cart = {
       items: signal([item]),

@@ -102,7 +102,7 @@
               @else { <p class="no-attachments">Este ticket todavía no tiene imágenes.</p> }
               @if (canEdit(ticket)) {
                 <div class="attachment-upload" [attr.aria-busy]="processingAttachment() || uploadingAttachment()">
-                  <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Agregar imagen<input type="file" name="ticketAttachment" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
+                  <app-ticket-image-picker label="Agregar imagen" inputName="ticketAttachment" [disabled]="editingBusy() || ticket.attachments.length >= 10" (filesSelected)="selectAttachment($event, ticket)" />
                   <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : processingAttachment() ? 'Optimizando imagen…' : attachmentFile()?.name || 'JPEG, PNG o HEIC · optimización automática' }}</span>
                   <button appButton="outlined" type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ processingAttachment() ? 'Optimizando…' : uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
                 </div>
