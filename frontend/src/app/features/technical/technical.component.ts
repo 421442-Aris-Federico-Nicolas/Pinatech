@@ -9,6 +9,7 @@ import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.se
 import { prepareTicketImage, TicketImageError, ticketImageUploadError } from '../../core/tickets/ticket-image';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
+import { TicketImagePickerComponent } from '../../shared/ticket-image-picker/ticket-image-picker.component';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
@@ -28,7 +29,7 @@ const PRIORITY_FILTERS = ['ALL', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
 
 @Component({
   selector: 'app-technical',
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent, TicketImagePickerComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './technical.component.html',
   styleUrl: './technical.component.scss',
@@ -242,10 +243,8 @@ export class TechnicalComponent {
     });
   }
 
-  async selectAttachment(event: Event, ticket: TechnicalTicket): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    input.value = '';
+  async selectAttachment(files: File[], ticket: TechnicalTicket): Promise<void> {
+    const file = files[0] ?? null;
     if (this.editingBusy()) return;
     this.attachmentFile.set(null);
     if (!file) return;

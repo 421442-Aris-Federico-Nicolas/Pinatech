@@ -9,6 +9,7 @@ import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.se
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
+import { TicketImagePickerComponent } from '../../shared/ticket-image-picker/ticket-image-picker.component';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
@@ -22,7 +23,7 @@ interface PendingImage { file: File; previewUrl: string; }
 interface TicketMessage { text: string; tone: 'success' | 'warning' | 'error'; }
 
 @Component({
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, DatePipe, FormsModule, TicketAttachmentGalleryComponent, TicketImagePickerComponent],
   templateUrl: './tickets.component.html',
   styleUrl: './tickets.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -103,18 +104,16 @@ export class TicketsComponent {
     });
   }
 
-  async selectCreateImages(event: Event): Promise<void> {
+  async selectCreateImages(files: File[]): Promise<void> {
     if (this.creating() || this.processingImages()) return;
-    const files = this.readFiles(event);
     if (!files.length || !this.validateCount(files, 10 - this.createImages().length)) return;
     const images = await this.prepare(files);
     if (!images) return;
     this.createImages.update((current) => [...current, ...images]);
   }
 
-  async selectTicketImages(ticket: Ticket, event: Event): Promise<void> {
+  async selectTicketImages(ticket: Ticket, files: File[]): Promise<void> {
     if (this.uploadingTicket() === ticket.id || this.processingImages()) return;
-    const files = this.readFiles(event);
     const current = this.pendingFor(ticket.id);
     if (!files.length || !this.validateCount(files, 10 - ticket.attachments.length - current.length)) return;
     const images = await this.prepare(files);
@@ -229,12 +228,6 @@ export class TicketsComponent {
     }
   }
 
-  private readFiles(event: Event): File[] {
-    const input = event.target as HTMLInputElement;
-    const files = Array.from(input.files ?? []);
-    input.value = '';
-    return files;
-  }
   private previews(files: File[]): PendingImage[] { return files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })); }
   private removePreview(images: PendingImage[], index: number): void { const image = images[index]; if (image) URL.revokeObjectURL(image.previewUrl); }
   private revoke(images: PendingImage[]): void { images.forEach((image) => URL.revokeObjectURL(image.previewUrl)); }
