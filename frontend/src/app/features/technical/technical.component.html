@@ -101,10 +101,11 @@
               @if (ticket.attachments.length) { <app-ticket-attachment-gallery [attachments]="ticket.attachments" /> }
               @else { <p class="no-attachments">Este ticket todavía no tiene imágenes.</p> }
               @if (canEdit(ticket)) {
-                <div class="attachment-upload" [attr.aria-busy]="uploadingAttachment()">
-                  <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Elegir imagen<input type="file" name="ticketAttachment" accept="image/jpeg,image/png" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
-                  <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : attachmentFile()?.name || 'JPEG o PNG, hasta 5 MiB (opcional)' }}</span>
-                  <button appButton="outlined" type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
+                <div class="attachment-upload" [attr.aria-busy]="processingAttachment() || uploadingAttachment()">
+                  <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Tomar foto<input type="file" name="ticketCameraAttachment" accept="image/*,.heic,.heif" capture="environment" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
+                  <label [class.disabled]="editingBusy() || ticket.attachments.length >= 10">Elegir de galería<input type="file" name="ticketAttachment" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" [disabled]="editingBusy() || ticket.attachments.length >= 10" (change)="selectAttachment($event, ticket)"></label>
+                  <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : processingAttachment() ? 'Optimizando imagen…' : attachmentFile()?.name || 'JPEG, PNG o HEIC · optimización automática' }}</span>
+                  <button appButton="outlined" type="button" [disabled]="!attachmentFile() || editingBusy()" (click)="uploadAttachment()">{{ processingAttachment() ? 'Optimizando…' : uploadingAttachment() ? 'Subiendo…' : 'Subir imagen' }}</button>
                 </div>
               }
             </section>

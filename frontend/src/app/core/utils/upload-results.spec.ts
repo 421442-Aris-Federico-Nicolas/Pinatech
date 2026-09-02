@@ -9,7 +9,7 @@ describe('summarizeUploadResults', () => {
     const uploadedThird = { id: 3 };
     const results: UploadResult<{ name: string }, { id: number }>[] = [
       { pending: first, uploaded: uploadedFirst },
-      { pending: second, uploaded: null },
+      { pending: second, uploaded: null, error: 'failed' },
       { pending: third, uploaded: uploadedThird },
     ];
 
@@ -17,6 +17,7 @@ describe('summarizeUploadResults', () => {
       uploaded: [uploadedFirst, uploadedThird],
       succeeded: [first, third],
       failed: [second],
+      errors: ['failed'],
     });
   });
 });
