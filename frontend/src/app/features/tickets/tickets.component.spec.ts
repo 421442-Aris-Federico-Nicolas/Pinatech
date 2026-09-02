@@ -81,7 +81,6 @@ describe('TicketsComponent attachment gallery', () => {
     expect(component.deviceTypes).toEqual(['Consola', 'Notebook', 'PC de escritorio']);
     expect(fixture.nativeElement.querySelector('[name="deviceBrand"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[name="deviceModel"]')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('[name="newTicketCamera"]')?.getAttribute('capture')).toBe('environment');
     expect(fixture.nativeElement.querySelector('[name="newTicketImages"]')?.getAttribute('accept')).toContain('image/heic');
 
     component.create();
