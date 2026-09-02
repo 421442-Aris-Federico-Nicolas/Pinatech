@@ -1,5 +1,5 @@
 <main>
-  <section appCard class="request-panel" [attr.aria-busy]="creating()">
+  <section appCard class="request-panel" [attr.aria-busy]="creating() || processingImages()">
     <p class="eyebrow">Servicio técnico</p>
     <h1>Solicitá una reparación</h1>
     <p class="lead">Contanos qué equipo necesitás revisar. Las imágenes son opcionales y privadas.</p>
@@ -9,13 +9,14 @@
       @if (form.deviceType !== 'PC de escritorio') {<app-input label="Modelo" [(ngModel)]="form.model" name="deviceModel" autocomplete="off" spellcheck="false" placeholder="Ej. Series S o IdeaPad 3…" [disabled]="creating()" required />}
       <app-textarea class="wide" label="Problema informado" [rows]="4" [(ngModel)]="form.reportedProblem" name="reportedProblem" autocomplete="off" spellcheck="true" placeholder="Ej. No enciende desde una actualización…" [disabled]="creating()" required />
       <div class="upload-field wide">
-        <div><strong>Imágenes del equipo</strong><small>{{ createLimitReached() ? 'Límite de 10 imágenes alcanzado' : 'Opcional · JPEG o PNG · 5 MiB por archivo · máximo 10' }}</small></div>
-        <label [class.disabled]="creating() || createLimitReached()">Seleccionar<input type="file" name="newTicketImages" accept="image/jpeg,image/png" multiple [disabled]="creating() || createLimitReached()" (change)="selectCreateImages($event)"></label>
+        <div><strong>Imágenes del equipo</strong><small>{{ createLimitReached() ? 'Límite de 10 imágenes alcanzado' : processingImages() ? 'Optimizando imágenes…' : 'Opcional · JPEG, PNG o HEIC · optimización automática · máximo 10' }}</small></div>
+        <label [class.disabled]="creating() || processingImages() || createLimitReached()">Tomar foto<input type="file" name="newTicketCamera" accept="image/*,.heic,.heif" capture="environment" [disabled]="creating() || processingImages() || createLimitReached()" (change)="selectCreateImages($event)"></label>
+        <label [class.disabled]="creating() || processingImages() || createLimitReached()">Elegir de galería<input type="file" name="newTicketImages" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" multiple [disabled]="creating() || processingImages() || createLimitReached()" (change)="selectCreateImages($event)"></label>
       </div>
       @if (createImages().length) {
         <div class="local-previews wide">@for (image of createImages(); track image.previewUrl; let index = $index) {<article><img [src]="image.previewUrl" [alt]="'Vista previa de ' + image.file.name" width="640" height="480" loading="lazy"><span>{{ image.file.name }}</span><button type="button" [disabled]="creating()" (click)="removeCreateImage(index)">Quitar</button></article>}</div>
       }
-       <button appButton="filled" class="wide" type="submit" [disabled]="creating()">{{ creating() ? (createImages().length ? 'Creando y subiendo imágenes…' : 'Creando solicitud…') : 'Enviar solicitud' }}</button>
+       <button appButton="filled" class="wide" type="submit" [disabled]="creating() || processingImages()">{{ processingImages() ? 'Optimizando imágenes…' : creating() ? (createImages().length ? 'Creando y subiendo imágenes…' : 'Creando solicitud…') : 'Enviar solicitud' }}</button>
     </form>
     @if (error()) { <app-feedback class="request-feedback" tone="error" announce="assertive">{{ error() }}</app-feedback> }
     @if (success()) { <app-feedback class="request-feedback" [tone]="successTone()" announce="polite">{{ success() }}</app-feedback> }
@@ -36,10 +37,11 @@
           }
           <section class="ticket-upload">
             <div><strong>Agregar imágenes</strong><small>{{ attachmentLimitReached(ticket) ? 'Límite de 10 adjuntos alcanzado' : 'Opcional, hasta completar 10 adjuntos.' }}</small></div>
-             <label [class.disabled]="uploadingTicket() === ticket.id || attachmentLimitReached(ticket)">Elegir<input type="file" [name]="'ticketImages' + ticket.id" accept="image/jpeg,image/png" multiple [disabled]="uploadingTicket() === ticket.id || attachmentLimitReached(ticket)" (change)="selectTicketImages(ticket, $event)"></label>
+             <label [class.disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)">Tomar foto<input type="file" [name]="'ticketCamera' + ticket.id" accept="image/*,.heic,.heif" capture="environment" [disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)" (change)="selectTicketImages(ticket, $event)"></label>
+             <label [class.disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)">Elegir de galería<input type="file" [name]="'ticketImages' + ticket.id" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" multiple [disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)" (change)="selectTicketImages(ticket, $event)"></label>
             @if (pendingFor(ticket.id).length) {
               <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" [disabled]="uploadingTicket() === ticket.id" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
-              <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
+               <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null || processingImages()" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ processingImages() ? 'Optimizando…' : uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
             }
            </section>
             @if(ticketMessages()[ticket.id]; as message){<app-feedback class="ticket-message" [tone]="message.tone" [announce]="message.tone === 'error' ? 'assertive' : 'polite'">{{ message.text }}</app-feedback>}

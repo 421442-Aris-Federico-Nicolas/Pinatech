@@ -6,6 +6,7 @@ import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
+import { prepareTicketImage, TicketImageError, ticketImageUploadError } from '../../core/tickets/ticket-image';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { TicketAttachmentGalleryComponent } from '../../shared/ticket-attachment-gallery/ticket-attachment-gallery.component';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
@@ -59,8 +60,9 @@ export class TechnicalComponent {
   readonly error = signal('');
   readonly assignmentDraft = signal<number | null>(null);
   readonly attachmentFile = signal<File | null>(null);
+  readonly processingAttachment = signal(false);
   readonly uploadingAttachment = signal(false);
-  readonly editingBusy = computed(() => this.saving() || this.uploadingAttachment());
+  readonly editingBusy = computed(() => this.saving() || this.processingAttachment() || this.uploadingAttachment());
   readonly statuses = WORKFLOW;
   readonly priorities: TicketPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
   readonly priorityOptions: readonly AppSelectOption[] = this.priorities.map((priority) => ({ value: priority, label: this.priorityLabel(priority) }));
@@ -240,7 +242,7 @@ export class TechnicalComponent {
     });
   }
 
-  selectAttachment(event: Event, ticket: TechnicalTicket): void {
+  async selectAttachment(event: Event, ticket: TechnicalTicket): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
     input.value = '';
@@ -249,10 +251,15 @@ export class TechnicalComponent {
     if (!file) return;
     if (!this.canEdit(ticket)) return this.fail('No tenés permisos para agregar imágenes a este ticket.');
     if (ticket.attachments.length >= 10) return this.fail('El ticket ya alcanzó el máximo de 10 imágenes.');
-    if (!['image/jpeg', 'image/png'].includes(file.type)) return this.fail('La imagen debe ser JPEG o PNG.');
-    if (file.size > 5 * 1024 * 1024) return this.fail('La imagen supera el máximo de 5 MiB.');
     this.clearMessages();
-    this.attachmentFile.set(file);
+    this.processingAttachment.set(true);
+    try {
+      this.attachmentFile.set(await prepareTicketImage(file));
+    } catch (error) {
+      this.fail(error instanceof TicketImageError ? error.message : 'No pudimos preparar la imagen. Intentá con otro archivo.');
+    } finally {
+      this.processingAttachment.set(false);
+    }
   }
 
   uploadAttachment(): void {
@@ -267,7 +274,7 @@ export class TechnicalComponent {
         this.attachmentFile.set(null);
         this.succeed(`Imagen "${attachment.fileName}" agregada al ticket #${ticket.id}.`);
       },
-      error: () => this.fail('No se pudo subir la imagen. Verificá el archivo e intentá nuevamente.'),
+      error: (error: unknown) => this.fail(ticketImageUploadError(error)),
     });
   }
 

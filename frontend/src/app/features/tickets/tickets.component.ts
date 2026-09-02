@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, concatMap, finalize, from, map, of, toArray } from 'rxjs';
 import { TicketAttachment } from '../../core/tickets/ticket-attachment.model';
+import { prepareTicketImage, TicketImageError, ticketImageUploadError } from '../../core/tickets/ticket-image';
 import { TicketAttachmentService } from '../../core/tickets/ticket-attachment.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
@@ -36,6 +37,7 @@ export class TicketsComponent {
   readonly tickets = signal<Ticket[]>([]);
   readonly loading = signal(true);
   readonly creating = signal(false);
+  readonly processingImages = signal(false);
   readonly uploadingTicket = signal<number | null>(null);
   readonly error = signal('');
   readonly success = signal('');
@@ -73,7 +75,7 @@ export class TicketsComponent {
   }
 
   create(): void {
-    if (this.creating()) return;
+    if (this.creating() || this.processingImages()) return;
     const requiresBrand = this.requiresBrand(this.form.deviceType);
     const payload: CreateTicketPayload = {
       deviceType: this.form.deviceType.trim(),
@@ -101,21 +103,23 @@ export class TicketsComponent {
     });
   }
 
-  selectCreateImages(event: Event): void {
-    if (this.creating()) return;
+  async selectCreateImages(event: Event): Promise<void> {
+    if (this.creating() || this.processingImages()) return;
     const files = this.readFiles(event);
-    if (!files.length || !this.validate(files, 10 - this.createImages().length)) return;
-    this.createImages.update((current) => [...current, ...this.previews(files)]);
-    this.clearMessages();
+    if (!files.length || !this.validateCount(files, 10 - this.createImages().length)) return;
+    const images = await this.prepare(files);
+    if (!images) return;
+    this.createImages.update((current) => [...current, ...images]);
   }
 
-  selectTicketImages(ticket: Ticket, event: Event): void {
-    if (this.uploadingTicket() === ticket.id) return;
+  async selectTicketImages(ticket: Ticket, event: Event): Promise<void> {
+    if (this.uploadingTicket() === ticket.id || this.processingImages()) return;
     const files = this.readFiles(event);
     const current = this.pendingFor(ticket.id);
-    if (!files.length || !this.validate(files, 10 - ticket.attachments.length - current.length)) return;
-    this.ticketImages.update((records) => ({ ...records, [ticket.id]: [...current, ...this.previews(files)] }));
-    this.clearMessages();
+    if (!files.length || !this.validateCount(files, 10 - ticket.attachments.length - current.length)) return;
+    const images = await this.prepare(files);
+    if (!images) return;
+    this.ticketImages.update((records) => ({ ...records, [ticket.id]: [...current, ...images] }));
   }
 
   removeCreateImage(index: number): void {
@@ -133,12 +137,12 @@ export class TicketsComponent {
 
   uploadToTicket(ticket: Ticket): void {
     const images = [...this.pendingFor(ticket.id)];
-    if (!images.length || this.uploadingTicket() !== null) return;
+    if (!images.length || this.uploadingTicket() !== null || this.processingImages()) return;
     this.clearMessages();
     this.clearTicketMessage(ticket.id);
     this.uploadingTicket.set(ticket.id);
     this.upload(ticket.id, images).pipe(finalize(() => this.uploadingTicket.set(null))).subscribe((results) => {
-      const { uploaded, succeeded, failed } = summarizeUploadResults(results);
+      const { uploaded, succeeded, failed, errors } = summarizeUploadResults(results);
       const updated = { ...ticket, attachments: [...ticket.attachments, ...uploaded] };
       this.tickets.update((tickets) => tickets.map((current) => current.id === ticket.id ? updated : current));
       this.revoke(succeeded);
@@ -146,8 +150,8 @@ export class TicketsComponent {
       const message: TicketMessage = uploaded.length === images.length
         ? { text: `${uploaded.length} ${uploaded.length === 1 ? 'imagen agregada' : 'imágenes agregadas'} al ticket #${ticket.id}.`, tone: 'success' }
         : uploaded.length
-          ? { text: `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. Podés volver a intentar las restantes.`, tone: 'warning' }
-          : { text: `No se pudo agregar ninguna de las ${images.length} imágenes al ticket #${ticket.id}. Revisá tu conexión y reintentá.`, tone: 'error' };
+          ? { text: `Se agregaron ${uploaded.length} de ${images.length} imágenes al ticket #${ticket.id}. ${ticketImageUploadError(errors[0])} Podés volver a intentar las restantes.`, tone: 'warning' }
+          : { text: `No se pudo agregar ninguna de las ${images.length} imágenes al ticket #${ticket.id}. ${ticketImageUploadError(errors[0])}`, tone: 'error' };
       this.ticketMessages.update((messages) => ({ ...messages, [ticket.id]: message }));
     });
   }
@@ -179,14 +183,14 @@ export class TicketsComponent {
     return from(images).pipe(
       concatMap((image) => this.attachments.upload(ticketId, image.file).pipe(
         map((uploaded): UploadResult<PendingImage, TicketAttachment> => ({ pending: image, uploaded })),
-        catchError(() => of<UploadResult<PendingImage, TicketAttachment>>({ pending: image, uploaded: null })),
+        catchError((error: unknown) => of<UploadResult<PendingImage, TicketAttachment>>({ pending: image, uploaded: null, error })),
       )),
       toArray(),
     );
   }
 
   private completeCreate(ticket: Ticket, results: UploadResult<PendingImage, TicketAttachment>[]): void {
-    const { uploaded, succeeded, failed } = summarizeUploadResults(results);
+    const { uploaded, succeeded, failed, errors } = summarizeUploadResults(results);
     const attempted = results.length;
     const updated = { ...ticket, attachments: [...(ticket.attachments ?? []), ...uploaded] };
     this.tickets.update((tickets) => [updated, ...tickets.filter((current) => current.id !== ticket.id)]);
@@ -199,19 +203,30 @@ export class TicketsComponent {
       ? `Solicitud #${ticket.id} creada.`
       : uploaded.length === attempted
         ? `Solicitud #${ticket.id} creada con ${uploaded.length} ${uploaded.length === 1 ? 'imagen' : 'imágenes'}.`
-        : `La solicitud #${ticket.id} se creó correctamente, pero solo se subieron ${uploaded.length} de ${attempted} imágenes. Las restantes quedaron seleccionadas para reintentar con "Subir imágenes".`);
+        : `La solicitud #${ticket.id} se creó correctamente, pero solo se subieron ${uploaded.length} de ${attempted} imágenes. ${ticketImageUploadError(errors[0])} Las restantes quedaron seleccionadas para reintentar con "Subir imágenes".`);
   }
 
-  private validate(files: File[], available: number): boolean {
+  private validateCount(files: File[], available: number): boolean {
     if (files.length > Math.max(0, available)) {
       this.fail(`Podés seleccionar hasta ${Math.max(0, available)} imágenes más; el máximo es 10 por ticket.`);
       return false;
     }
-    const invalid = files.find((file) => !['image/jpeg', 'image/png'].includes(file.type));
-    if (invalid) { this.fail(`“${invalid.name}” no es JPEG ni PNG.`); return false; }
-    const oversized = files.find((file) => file.size > 5 * 1024 * 1024);
-    if (oversized) { this.fail(`“${oversized.name}” supera el máximo de 5 MiB.`); return false; }
     return true;
+  }
+
+  private async prepare(files: File[]): Promise<PendingImage[] | null> {
+    this.clearMessages();
+    this.processingImages.set(true);
+    try {
+      const prepared: File[] = [];
+      for (const file of files) prepared.push(await prepareTicketImage(file));
+      return this.previews(prepared);
+    } catch (error) {
+      this.fail(error instanceof TicketImageError ? error.message : 'No pudimos preparar la imagen. Intentá con otro archivo.');
+      return null;
+    } finally {
+      this.processingImages.set(false);
+    }
   }
 
   private readFiles(event: Event): File[] {
