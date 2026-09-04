@@ -15,12 +15,13 @@ export interface Profile {
   lastName: string;
   email: string;
   phone: string | null;
+  documentNumber: string | null;
   emailVerified: boolean;
   roles: string[];
   address: ProfileAddress | null;
 }
 
-export interface UpdateProfileRequest { firstName: string; lastName: string; phone: string; }
+export interface UpdateProfileRequest { firstName: string; lastName: string; phone: string; documentNumber: string; }
 export interface EmailChangeRequest { email: string; currentPassword: string; }
 export interface AddressRequest {
   street: string;

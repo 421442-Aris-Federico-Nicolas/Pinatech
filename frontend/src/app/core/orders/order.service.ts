@@ -26,6 +26,41 @@ export interface PickupLocation {
 }
 
 export type PaymentMethod = 'BANK_TRANSFER' | 'MERCADO_PAGO';
+export type FulfillmentMethod = 'PICKUP' | 'DELIVERY';
+
+export interface DeliveryAddress {
+  recipientName: string;
+  street: string;
+  streetNumber: string;
+  floorApartment: string | null;
+  locality: string;
+  province: string;
+  provinceCode: string;
+  postalCode: string;
+  countryCode: string;
+  reference: string | null;
+}
+
+export interface ShipmentSummary {
+  status: string;
+  providerStatus: string | null;
+  providerSubstatus: string | null;
+  carrier: string | null;
+  trackingCode: string | null;
+  trackingUrl: string | null;
+  estimatedDeliveryAt: string | null;
+  incident: boolean;
+}
+
+export interface ShipmentTracking extends ShipmentSummary {
+  history: ShipmentTrackingEvent[];
+}
+
+export interface ShipmentTrackingEvent {
+  status: string;
+  substatus: string | null;
+  occurredAt: string;
+}
 
 export interface Order {
   id: number;
@@ -35,9 +70,10 @@ export interface Order {
   currency: string;
   paymentMethod: PaymentMethod;
   deliveryMethod: string | null;
-  fulfillmentMethod: string | null;
+  fulfillmentMethod: FulfillmentMethod | null;
   pickupLocation: PickupLocation | null;
   subtotal: number;
+  shippingCost: number;
   paymentDiscount: number;
   paymentSurcharge: number;
   total: number;
@@ -46,6 +82,8 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   items: OrderItem[];
+  deliveryAddress: DeliveryAddress | null;
+  shipment: ShipmentSummary | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -58,5 +96,9 @@ export class OrderService {
 
   get(id: number) {
     return this.http.get<Order>(`${environment.apiBaseUrl}/orders/${id}`);
+  }
+
+  tracking(orderId: number) {
+    return this.http.get<ShipmentTracking>(`${environment.apiBaseUrl}/shipping/orders/${orderId}/tracking`);
   }
 }

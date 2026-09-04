@@ -41,6 +41,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.computerstore.email.OrderEmailEventType;
 import com.computerstore.email.OrderEmailOutboxService;
 import java.util.ArrayList;
+import com.computerstore.shipping.service.ShipmentDispatchService;
+import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 public class PaymentAttemptTransactionalService {
@@ -57,8 +59,8 @@ public class PaymentAttemptTransactionalService {
     private final FulfillmentPolicy fulfillment;
     private final Clock clock;
     private final OrderEmailOutboxService outbox;
+    private final ShipmentDispatchService shipmentDispatch;
 
-    @Autowired
     public PaymentAttemptTransactionalService(
             PaymentAttemptRepository attempts,
             ProviderPaymentRepository providerPayments,
@@ -79,6 +81,18 @@ public class PaymentAttemptTransactionalService {
         this.fulfillment = fulfillment;
         this.clock = clock;
         this.outbox = outbox;
+        this.shipmentDispatch = null;
+    }
+
+    @Autowired
+    public PaymentAttemptTransactionalService(PaymentAttemptRepository attempts,
+            ProviderPaymentRepository providerPayments, PaymentEventRepository events,
+            CustomerOrderRepository orders, OrderStockService stock, MercadoPagoProperties properties,
+            FulfillmentPolicy fulfillment, Clock clock, OrderEmailOutboxService outbox,
+            ObjectProvider<ShipmentDispatchService> shipmentDispatch) {
+        this.attempts = attempts; this.providerPayments = providerPayments; this.events = events; this.orders = orders;
+        this.stock = stock; this.properties = properties; this.fulfillment = fulfillment; this.clock = clock;
+        this.outbox = outbox; this.shipmentDispatch = shipmentDispatch.getIfAvailable();
     }
 
     public PaymentAttemptTransactionalService(PaymentAttemptRepository attempts,
@@ -193,7 +207,10 @@ public class PaymentAttemptTransactionalService {
             }
             case "in_mediation" -> {
                 providerPayment.mediation();
-                if (providerPayment.isFundsOrder()) order.markPaymentInMediation();
+                if (providerPayment.isFundsOrder()) {
+                    order.markPaymentInMediation();
+                    shippingPaymentRevoked(order);
+                }
                 event.processed("MEDIATION");
             }
             case "rejected", "cancelled" -> {
@@ -211,13 +228,17 @@ public class PaymentAttemptTransactionalService {
                 if (providerPayment.isFundsOrder()
                         || !providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
                     order.markPaymentRefunded();
+                    shippingPaymentRevoked(order);
                     attempt.summaryStatus(status, PaymentAttemptStatus.REFUNDED);
                 }
                 event.processed("REFUNDED_BY_PROVIDER");
             }
             case "charged_back" -> {
                 providerPayment.chargeback();
-                if (providerPayment.isFundsOrder()) order.markPaymentChargedBack();
+                if (providerPayment.isFundsOrder()) {
+                    order.markPaymentChargedBack();
+                    shippingPaymentRevoked(order);
+                }
                 event.processed("CHARGEBACK");
             }
             default -> event.processed("IGNORED_STATUS");
@@ -234,6 +255,7 @@ public class PaymentAttemptTransactionalService {
     ) {
         if (providerPayment.isFundsOrder()) {
             order.confirmPaymentApproved();
+            if (shipmentDispatch != null) shipmentDispatch.enqueue(order);
             event.processed("ALREADY_FUNDED");
             return Optional.empty();
         }
@@ -255,6 +277,7 @@ public class PaymentAttemptTransactionalService {
             providerPayment.fundsOrder();
             order.approveMercadoPagoPayment();
             if (outbox != null) outbox.enqueue(order, OrderEmailEventType.PAYMENT_APPROVED);
+            if (shipmentDispatch != null) shipmentDispatch.enqueue(order);
             attempt.summaryStatus(payment.status(), PaymentAttemptStatus.APPROVED);
             event.processed("ORDER_PAID");
             return Optional.empty();
@@ -287,6 +310,7 @@ public class PaymentAttemptTransactionalService {
         if (payment.refundTerminalAndComplete()) {
             if (!providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
                 order.markPaymentRefunded();
+                shippingPaymentRevoked(order);
                 payment.getAttempt().summaryStatus("refunded", PaymentAttemptStatus.REFUNDED);
             }
             event(instruction.eventId()).ifPresent(value -> value.processed("REFUNDED"));
@@ -344,6 +368,10 @@ public class PaymentAttemptTransactionalService {
                 payment.getRefundIdempotencyKey(), payment.getRefundId(), eventId));
     }
 
+    private void shippingPaymentRevoked(com.computerstore.order.domain.CustomerOrder order) {
+        if (shipmentDispatch != null) shipmentDispatch.paymentNoLongerApproved(order);
+    }
+
     private void validateAuthoritativePayment(PaymentAttempt attempt, ProviderPayment payment) {
         boolean expectedLiveMode = properties.environment() == MercadoPagoEnvironment.PRODUCTION;
         if (!attempt.getPublicId().toString().equals(payment.externalReference())
@@ -375,6 +403,10 @@ public class PaymentAttemptTransactionalService {
             items.add(new PaymentPreferenceRequest.Item(
                     "MERCADO_PAGO_SURCHARGE", "Recargo Mercado Pago", 1,
                     attempt.getOrder().getPaymentSurcharge()));
+        }
+        if (attempt.getOrder().getShippingCost().signum() > 0) {
+            items.add(new PaymentPreferenceRequest.Item(
+                    "ENVIO_ZIPNOVA", "Envio Zipnova", 1, attempt.getOrder().getShippingCost()));
         }
         return new PaymentPreferenceRequest(
                 attempt.getPublicId(), attempt.getOrder().getId(), attempt.getAmount(), attempt.getCurrency(),

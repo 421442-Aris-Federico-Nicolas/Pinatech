@@ -9,7 +9,7 @@ public record AddressRequest(
         @NotBlank @Size(max = 30) String number,
         @Size(max = 50) String floorApartment,
         @NotBlank @Size(max = 120) String locality,
-        @NotBlank @Pattern(regexp = "[A-Za-z]{1,3}") String provinceCode,
+        @NotBlank @Pattern(regexp = "[A-Za-z]{1,4}") String provinceCode,
         @NotBlank @Pattern(regexp = "[A-Za-z0-9 -]{4,12}") String postalCode,
         @Pattern(regexp = "[A-Za-z]{2}") String countryCode,
         @Size(max = 300) String reference

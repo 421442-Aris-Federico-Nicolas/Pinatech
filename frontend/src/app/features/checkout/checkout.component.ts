@@ -5,15 +5,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { CartService, OrderConfirmation } from '../../core/cart/cart.service';
-import { PaymentMethod } from '../../core/orders/order.service';
-import { bankTransferPrice, listPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
+import { CartService, CheckoutFulfillment, OrderConfirmation } from '../../core/cart/cart.service';
+import { FulfillmentMethod, PaymentMethod } from '../../core/orders/order.service';
+import { bankTransferPrice, listPrice, priceWithoutNationalTax, roundMoney } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel } from '../../core/utils/estado-label';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
-import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService } from './checkout.service';
+import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService, ShippingQuoteOption } from './checkout.service';
 
 @Component({
   selector: 'app-checkout',
@@ -33,7 +33,12 @@ export class CheckoutComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly capabilities = signal<CheckoutCapabilities | null>(null);
+  readonly checkoutStep = signal<'SHIPPING' | 'PAYMENT'>('SHIPPING');
+  readonly selectedFulfillmentMethod = signal<FulfillmentMethod | null>(null);
   readonly selectedPickupCode = signal('');
+  readonly shippingQuotes = signal<ShippingQuoteOption[]>([]);
+  readonly selectedShippingQuoteId = signal('');
+  readonly quoteClock = signal(Date.now());
   readonly selectedPaymentMethod = signal<PaymentMethod | null>(
     this.route.snapshot.queryParamMap.get('paymentMethod') === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : null,
   );
@@ -45,12 +50,22 @@ export class CheckoutComponent {
   readonly resendingVerification = signal(false);
   readonly reconciliationError = signal('');
   readonly capabilitiesError = signal('');
+  readonly quoteError = signal('');
+  readonly quoteNeedsProfile = signal(false);
+  readonly loadingQuotes = signal(false);
   readonly submitError = signal('');
   readonly verificationNotice = signal('');
-  readonly submitErrorKind = signal<'verification' | 'pending-transfer' | 'conflict' | 'network' | 'generic' | null>(null);
+  readonly submitErrorKind = signal<'verification' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' | null>(null);
   readonly emailVerified = computed(() => this.auth.user()?.emailVerified === true);
   readonly selectedPickup = computed(() => this.capabilities()?.pickupLocations
     .find((location) => location.code === this.selectedPickupCode()) ?? null);
+  readonly selectedShippingQuote = computed(() => this.shippingQuotes()
+    .find((quote) => quote.shippingQuoteId === this.selectedShippingQuoteId()) ?? null);
+  readonly quoteExpired = computed(() => {
+    this.quoteClock();
+    const expiration = this.selectedShippingQuote()?.expiresAt;
+    return !expiration || !Number.isFinite(Date.parse(expiration)) || Date.parse(expiration) <= Date.now();
+  });
   readonly transferPricing = computed(() => bankTransferPrice(
     this.cart.total(),
     this.capabilities()?.bankTransferDiscountRate ?? 0.1,
@@ -59,10 +74,15 @@ export class CheckoutComponent {
   readonly selectedPricing = computed(() => this.selectedPaymentMethod() === 'BANK_TRANSFER'
     ? this.transferPricing()
     : this.mercadoPagoPricing());
+  readonly selectedShippingCost = computed(() => this.selectedFulfillmentMethod() === 'DELIVERY'
+    && !this.quoteExpired() ? this.selectedShippingQuote()?.amount ?? 0 : 0);
+  readonly selectedTotal = computed(() => roundMoney(this.selectedPricing().total + this.selectedShippingCost()));
   readonly priceWithoutTax = priceWithoutNationalTax;
+  private quoteExpirationTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
     this.reconcileCheckout();
+    this.destroyRef.onDestroy(() => clearTimeout(this.quoteExpirationTimer));
   }
 
   reconcileCheckout(): void {
@@ -102,7 +122,13 @@ export class CheckoutComponent {
           this.selectedPickupCode.set(selectedCode);
           this.pickupAccepted.set(false);
         }
+        const currentFulfillment = this.selectedFulfillmentMethod();
+        const selectedFulfillment = currentFulfillment && capabilities.fulfillmentMethods.includes(currentFulfillment)
+          ? currentFulfillment
+          : null;
+        this.selectedFulfillmentMethod.set(selectedFulfillment);
         this.capabilitiesError.set('');
+        if (this.deliveryEnabled(capabilities)) this.loadShippingQuotes();
       },
       error: () => {
         this.capabilities.set(null);
@@ -115,12 +141,22 @@ export class CheckoutComponent {
     const capabilities = this.capabilities();
     const pickup = this.selectedPickup();
     const paymentMethod = this.selectedPaymentMethod();
-    if (this.submitting() || !this.cart.items().length || !pickup || !paymentMethod || !this.canSubmit(capabilities)) return;
+    const fulfillmentMethod = this.selectedFulfillmentMethod();
+    if (fulfillmentMethod === 'DELIVERY' && this.quoteExpired()) {
+      this.markQuoteExpired();
+      return;
+    }
+    if (this.checkoutStep() !== 'PAYMENT' || this.submitting() || !this.cart.items().length
+        || !paymentMethod || !fulfillmentMethod || !this.canSubmit(capabilities)) return;
+
+    const fulfillment: CheckoutFulfillment = fulfillmentMethod === 'PICKUP'
+      ? { fulfillmentMethod, pickupLocationCode: pickup!.code, pickupLocationVersion: pickup!.version, shippingQuoteId: null }
+      : { fulfillmentMethod, pickupLocationCode: null, pickupLocationVersion: null, shippingQuoteId: this.selectedShippingQuote()!.shippingQuoteId };
 
     this.submitting.set(true);
     this.submitError.set('');
     this.submitErrorKind.set(null);
-    this.cart.checkout(paymentMethod, 'PICKUP', pickup.code, pickup.version).pipe(
+    this.cart.checkout(paymentMethod, fulfillment).pipe(
       switchMap((order) => paymentMethod === 'MERCADO_PAGO'
         ? this.checkoutService.mercadoPago(order.id, order.paymentStatus).pipe(map((payment) => {
           if (!payment.checkoutUrl.trim()) throw new Error('Mercado Pago did not return a checkout URL.');
@@ -141,10 +177,50 @@ export class CheckoutComponent {
   }
 
   selectPickup(event: Event): void {
-    this.selectedPickupCode.set((event.target as HTMLSelectElement).value);
+    this.selectedFulfillmentMethod.set('PICKUP');
+    this.selectedPickupCode.set((event.target as HTMLInputElement).value);
     this.pickupAccepted.set(false);
     this.submitError.set('');
     this.submitErrorKind.set(null);
+  }
+
+  loadShippingQuotes(): void {
+    if (this.loadingQuotes() || !this.deliveryEnabled()) return;
+    this.loadingQuotes.set(true);
+    this.quoteNeedsProfile.set(false);
+    const items = this.cart.items().map((item) => ({ variantId: item.variant.id, quantity: item.quantity }));
+    this.checkoutService.shippingQuotes(items).pipe(
+      finalize(() => this.loadingQuotes.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: ({ options }) => {
+        this.shippingQuotes.set(options);
+        const currentId = this.selectedShippingQuoteId();
+        this.selectedShippingQuoteId.set(options.some((option) => option.shippingQuoteId === currentId)
+          ? currentId : options[0]?.shippingQuoteId ?? '');
+        this.quoteError.set(options.length ? '' : 'No encontramos opciones de envío para tu dirección.');
+        this.scheduleQuoteExpiration();
+      },
+      error: (error: unknown) => {
+        this.shippingQuotes.set([]);
+        this.selectedShippingQuoteId.set('');
+        clearTimeout(this.quoteExpirationTimer);
+        const detail = error instanceof HttpErrorResponse && error.error && typeof error.error === 'object'
+          ? (error.error as Record<string, unknown>)['detail'] : null;
+        this.quoteNeedsProfile.set(typeof detail === 'string' && /address|phone|document|street|postal|delivery profile/i.test(detail));
+        this.quoteError.set(this.quoteNeedsProfile()
+          ? 'Completá tus datos personales y tu dirección de entrega para calcular el envío.'
+          : 'No pudimos calcular el envío. Revisá tu dirección o intentá nuevamente.');
+      },
+    });
+  }
+
+  selectShippingQuote(event: Event): void {
+    this.selectedFulfillmentMethod.set('DELIVERY');
+    this.selectedShippingQuoteId.set((event.target as HTMLInputElement).value);
+    this.submitError.set('');
+    this.submitErrorKind.set(null);
+    this.scheduleQuoteExpiration();
   }
 
   setPickupAccepted(event: Event): void {
@@ -197,10 +273,40 @@ export class CheckoutComponent {
     return !!capabilities?.fulfillmentMethods.includes('PICKUP') && !!this.selectedPickup();
   }
 
+  continueToPayment(): void {
+    if (this.selectedFulfillmentMethod() === 'DELIVERY' && this.quoteExpired()) {
+      this.markQuoteExpired();
+      return;
+    }
+    if (this.reconciling() || this.loadingCapabilities() || !this.fulfillmentEnabled()) return;
+    this.submitError.set('');
+    this.submitErrorKind.set(null);
+    this.checkoutStep.set('PAYMENT');
+  }
+
+  returnToShipping(): void {
+    if (this.submitting()) return;
+    this.checkoutStep.set('SHIPPING');
+  }
+
+  deliveryEnabled(capabilities = this.capabilities()): boolean {
+    return !!capabilities?.orderRequestsEnabled
+      && capabilities.deliveryQuotesEnabled
+      && capabilities.deliveryMethods.includes('ZIPNOVA')
+      && capabilities.fulfillmentMethods.includes('DELIVERY');
+  }
+
+  fulfillmentEnabled(capabilities = this.capabilities()): boolean {
+    return this.selectedFulfillmentMethod() === 'PICKUP'
+      ? this.pickupEnabled(capabilities) && this.pickupAccepted()
+      : this.selectedFulfillmentMethod() === 'DELIVERY'
+        ? this.deliveryEnabled(capabilities) && !!this.selectedShippingQuote() && !this.quoteExpired()
+        : false;
+  }
+
   canSubmit(capabilities = this.capabilities()): boolean {
     return this.selectedPaymentEnabled(capabilities)
-      && this.pickupEnabled(capabilities)
-      && this.pickupAccepted()
+      && this.fulfillmentEnabled(capabilities)
       && this.emailVerified();
   }
 
@@ -222,8 +328,40 @@ export class CheckoutComponent {
     return estadoLabel(method, 'metodo');
   }
 
+  carrierLogo(carrier: string): string | null {
+    const normalized = carrier.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
+    if (/\boca\b/.test(normalized)) return '/Logooca.png';
+    if (normalized.includes('correo argentino') || normalized === 'correo') return '/logo-correo.png';
+    return null;
+  }
+
+  carrierInitials(carrier: string): string {
+    return carrier.trim().split(/\s+/).slice(0, 2).map((word) => word[0] ?? '').join('').toUpperCase() || 'ENV';
+  }
+
+  private scheduleQuoteExpiration(): void {
+    clearTimeout(this.quoteExpirationTimer);
+    this.quoteClock.set(Date.now());
+    const expiration = this.selectedShippingQuote()?.expiresAt;
+    if (!expiration || !Number.isFinite(Date.parse(expiration))) return;
+    const delay = Math.max(0, Date.parse(expiration) - Date.now());
+    const maximumDelay = 2_147_483_647;
+    this.quoteExpirationTimer = setTimeout(
+      () => delay > maximumDelay ? this.scheduleQuoteExpiration() : this.markQuoteExpired(),
+      Math.min(delay, maximumDelay),
+    );
+  }
+
+  private markQuoteExpired(): void {
+    this.quoteClock.set(Date.now());
+    if (this.selectedFulfillmentMethod() === 'DELIVERY') {
+      this.quoteError.set('La cotización venció. Calculá el envío nuevamente antes de continuar.');
+      this.checkoutStep.set('SHIPPING');
+    }
+  }
+
   private handleSubmitError(error: unknown): void {
-    let kind: 'verification' | 'pending-transfer' | 'conflict' | 'network' | 'generic' = 'generic';
+    let kind: 'verification' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' = 'generic';
     let message = 'No pudimos completar la compra. Conservamos tu carrito para que puedas reintentarlo sin duplicar el pedido.';
 
     if (error instanceof HttpErrorResponse) {
@@ -245,6 +383,13 @@ export class CheckoutComponent {
       } else if (error.status === 409) {
         kind = 'conflict';
         message = 'Cambió el stock o el pedido entró en conflicto. Revisá el carrito antes de reintentar; no quitamos tus productos.';
+      } else if (this.selectedFulfillmentMethod() === 'DELIVERY'
+          && ((error.status === 400 && typeof problemDetail === 'string' && /shipping quote|delivery profile/i.test(problemDetail))
+            || error.status === 502 || error.status === 503)) {
+        kind = 'shipping';
+        message = 'La cotización venció o cambiaron los datos del envío. Calculá el envío nuevamente; conservamos tu carrito.';
+        this.shippingQuotes.set([]);
+        this.selectedShippingQuoteId.set('');
       } else if (error.status === 0) {
         kind = 'network';
         message = 'No pudimos conectarnos con el servidor. Conservamos tu carrito; revisá tu conexión y reintentá.';

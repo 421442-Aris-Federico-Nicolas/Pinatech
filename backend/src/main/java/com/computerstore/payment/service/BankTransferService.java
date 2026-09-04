@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.computerstore.shipping.service.ShipmentDispatchService;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -33,12 +36,22 @@ public class BankTransferService {
     private final PrivateDocumentStorage storage;
     private final OrderEmailOutboxService outbox;
     private final Clock clock;
+    private final ShipmentDispatchService shipmentDispatch;
 
     public BankTransferService(CustomerOrderRepository orders, BankTransferProofRepository proofs,
             OrderStockService stock, PrivateDocumentStorage storage,
             OrderEmailOutboxService outbox, Clock clock) {
         this.orders = orders; this.proofs = proofs; this.stock = stock; this.storage = storage;
         this.outbox = outbox; this.clock = clock;
+        this.shipmentDispatch = null;
+    }
+
+    @Autowired
+    public BankTransferService(CustomerOrderRepository orders, BankTransferProofRepository proofs,
+            OrderStockService stock, PrivateDocumentStorage storage, OrderEmailOutboxService outbox, Clock clock,
+            ObjectProvider<ShipmentDispatchService> shipmentDispatch) {
+        this.orders = orders; this.proofs = proofs; this.stock = stock; this.storage = storage;
+        this.outbox = outbox; this.clock = clock; this.shipmentDispatch = shipmentDispatch.getIfAvailable();
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +164,7 @@ public class BankTransferService {
             throw new DuplicateResourceException("This bank reference was already used.");
         }
         outbox.enqueue(order, OrderEmailEventType.PAYMENT_APPROVED);
+        if (shipmentDispatch != null) shipmentDispatch.enqueue(order);
         return BankTransferProofResponse.from(proof);
     }
 

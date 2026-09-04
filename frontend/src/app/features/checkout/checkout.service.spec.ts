@@ -53,4 +53,22 @@ describe('CheckoutService', () => {
     expect(newAttempt.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
     newAttempt.flush({ attemptId: 'a-2', orderId: 42, status: 'PENDING', checkoutUrl: 'https://example.com', expiresAt: '2099-01-01T00:00:00Z' });
   });
+
+  it('posts typed cart lines to the Zipnova quote endpoint', () => {
+    const service = TestBed.inject(CheckoutService);
+    const http = TestBed.inject(HttpTestingController);
+    let carrier = '';
+
+    service.shippingQuotes([{ variantId: 11, quantity: 2 }]).subscribe((response) => carrier = response.options[0].carrier);
+    const request = http.expectOne(`${environment.apiBaseUrl}/shipping/quotes`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ items: [{ variantId: 11, quantity: 2 }] });
+    request.flush({ options: [{
+      shippingQuoteId: '0b47f21d-a03a-4bc6-a59a-a761a31bd68d', carrier: 'Andreani',
+      serviceCode: 'standard', service: 'Estándar', logisticType: 'carrier_pickup', amount: 850,
+      currency: 'ARS', estimatedDeliveryAt: '2099-08-03T20:00:00Z', expiresAt: '2099-08-01T20:10:00Z', tags: [],
+    }] });
+
+    expect(carrier).toBe('Andreani');
+  });
 });

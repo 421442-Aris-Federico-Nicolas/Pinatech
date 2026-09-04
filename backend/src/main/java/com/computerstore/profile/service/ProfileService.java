@@ -59,11 +59,13 @@ public class ProfileService {
 
     @Transactional
     public ProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
-        if (request.firstName() == null && request.lastName() == null && request.phone() == null) {
+        if (request.firstName() == null && request.lastName() == null && request.phone() == null
+                && request.documentNumber() == null) {
             throw new InvalidRequestException("At least one profile field is required.");
         }
         UserAccount user = activeUser(userId);
-        user.updateProfile(trim(request.firstName()), trim(request.lastName()), trimAllowEmpty(request.phone()));
+        user.updateProfile(trim(request.firstName()), trim(request.lastName()), trimAllowEmpty(request.phone()),
+                normalizeDocumentNumber(request.documentNumber()));
         return toResponse(user);
     }
 
@@ -149,7 +151,7 @@ public class ProfileService {
                 .collect(Collectors.toUnmodifiableSet());
         AddressResponse address = addressRepository.findById(user.getId()).map(this::toAddress).orElse(null);
         return new ProfileResponse(user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(),
-                user.getPhone(), user.isEmailVerified(), roles, address);
+                user.getPhone(), user.getDocumentNumber(), user.isEmailVerified(), roles, address);
     }
 
     private AddressResponse toAddress(UserAddress address) {
@@ -164,6 +166,17 @@ public class ProfileService {
 
     private String trimAllowEmpty(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeDocumentNumber(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.replaceAll("[.\\s-]", "");
+        if (!normalized.isEmpty() && !normalized.matches("[0-9]{7,11}")) {
+            throw new InvalidRequestException("Document number format is invalid.");
+        }
+        return normalized;
     }
 
     private String optional(String value) {

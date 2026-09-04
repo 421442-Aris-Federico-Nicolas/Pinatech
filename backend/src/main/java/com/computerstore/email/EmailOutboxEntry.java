@@ -26,7 +26,7 @@ public class EmailOutboxEntry {
     @Column(name = "rejection_reason", length = 1000)
     private String rejectionReason;
     @Column(name = "seller_payload", columnDefinition = "text")
-    private String sellerPayload;
+    private String eventPayload;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EmailOutboxStatus status;
@@ -66,7 +66,7 @@ public class EmailOutboxEntry {
         this.eventType = eventType;
         this.recipient = recipient;
         this.customerName = order.getUser().getFirstName();
-        this.sellerPayload = sellerPayload;
+        this.eventPayload = sellerPayload;
         this.status = EmailOutboxStatus.PENDING;
         this.nextAttemptAt = now;
         this.createdAt = now;
@@ -106,7 +106,8 @@ public class EmailOutboxEntry {
     public String getRecipient() { return recipient; }
     public String getCustomerName() { return customerName; }
     public String getRejectionReason() { return rejectionReason; }
-    public String getSellerPayload() { return sellerPayload; }
+    public String getSellerPayload() { return eventPayload; }
+    public String getEventPayload() { return eventPayload; }
     public EmailOutboxStatus getStatus() { return status; }
     public int getAttemptCount() { return attemptCount; }
     public boolean hasLease(UUID token) { return token != null && token.equals(leaseToken); }

@@ -34,4 +34,19 @@ describe('OrderService', () => {
     expect(request.request.method).toBe('GET');
     request.flush([]);
   });
+
+  it('gets customer shipment tracking and its ordered history', () => {
+    let historyStatus = '';
+    TestBed.inject(OrderService).tracking(42).subscribe((tracking) => historyStatus = tracking.history[0].status);
+
+    const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/shipping/orders/42/tracking`);
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      status: 'ACTIVE', providerStatus: 'in_transit', providerSubstatus: null, carrier: 'Andreani',
+      trackingCode: 'AR123', trackingUrl: 'https://tracking.example/AR123', estimatedDeliveryAt: null,
+      incident: false, history: [{ status: 'in_transit', substatus: null, occurredAt: '2026-08-01T20:00:00Z' }],
+    });
+
+    expect(historyStatus).toBe('in_transit');
+  });
 });

@@ -33,6 +33,8 @@ import com.computerstore.email.OrderEmailEventType;
 import com.computerstore.email.OrderEmailOutboxService;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.user.repository.UserAccountRepository;
+import com.computerstore.shipping.service.ShippingHashes;
+import com.computerstore.shipping.service.ShippingQuoteService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +65,7 @@ public class OrderController {
     private final FulfillmentPolicy fulfillment;
     private final BankTransferProperties bankTransfer;
     private final OrderEmailOutboxService outbox;
+    private final ShippingQuoteService shippingQuotes;
 
     @Autowired
     public OrderController(
@@ -73,7 +76,8 @@ public class OrderController {
             OrderProperties properties,
             FulfillmentPolicy fulfillment,
             ObjectProvider<BankTransferProperties> bankTransfer,
-            ObjectProvider<OrderEmailOutboxService> outbox
+            ObjectProvider<OrderEmailOutboxService> outbox,
+            ObjectProvider<ShippingQuoteService> shippingQuotes
     ) {
         this.orders = orders;
         this.variants = variants;
@@ -84,6 +88,18 @@ public class OrderController {
         this.bankTransfer = bankTransfer.getIfAvailable(() ->
                 new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
         this.outbox = outbox.getIfAvailable();
+        this.shippingQuotes = shippingQuotes.getIfAvailable();
+    }
+
+    public OrderController(CustomerOrderRepository orders, ProductVariantRepository variants,
+            UserAccountRepository users, OrderStockService stock, OrderProperties properties,
+            FulfillmentPolicy fulfillment, ObjectProvider<BankTransferProperties> bankTransfer,
+            ObjectProvider<OrderEmailOutboxService> outbox) {
+        this.orders = orders; this.variants = variants; this.users = users; this.stock = stock;
+        this.properties = properties; this.fulfillment = fulfillment;
+        this.bankTransfer = bankTransfer.getIfAvailable(() ->
+                new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
+        this.outbox = outbox.getIfAvailable(); this.shippingQuotes = null;
     }
 
     public OrderController(CustomerOrderRepository orders, ProductVariantRepository variants,
@@ -97,6 +113,7 @@ public class OrderController {
         this.fulfillment = fulfillment;
         this.bankTransfer = new BankTransferProperties(false, "", "", "", "", "", "ARS", null);
         this.outbox = null;
+        this.shippingQuotes = null;
     }
 
     @PostMapping
@@ -133,8 +150,9 @@ public class OrderController {
             }
         }
 
-        var pickupLocation = fulfillment.select(
-                request.fulfillmentMethod(), request.pickupLocationCode(), request.pickupLocationVersion());
+        var pickupLocation = request.fulfillmentMethod() == com.computerstore.order.domain.FulfillmentMethod.PICKUP
+                ? fulfillment.select(request.fulfillmentMethod(), request.pickupLocationCode(), request.pickupLocationVersion())
+                : null;
         if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
             if (!bankTransfer.available()) {
                 throw new InvalidRequestException("Bank transfer payment is not available.");
@@ -150,6 +168,7 @@ public class OrderController {
                 .toList();
         var variantIds = new HashSet<Long>();
         var items = new ArrayList<OrderItem>();
+        var selectedVariants = new ArrayList<com.computerstore.catalog.domain.ProductVariant>();
         for (var input : sortedInputs) {
             if (!variantIds.add(input.variantId())) {
                 throw new InvalidRequestException("An order cannot contain the same product variant more than once.");
@@ -157,6 +176,14 @@ public class OrderController {
             var variant = variants.findByIdAndActiveTrueAndProduct_ActiveTrue(input.variantId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product variant not found."));
             items.add(new OrderItem(variant, input.quantity()));
+            selectedVariants.add(variant);
+        }
+
+        ShippingQuoteService.ValidatedQuote delivery = null;
+        if (request.fulfillmentMethod() == com.computerstore.order.domain.FulfillmentMethod.DELIVERY) {
+            if (shippingQuotes == null) throw new InvalidRequestException("Delivery shipping is unavailable.");
+            delivery = shippingQuotes.validateForOrder(request.shippingQuoteId(), user,
+                    request.items().stream().map(ShippingHashes::item).toList(), selectedVariants);
         }
 
         BigDecimal subtotal = items.stream().map(OrderItem::getSubtotal).reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -165,6 +192,7 @@ public class OrderController {
         BigDecimal discount = paymentMethod == PaymentMethod.BANK_TRANSFER
                 ? subtotal.multiply(BANK_TRANSFER_DISCOUNT_RATE).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2);
+        BigDecimal shippingCost = delivery == null ? BigDecimal.ZERO.setScale(2) : delivery.quote().getAmount();
         Instant now = Instant.now();
         boolean transfer = paymentMethod == PaymentMethod.BANK_TRANSFER;
         CustomerOrder order = orders.save(new CustomerOrder(
@@ -173,6 +201,7 @@ public class OrderController {
                 subtotal,
                 surcharge,
                 discount,
+                shippingCost,
                 paymentMethod,
                 now.plus(transfer ? bankTransfer.proofTtl() : properties.reservationTtl()),
                 transfer ? now.plus(bankTransfer.proofTtl()) : null,
@@ -180,7 +209,10 @@ public class OrderController {
                 idempotencyKey,
                 requestHash,
                 request.fulfillmentMethod(),
-                pickupLocation));
+                pickupLocation,
+                delivery == null ? null : delivery.quote(),
+                delivery == null ? null : delivery.address()));
+        if (delivery != null) delivery.quote().consume(order);
         stock.reserve(order);
         if (outbox != null) outbox.enqueue(order, OrderEmailEventType.ORDER_CREATED);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponseMapper.toResponse(order));
@@ -231,8 +263,10 @@ public class OrderController {
                 .map(item -> item.variantId() + ":" + item.quantity())
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
-        return request.fulfillmentMethod().name() + "|" + request.pickupLocationCode().trim()
-                + "|" + request.pickupLocationVersion().trim() + "|" + items;
+        String fulfillmentSelection = request.fulfillmentMethod().name() + "|" + safe(request.pickupLocationCode())
+                + "|" + safe(request.pickupLocationVersion());
+        if (request.shippingQuoteId() != null) fulfillmentSelection += "|" + request.shippingQuoteId();
+        return fulfillmentSelection + "|" + items;
     }
 
     private String hash(String canonicalRequest) {
@@ -243,5 +277,8 @@ public class OrderController {
             throw new IllegalStateException("SHA-256 is not available.", exception);
         }
     }
+
+    private String safe(String value) { return value == null ? "" : value.trim(); }
+
 
 }

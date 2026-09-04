@@ -10,18 +10,32 @@ import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.FulfillmentMethod;
 import com.computerstore.order.domain.PickupLocationSnapshot;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.computerstore.shipping.config.ZipnovaProperties;
 
 @Component
 public class FulfillmentPolicy {
 
     private final FulfillmentProperties properties;
+    private final ZipnovaProperties shipping;
 
     public FulfillmentPolicy(FulfillmentProperties properties) {
         this.properties = properties;
+        this.shipping = null;
+    }
+
+    @Autowired
+    public FulfillmentPolicy(FulfillmentProperties properties, ObjectProvider<ZipnovaProperties> shipping) {
+        this.properties = properties;
+        this.shipping = shipping.getIfAvailable();
     }
 
     public List<FulfillmentMethod> availableMethods() {
-        return properties.pickupAvailable() ? List.of(FulfillmentMethod.PICKUP) : List.of();
+        java.util.ArrayList<FulfillmentMethod> methods = new java.util.ArrayList<>();
+        if (properties.pickupAvailable()) methods.add(FulfillmentMethod.PICKUP);
+        if (shipping != null && shipping.available()) methods.add(FulfillmentMethod.DELIVERY);
+        return List.copyOf(methods);
     }
 
     public Optional<PickupLocationSnapshot> activePickupLocation() {
@@ -39,9 +53,7 @@ public class FulfillmentPolicy {
             String pickupLocationCode,
             String pickupLocationVersion
     ) {
-        if (method != FulfillmentMethod.PICKUP) {
-            throw new InvalidRequestException("Only PICKUP fulfillment is currently supported.");
-        }
+        if (method != FulfillmentMethod.PICKUP) throw new InvalidRequestException("Pickup selection is invalid.");
         PickupLocationSnapshot location = activePickupLocation()
                 .orElseThrow(() -> new BusinessRuleException("Pickup fulfillment is currently unavailable."));
         if (pickupLocationCode == null || !location.getCode().equals(pickupLocationCode.trim())) {
@@ -54,6 +66,13 @@ public class FulfillmentPolicy {
     }
 
     public void validatePayment(CustomerOrder order) {
+        if (order.getFulfillmentMethod() == FulfillmentMethod.DELIVERY) {
+            if (shipping == null || !shipping.available() || !"ZIPNOVA".equals(order.getDeliveryMethod()) || order.getDeliveryAddress() == null
+                    || order.getShippingQuote() == null || order.getShippingCost() == null) {
+                throw new BusinessRuleException("The order delivery snapshot is not eligible for payment.");
+            }
+            return;
+        }
         PickupLocationSnapshot active = activePickupLocation()
                 .orElseThrow(() -> new BusinessRuleException("Pickup fulfillment is currently unavailable."));
         PickupLocationSnapshot selected = order.getPickupLocation();

@@ -31,6 +31,8 @@ Keep `BANK_TRANSFER_ENABLED=false` until every `BANK_TRANSFER_*` value has been 
 
 Keep `RESEND_ENABLED=false` until `RESEND_API_KEY`, `RESEND_FROM`, `STOREFRONT_BASE_URL`, `EMAIL_LOGO_URL` and the single `SELLER_NOTIFICATION_EMAIL` recipient are correct and the sender domain is verified. `EMAIL_LOGO_URL` must be a public HTTPS image URL without credentials, query parameters or a fragment; it is independent of the storefront URL and is loaded directly by email clients rather than attached as CID content. Enable pickup only after every `PICKUP_*` public field has been reviewed.
 
+Keep `ZIPNOVA_ENABLED=false` until the production account, origin and credentials are verified. Use an environment-specific `ZIPNOVA_SOURCE`, register `https://api.pinatech.com.ar/api/shipping/webhooks/zipnova/{ZIPNOVA_WEBHOOK_SECRET}` in Zipnova, and never point the callback at the Vercel storefront. Railway edge and application logs must be checked to confirm that the secret-bearing path is not retained before setting both `ZIPNOVA_ENABLED=true` and `ZIPNOVA_PRODUCTION_CONFIRMATION=true`.
+
 ### Attach persistent storage
 
 1. Attach one Railway Volume to the backend service.
@@ -111,7 +113,7 @@ Run these checks after both DNS records have valid TLS certificates:
 3. Product images return `200` from `/api/products/images/{id}/content`.
 4. Registration, login, page reload, token refresh, and logout work from `https://pinatech.com.ar`.
 5. An authenticated image upload remains available after restarting the Railway service.
-6. Flyway reports schema version 24 in Railway logs.
+6. Flyway reports schema version 27 in Railway logs.
 7. No secret appears in Vercel variables, frontend bundles, Git history, or deployment logs.
 8. A Mercado Pago webhook test returns `200` from
    `https://api.pinatech.com.ar/api/payments/webhooks/mercado-pago`.
@@ -124,3 +126,7 @@ Run these checks after both DNS records have valid TLS certificates:
 15. A nonexistent old chunk returns `404` instead of the Angular HTML shell.
 16. An open tab detects a later frontend deployment and keeps the `Actualizar` action visible until the user activates it.
 17. Creating an order and approving Mercado Pago or bank-transfer payment sends the expected seller notifications to `SELLER_NOTIFICATION_EMAIL` with a working admin order link.
+18. A delivery quote returns only persisted Zipnova options and charges the selected `price_incl_tax` without applying the bank-transfer discount to shipping.
+19. Payment approval creates one Zipnova shipment, exposes its tracking and documents, and duplicate worker/webhook execution does not create another shipment or email.
+20. Reconciliation covers delivery, damage and cancellation states; disabling Zipnova with pending work stops provider calls without losing queued records.
+21. Railway request logs, application logs and APM traces do not contain `ZIPNOVA_WEBHOOK_SECRET`; rotate it immediately if any layer retained the callback path.

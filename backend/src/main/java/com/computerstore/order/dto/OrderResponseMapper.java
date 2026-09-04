@@ -19,6 +19,7 @@ public final class OrderResponseMapper {
                 order.getFulfillmentMethod() == null ? null : order.getFulfillmentMethod().name(),
                 order.getPickupLocation() == null ? null : PickupLocationResponse.from(order.getPickupLocation()),
                 order.getSubtotal(),
+                order.getShippingCost(),
                 order.getPaymentSurcharge(),
                 order.getPaymentDiscount(),
                 order.getTotal(),
@@ -36,7 +37,24 @@ public final class OrderResponseMapper {
                                 item.getUnitPrice(),
                                 item.getQuantity(),
                                 item.getSubtotal()))
-                        .toList()
+                        .toList(),
+                delivery(order),
+                shipment(order)
         );
+    }
+
+    private static OrderResponse.DeliveryAddress delivery(CustomerOrder order) {
+        var value = order.getDeliveryAddress();
+        return value == null ? null : new OrderResponse.DeliveryAddress(value.getRecipientName(), value.getStreet(),
+                value.getStreetNumber(), value.getFloorApartment(), value.getLocality(), value.getProvince(),
+                value.getProvinceCode(), value.getPostalCode(), value.getCountryCode(), value.getReference());
+    }
+
+    private static OrderResponse.ShipmentSummary shipment(CustomerOrder order) {
+        var value = order.getShipment();
+        return value == null ? null : new OrderResponse.ShipmentSummary(value.getStatus().name(), value.getRawStatus(),
+                value.getRawSubstatus(), order.getShippingCarrierName(), value.getCarrierTrackingId(),
+                value.getTrackingUrl(), value.getEstimatedDeliveryAt() == null
+                        ? order.getShippingEta() : value.getEstimatedDeliveryAt(), value.isIncident());
     }
 }

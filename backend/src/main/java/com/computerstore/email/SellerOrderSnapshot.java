@@ -1,6 +1,7 @@
 package com.computerstore.email;
 
 import com.computerstore.order.domain.CustomerOrder;
+import com.computerstore.order.domain.DeliveryAddressSnapshot;
 import com.computerstore.order.domain.PickupLocationSnapshot;
 
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ public record SellerOrderSnapshot(
         BigDecimal subtotal,
         BigDecimal discount,
         BigDecimal surcharge,
+        BigDecimal shipping,
         BigDecimal total,
         String customerName,
         String customerEmail,
@@ -25,6 +27,7 @@ public record SellerOrderSnapshot(
         String fulfillmentMethod,
         String fulfillmentStatus,
         String deliveryMethod,
+        Delivery delivery,
         Pickup pickup,
         List<Item> items
 ) {
@@ -46,6 +49,7 @@ public record SellerOrderSnapshot(
                 order.getSubtotal(),
                 order.getPaymentDiscount(),
                 order.getPaymentSurcharge(),
+                order.getShippingCost(),
                 order.getTotal(),
                 customerName,
                 user.getEmail(),
@@ -53,6 +57,7 @@ public record SellerOrderSnapshot(
                 order.getFulfillmentMethod() == null ? null : order.getFulfillmentMethod().name(),
                 order.getFulfillmentStatus().name(),
                 order.getDeliveryMethod(),
+                Delivery.from(order.getDeliveryAddress()),
                 Pickup.from(order.getPickupLocation()),
                 order.getItems().stream().map(item -> new Item(
                         item.getProductName(),
@@ -61,6 +66,24 @@ public record SellerOrderSnapshot(
                         item.getQuantity(),
                         item.getUnitPrice(),
                         item.getSubtotal())).toList());
+    }
+
+    public record Delivery(
+            String recipientName,
+            String street,
+            String streetNumber,
+            String floorApartment,
+            String locality,
+            String province,
+            String postalCode,
+            String reference
+    ) {
+        static Delivery from(DeliveryAddressSnapshot delivery) {
+            if (delivery == null) return null;
+            return new Delivery(delivery.getRecipientName(), delivery.getStreet(), delivery.getStreetNumber(),
+                    delivery.getFloorApartment(), delivery.getLocality(), delivery.getProvince(),
+                    delivery.getPostalCode(), delivery.getReference());
+        }
     }
 
     public record Pickup(

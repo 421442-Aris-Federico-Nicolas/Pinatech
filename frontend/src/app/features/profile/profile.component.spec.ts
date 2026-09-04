@@ -16,6 +16,7 @@ describe('ProfileComponent', () => {
     lastName: 'Lovelace',
     email: 'ada@example.com',
     phone: null,
+    documentNumber: null,
     emailVerified: false,
     roles: ['CUSTOMER'],
     address: null,
@@ -27,7 +28,7 @@ describe('ProfileComponent', () => {
     const replaceUser = vi.fn((value: AuthenticatedUser) => user.set(value));
     const profiles = {
       get: vi.fn(() => of(profile)),
-      update: vi.fn(() => of({ ...profile, firstName: 'Augusta' })),
+      update: vi.fn(() => of({ ...profile, firstName: 'Augusta', documentNumber: '2012345678' })),
       putAddress: vi.fn(), deleteAddress: vi.fn(), requestEmailChange: vi.fn(),
     };
     await TestBed.configureTestingModule({
@@ -43,13 +44,27 @@ describe('ProfileComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Ada Lovelace');
     expect(fixture.nativeElement.textContent).toContain('Verificación pendiente');
-    expect(fixture.nativeElement.querySelectorAll('#personal-form app-input').length).toBe(3);
+    expect(fixture.nativeElement.querySelectorAll('#personal-form app-input').length).toBe(4);
+    expect(fixture.nativeElement.textContent).toContain('DNI o CUIT de 7 a 11 dígitos');
     expect(fixture.nativeElement.querySelector('#address-form')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('#address-form app-select option').length).toBe(25);
+    expect(fixture.nativeElement.textContent).toContain('código oficial de una letra');
     expect(fixture.nativeElement.textContent).toContain('Ver mis pedidos');
 
-    fixture.componentInstance.personalForm.setValue({ firstName: 'Augusta', lastName: 'Lovelace', phone: '+54 11 1234-5678' });
+    const documentNumber = fixture.componentInstance.personalForm.controls.documentNumber;
+    documentNumber.setValue('1.234-56');
+    expect(documentNumber.hasError('pattern')).toBe(true);
+    documentNumber.setValue('12.345.678.901-2');
+    expect(documentNumber.hasError('pattern')).toBe(true);
+    documentNumber.setValue('20/12345678');
+    expect(documentNumber.hasError('pattern')).toBe(true);
+    documentNumber.setValue('20 123.456-78');
+    expect(documentNumber.valid).toBe(true);
+
+    fixture.componentInstance.personalForm.setValue({ firstName: 'Augusta', lastName: 'Lovelace', phone: '+54 11 1234-5678', documentNumber: '20 123.456-78' });
     fixture.componentInstance.savePersonal();
-    expect(profiles.update).toHaveBeenCalledWith({ firstName: 'Augusta', lastName: 'Lovelace', phone: '+54 11 1234-5678' });
+    expect(profiles.update).toHaveBeenCalledWith({ firstName: 'Augusta', lastName: 'Lovelace', phone: '+54 11 1234-5678', documentNumber: '20 123.456-78' });
+    expect(documentNumber.value).toBe('2012345678');
     expect(replaceUser).toHaveBeenLastCalledWith({
       id: 7, firstName: 'Augusta', lastName: 'Lovelace', email: 'ada@example.com', phone: null,
       emailVerified: false, roles: ['CUSTOMER'],
@@ -69,6 +84,12 @@ describe('ProfileComponent', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(ProfileComponent);
     fixture.detectChanges();
+    const provinceCode = fixture.componentInstance.addressForm.controls.provinceCode;
+    provinceCode.setValue('CABA');
+    expect(provinceCode.valid).toBe(true);
+    provinceCode.setValue('ABCDE');
+    expect(provinceCode.hasError('pattern')).toBe(true);
+    provinceCode.setValue('');
     fixture.componentInstance.saveAddress();
     fixture.detectChanges();
     await fixture.whenStable();

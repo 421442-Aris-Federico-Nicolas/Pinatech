@@ -16,4 +16,7 @@ public interface TransactionalEmailService {
 
     void sendSellerOrderEvent(UUID idempotencyKey, String recipient, OrderEmailEventType eventType,
                               SellerOrderSnapshot snapshot);
+
+    void sendShipmentTracking(UUID idempotencyKey, String recipient, String customerName, Long orderId,
+                              ShipmentTrackingSnapshot snapshot);
 }

@@ -108,7 +108,7 @@ class CatalogAdminControllerTest {
     @Test
     void rejectsImageReferencesWhenCreatingAProduct() {
         CreateProductRequest request = new CreateProductRequest("Mouse", "mouse", "Mouse gamer",
-                BigDecimal.TEN, 1L, 1L, List.of(),
+                BigDecimal.TEN, 1L, 1L, 500, 10, 20, 30, 1, false, List.of(),
                 List.of(new ProductVariantRequest(null, "Black", "#000000", 9L)));
 
         assertThrows(InvalidRequestException.class, () -> controller.createProduct(request));
@@ -175,6 +175,6 @@ class CatalogAdminControllerTest {
 
     private UpdateProductRequest updateRequest(ProductVariantRequest variant) {
         return new UpdateProductRequest("Mouse", "mouse", "Mouse gamer", BigDecimal.TEN,
-                1L, 1L, List.of(), List.of(variant));
+                1L, 1L, 500, 10, 20, 30, 1, false, List.of(), List.of(variant));
     }
 }

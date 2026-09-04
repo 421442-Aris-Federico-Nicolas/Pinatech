@@ -19,6 +19,7 @@ describe('OrdersComponent', () => {
     fulfillmentMethod: 'PICKUP',
     pickupLocation,
     subtotal: 3000,
+    shippingCost: 0,
     paymentDiscount: 0,
     paymentSurcharge: 300,
     total: 3300,
@@ -27,6 +28,8 @@ describe('OrdersComponent', () => {
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
     items: [{ productId: 1, variantId: 11, productName: 'Teclado', colorName: 'Negro', colorHex: '#000000', unitPrice: 1500, quantity: 2, subtotal: 3000 }],
+    deliveryAddress: null,
+    shipment: null,
   };
 
   it('renders Spanish statuses and the expiration for pending payment', async () => {
@@ -201,6 +204,7 @@ describe('OrdersComponent', () => {
 
     expect(fixture.nativeElement.textContent).toContain('PINATECH.PAGOS');
     expect(fixture.nativeElement.textContent).not.toContain('Continuar pago');
+    expect(fixture.componentInstance.canUploadProof(transfer, { ...details, paymentDueAt: '2000-01-01T00:00:00Z' })).toBe(false);
 
     const invalid = new File(['x'], 'proof.txt', { type: 'text/plain' });
     fixture.componentInstance.selectProof(42, { target: { files: [invalid], value: 'proof.txt' } } as unknown as Event);
@@ -227,5 +231,39 @@ describe('OrdersComponent', () => {
       paymentStatus: 'REJECTED',
       fulfillmentStatus: 'CANCELLED',
     });
+  });
+
+  it('renders a delivery address, customer tracking timeline, incident and safe carrier link', async () => {
+    const delivery: Order = {
+      ...order, fulfillmentMethod: 'DELIVERY', pickupLocation: null, shippingCost: 850, total: 3850,
+      deliveryAddress: { recipientName: 'Ada Lovelace', street: 'San Martín', streetNumber: '123', floorApartment: '2 B', locality: 'Córdoba', province: 'Córdoba', provinceCode: 'X', postalCode: '5000', countryCode: 'AR', reference: 'Portón negro' },
+      shipment: { status: 'ACTIVE', providerStatus: 'in_transit', providerSubstatus: null, carrier: 'Andreani', trackingCode: 'AR123', trackingUrl: 'https://tracking.example/AR123', estimatedDeliveryAt: '2099-08-03T20:00:00Z', incident: true },
+    };
+    const tracking = vi.fn(() => of({
+      ...delivery.shipment!,
+      history: [{ status: 'ready_to_ship', substatus: null, occurredAt: '2026-08-01T10:00:00Z' }, { status: 'in_transit', substatus: 'sorting_center', occurredAt: '2026-08-02T10:00:00Z' }],
+    }));
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([delivery]), tracking } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+
+    expect(tracking).toHaveBeenCalledWith(42);
+    expect(fixture.nativeElement.textContent).toContain('San Martín 123, 2 B');
+    expect(fixture.nativeElement.textContent).toContain('registra una incidencia');
+    expect(fixture.nativeElement.textContent).toContain('Listo para despachar');
+    expect(fixture.nativeElement.textContent).toContain('En tránsito');
+    const link = fixture.nativeElement.querySelector('.tracking-link') as HTMLAnchorElement;
+    expect(link.href).toBe('https://tracking.example/AR123');
+    expect(link.rel).toBe('noopener noreferrer');
+    expect(fixture.componentInstance.safeTrackingUrl('javascript:alert(1)')).toBeNull();
   });
 });

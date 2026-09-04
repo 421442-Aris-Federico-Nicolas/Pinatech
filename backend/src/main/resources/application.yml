@@ -18,6 +18,10 @@ spring:
   flyway:
     locations: classpath:db/migration
     baseline-on-migrate: false
+  task:
+    scheduling:
+      pool:
+        size: 8
 
 server:
   port: ${PORT:${SERVER_PORT:8080}}
@@ -88,6 +92,21 @@ app:
       postal-code: ${PICKUP_POSTAL_CODE:}
       instructions: ${PICKUP_INSTRUCTIONS:}
       hours: ${PICKUP_HOURS:}
+  shipping:
+    zipnova:
+      enabled: ${ZIPNOVA_ENABLED:false}
+      production-confirmation: ${ZIPNOVA_PRODUCTION_CONFIRMATION:false}
+      token: ${ZIPNOVA_TOKEN:}
+      secret: ${ZIPNOVA_SECRET:}
+      account-id: ${ZIPNOVA_ACCOUNT_ID:}
+      origin-id: ${ZIPNOVA_ORIGIN_ID:}
+      source: ${ZIPNOVA_SOURCE:pinatech-local}
+      packaging-mode: ${ZIPNOVA_PACKAGING_MODE:dynamic}
+      quote-ttl: ${ZIPNOVA_QUOTE_TTL:PT15M}
+      connect-timeout: ${ZIPNOVA_CONNECT_TIMEOUT:PT3S}
+      read-timeout: ${ZIPNOVA_READ_TIMEOUT:PT15S}
+      webhook-secret: ${ZIPNOVA_WEBHOOK_SECRET:}
+      reconciliation-interval: ${ZIPNOVA_RECONCILIATION_INTERVAL:PT10M}
   payments:
     bank-transfer:
       enabled: ${BANK_TRANSFER_ENABLED:false}

@@ -19,7 +19,7 @@
   <main [attr.aria-busy]="loading()">
     <header class="page-heading">
       <div><p class="eyebrow">Operación interna</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
-      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock()" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
+      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock() || shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
     </header>
 
     @if (error()) { <app-feedback class="page-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
@@ -90,7 +90,7 @@
         } @empty { <p class="empty-row">No hay comprobantes pendientes de revisión.</p> }
       </section>
       <section class="sales-toolbar">
-        <div class="filter-tabs" aria-label="Filtrar pedidos">@for(filter of [['ALL','Todos'],['PENDING_PAYMENT','Pendientes'],['PAID','Pagados'],['PREPARING','Preparando'],['READY','Listos'],['DELIVERED','Entregados'],['CANCELLED','Cancelados']];track filter[0]){<button type="button" [class.active]="orderFilter() === filter[0]" [attr.aria-pressed]="orderFilter() === filter[0]" (click)="filterOrders(filter[0])">{{ filter[1] }} <span>{{ filter[0] === 'ALL' ? orders().length : statusCount(filter[0]) }}</span></button>}</div>
+        <div class="filter-tabs" aria-label="Filtrar pedidos">@for(filter of [['ALL','Todos'],['PENDING_PAYMENT','Pendientes'],['PAID','Pagados'],['PREPARING','Preparando'],['READY','Listos'],['SHIPPED','Enviados'],['DELIVERED','Entregados'],['CANCELLED','Cancelados']];track filter[0]){<button type="button" [class.active]="orderFilter() === filter[0]" [attr.aria-pressed]="orderFilter() === filter[0]" (click)="filterOrders(filter[0])">{{ filter[1] }} <span>{{ filter[0] === 'ALL' ? orders().length : statusCount(filter[0]) }}</span></button>}</div>
       </section>
       <section class="orders-list">
         @for(order of filteredOrders(); track order.id){
@@ -106,8 +106,39 @@
             </button>
             @if(expandedOrder() === order.id){
               <div class="order-detail" [id]="'order-detail-' + order.id" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
-                <div class="order-items"><h3>Detalle del pedido</h3>@for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}</div>
-                <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
+                <div class="order-items">
+                  <h3>Detalle del pedido</h3>
+                  @for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}
+                  @if (order.fulfillmentMethod === 'DELIVERY') {
+                    <section class="delivery-detail" aria-label="Datos de entrega">
+                      <h3>Entrega a domicilio</h3>
+                      @if (order.deliveryAddress; as address) {
+                        <address><strong>{{ address.recipientName }}</strong><span>{{ address.street }} {{ address.streetNumber }}@if(address.floorApartment){, {{ address.floorApartment }}}</span><span>{{ address.locality }}, {{ address.province }} ({{ address.postalCode }})</span>@if(address.reference){<small>Referencia: {{ address.reference }}</small>}</address>
+                      } @else { <p class="shipment-empty">No hay una dirección de entrega disponible.</p> }
+                      <p class="delivery-provider"><span>Método</span><strong>{{ order.shipment?.carrier || order.deliveryMethod || 'Zipnova' }}</strong></p>
+                    </section>
+                    @if (order.shipment; as shipment) {
+                      <section class="shipment-detail" [class.incident]="shipment.incident" [attr.aria-busy]="shipmentUpdating() === order.id || shipmentDocumentLoading()?.startsWith(order.id + '-')">
+                        <div class="shipment-heading"><h3>Envío Zipnova</h3><i class="status-badge" [appBadge]="shipment.incident ? 'danger' : 'info'">{{ shipmentStatusLabel(shipment.status) }}</i></div>
+                        <dl>
+                          <div><dt>Estado del operador</dt><dd>{{ shipment.providerStatus || 'Sin informar' }}@if(shipment.providerSubstatus){ · {{ shipment.providerSubstatus }}}</dd></div>
+                          @if(shipment.carrier){<div><dt>Transportista</dt><dd>{{ shipment.carrier }}</dd></div>}
+                          @if(shipment.trackingCode){<div><dt>Seguimiento</dt><dd>{{ shipment.trackingCode }}</dd></div>}
+                          @if(shipment.estimatedDeliveryAt){<div><dt>Entrega estimada</dt><dd>{{ shipment.estimatedDeliveryAt | date:'dd/MM/yyyy' }}</dd></div>}
+                        </dl>
+                        @if(shipment.trackingUrl){<a [href]="shipment.trackingUrl" target="_blank" rel="noopener noreferrer">Abrir seguimiento del transportista</a>}
+                        @if(canDownloadShipmentDocuments(order) || canRetryShipment(order) || canCancelShipment(order)) {
+                          <div class="shipment-actions" aria-label="Acciones del envío">
+                            @if(canDownloadShipmentDocuments(order)){<button appButton="outlined" type="button" [disabled]="shipmentDocumentLoading() !== null || shipmentUpdating() !== null" (click)="downloadShipmentPdf(order, 'label')">{{ shipmentDocumentLoading() === order.id + '-label' ? 'Descargando…' : 'Etiqueta PDF' }}</button><button appButton="outlined" type="button" [disabled]="shipmentDocumentLoading() !== null || shipmentUpdating() !== null" (click)="downloadShipmentPdf(order, 'document')">{{ shipmentDocumentLoading() === order.id + '-document' ? 'Descargando…' : 'Documento PDF' }}</button>}
+                            @if(canRetryShipment(order)){<button appButton="outlined" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="retryShipment(order)">{{ shipmentUpdating() === order.id ? 'Solicitando…' : 'Reintentar envío' }}</button>}
+                            @if(canCancelShipment(order)){<button appButton="outlined" tone="danger" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="cancelShipment(order)">{{ shipmentUpdating() === order.id ? 'Cancelando…' : 'Cancelar envío' }}</button>}
+                          </div>
+                        }
+                      </section>
+                    } @else { <p class="shipment-empty">Zipnova todavía no generó un envío para este pedido.</p> }
+                  }
+                </div>
+                <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.fulfillmentMethod === 'DELIVERY'){<p><span>Envío</span><strong>{{ (order.shippingCost ?? 0) | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus, order.fulfillmentMethod);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
               </div>
             }
           </article>
@@ -125,6 +156,17 @@
           <header><div><p class="panel-kicker">{{ selected() ? 'Producto #' + selected()!.id : 'Alta de producto' }}</p><h2>{{ selected() ? 'Editar producto' : 'Nuevo producto' }}</h2></div>@if(selected()){<button class="text-danger" appButton="text" tone="danger" type="button" [disabled]="saving() || deactivatingProduct()" (click)="deleteProduct()">{{ deactivatingProduct() ? 'Dando de baja…' : 'Dar de baja' }}</button>}</header>
           <fieldset class="product-editor-fields" [disabled]="saving()">
             <div class="product-form"><app-input label="Nombre" [(ngModel)]="form.name" (ngModelChange)="updateSlug()" name="productName" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse Pinatech Pro…" required /><app-input label="Slug" [(ngModel)]="form.slug" name="productSlug" autocomplete="off" spellcheck="false" placeholder="Ej. mouse-pinatech-pro…" required /><app-input label="Precio de lista / Mercado Pago" type="number" [min]="0.01" step="0.01" [(ngModel)]="form.price" name="productPrice" inputMode="decimal" required /><app-select label="Categoría" [options]="categoryOptions()" [(ngModel)]="form.categoryId" name="productCategory" [disabled]="saving()" required /><app-select label="Marca" [options]="brandOptions()" [(ngModel)]="form.brandId" name="productBrand" [disabled]="saving()" required /><app-textarea class="wide" label="Descripción" [rows]="5" [(ngModel)]="form.description" name="productDescription" autocomplete="off" spellcheck="true" placeholder="Ej. Mouse inalámbrico para uso profesional…" required /></div>
+            <section class="shipping-editor" aria-labelledby="shipping-editor-title">
+              <div class="section-label"><div><h3 id="shipping-editor-title">Datos para el envío</h3><p>Medidas del paquete por unidad. Zipnova usa estos datos para cotizar y despachar.</p></div></div>
+              <div class="shipping-form">
+                <app-input label="Peso (g)" type="number" [min]="10" [max]="10000000" step="1" [(ngModel)]="form.shippingWeightGrams" name="shippingWeightGrams" inputMode="numeric" hint="Entre 10 y 10.000.000 g" required />
+                <app-input label="Alto (cm)" type="number" [min]="1" [max]="5000" step="1" [(ngModel)]="form.shippingHeightCm" name="shippingHeightCm" inputMode="numeric" hint="Entre 1 y 5.000 cm" required />
+                <app-input label="Ancho (cm)" type="number" [min]="1" [max]="5000" step="1" [(ngModel)]="form.shippingWidthCm" name="shippingWidthCm" inputMode="numeric" hint="Entre 1 y 5.000 cm" required />
+                <app-input label="Largo (cm)" type="number" [min]="1" [max]="5000" step="1" [(ngModel)]="form.shippingLengthCm" name="shippingLengthCm" inputMode="numeric" hint="Entre 1 y 5.000 cm" required />
+                <app-input label="Clasificación Zipnova" type="number" [min]="1" [max]="8" step="1" [(ngModel)]="form.shippingClassificationId" name="shippingClassificationId" inputMode="numeric" hint="Código entre 1 y 8" required />
+                <label class="vertical-option"><input type="checkbox" [(ngModel)]="form.mustKeepVertical" name="mustKeepVertical"><span><strong>Mantener vertical</strong><small>Indica al operador que no debe inclinar el paquete.</small></span></label>
+              </div>
+            </section>
           <section class="variants-editor">
              <div class="section-label"><div><h3>Colores y variantes</h3><p>Cada color tendrá su propio stock. Podés asociarlo a una imagen ya guardada del producto.</p></div><button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button></div>
             @for (variant of form.variants; track variant.id ?? $index; let index = $index) {

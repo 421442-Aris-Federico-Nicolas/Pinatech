@@ -15,6 +15,7 @@ public record OrderResponse(
         String fulfillmentMethod,
         PickupLocationResponse pickupLocation,
         BigDecimal subtotal,
+        BigDecimal shippingCost,
         BigDecimal paymentSurcharge,
         BigDecimal paymentDiscount,
         BigDecimal total,
@@ -22,8 +23,16 @@ public record OrderResponse(
         Instant reservationExpiresAt,
         String customerName,
         String customerEmail,
-        List<Item> items
+        List<Item> items,
+        DeliveryAddress deliveryAddress,
+        ShipmentSummary shipment
 ) {
+    public record DeliveryAddress(String recipientName, String street, String streetNumber, String floorApartment,
+                                  String locality, String province, String provinceCode, String postalCode,
+                                  String countryCode, String reference) {}
+    public record ShipmentSummary(String status, String providerStatus, String providerSubstatus, String carrier,
+                                  String trackingCode, String trackingUrl, Instant estimatedDeliveryAt,
+                                  boolean incident) {}
     public record Item(
             Long productId,
             Long variantId,

@@ -55,6 +55,17 @@ public class OrderEmailOutboxService {
                 order, sellerEvent, sellerRecipient, serialize(SellerOrderSnapshot.from(order, now)), now)));
     }
 
+    public void enqueueOnce(CustomerOrder order, OrderEmailEventType event) {
+        if (!entries.existsByOrderIdAndEventType(order.getId(), event)) enqueue(order, event);
+    }
+
+    public void enqueueTracking(CustomerOrder order, ShipmentTrackingSnapshot snapshot) {
+        if (entries.existsByOrderIdAndEventType(order.getId(), OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE)) return;
+        Instant now = Instant.now(clock);
+        entries.save(new EmailOutboxEntry(order, OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE,
+                order.getUser().getEmail(), serializeTracking(snapshot), now));
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<Instruction> claim() {
         Instant now = Instant.now(clock);
@@ -67,7 +78,11 @@ public class OrderEmailOutboxService {
 
     public void deliver(Instruction instruction) {
         try {
-            if (isSellerEvent(instruction.eventType())) {
+            if (instruction.eventType() == OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE) {
+                if (instruction.sellerPayload() == null) throw new IllegalStateException("Shipment email snapshot is missing.");
+                email.sendShipmentTracking(instruction.id(), instruction.recipient(), instruction.customerName(),
+                        instruction.orderId(), deserializeTracking(instruction.sellerPayload()));
+            } else if (isSellerEvent(instruction.eventType())) {
                 if (instruction.sellerPayload() == null) {
                     throw new IllegalStateException("Seller order email snapshot is missing.");
                 }
@@ -114,6 +129,16 @@ public class OrderEmailOutboxService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Seller order email snapshot could not be decoded.", exception);
         }
+    }
+
+    private String serializeTracking(ShipmentTrackingSnapshot snapshot) {
+        try { return objectMapper.writeValueAsString(snapshot); }
+        catch (JsonProcessingException exception) { throw new IllegalStateException("Shipment email snapshot could not be encoded.", exception); }
+    }
+
+    private ShipmentTrackingSnapshot deserializeTracking(String payload) {
+        try { return objectMapper.readValue(payload, ShipmentTrackingSnapshot.class); }
+        catch (JsonProcessingException exception) { throw new IllegalStateException("Shipment email snapshot could not be decoded.", exception); }
     }
 
     public record Instruction(UUID id, UUID leaseToken, OrderEmailEventType eventType, Long orderId, String recipient,

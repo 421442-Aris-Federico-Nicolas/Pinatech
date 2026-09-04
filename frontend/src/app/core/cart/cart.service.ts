@@ -4,7 +4,7 @@ import { catchError, forkJoin, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Product, ProductVariant } from '../../features/catalog/catalog.service';
 import { AuthService } from '../auth/auth.service';
-import { PaymentMethod, PickupLocation } from '../orders/order.service';
+import { DeliveryAddress, FulfillmentMethod, PaymentMethod, PickupLocation, ShipmentSummary } from '../orders/order.service';
 import { roundMoney } from '../payments/payment-pricing';
 
 export interface CartItem { product: Product; variant: ProductVariant; quantity: number; }
@@ -17,15 +17,23 @@ export interface OrderConfirmation {
   currency: string;
   paymentMethod: PaymentMethod;
   deliveryMethod: string | null;
-  fulfillmentMethod: string | null;
+  fulfillmentMethod: FulfillmentMethod | null;
   pickupLocation: PickupLocation | null;
   subtotal: number;
+  shippingCost: number;
   paymentDiscount: number;
   paymentSurcharge: number;
   total: number;
   createdAt: string;
   reservationExpiresAt: string | null;
+  deliveryAddress: DeliveryAddress | null;
+  shipment: ShipmentSummary | null;
 }
+
+
+export type CheckoutFulfillment =
+  | { fulfillmentMethod: 'PICKUP'; pickupLocationCode: string; pickupLocationVersion: string; shippingQuoteId: null }
+  | { fulfillmentMethod: 'DELIVERY'; pickupLocationCode: null; pickupLocationVersion: null; shippingQuoteId: string };
 
 const GUEST_CART_KEY = 'pinatech-cart-guest';
 const MAX_QUANTITY = 99;
@@ -149,18 +157,16 @@ export class CartService {
     );
   }
 
-  checkout(paymentMethod: PaymentMethod, fulfillmentMethod: string, pickupLocationCode: string, pickupLocationVersion: string) {
+  checkout(paymentMethod: PaymentMethod, fulfillment: CheckoutFulfillment) {
     const items = this.itemsState().map((item) => ({ variantId: item.variant.id, quantity: item.quantity }));
-    const requestHash = `${paymentMethod}|${fulfillmentMethod}|${pickupLocationCode}|${pickupLocationVersion}|${[...items]
+    const requestHash = `${paymentMethod}|${fulfillment.fulfillmentMethod}|${fulfillment.pickupLocationCode ?? ''}|${fulfillment.pickupLocationVersion ?? ''}|${fulfillment.shippingQuoteId ?? ''}|${[...items]
       .sort((left, right) => left.variantId - right.variantId || left.quantity - right.quantity)
       .map((item) => `${item.variantId}:${item.quantity}`).join(',')}`;
     const idempotencyKey = this.checkoutAttempt(requestHash);
     return this.http.post<OrderConfirmation>(`${environment.apiBaseUrl}/orders`, {
       items,
       paymentMethod,
-      fulfillmentMethod,
-      pickupLocationCode,
-      pickupLocationVersion,
+      ...fulfillment,
     }, { headers: { 'Idempotency-Key': idempotencyKey } });
   }
 
@@ -292,6 +298,7 @@ export class CartService {
 
       return typeof value['id'] === 'number' && Number.isFinite(value['id'])
         && typeof value['subtotal'] === 'number' && Number.isFinite(value['subtotal'])
+        && (value['shippingCost'] === undefined || typeof value['shippingCost'] === 'number' && Number.isFinite(value['shippingCost']))
         && (value['paymentDiscount'] === undefined || typeof value['paymentDiscount'] === 'number' && Number.isFinite(value['paymentDiscount']))
         && (value['paymentSurcharge'] === undefined || typeof value['paymentSurcharge'] === 'number' && Number.isFinite(value['paymentSurcharge']))
         && typeof value['total'] === 'number' && Number.isFinite(value['total'])
@@ -302,8 +309,10 @@ export class CartService {
         && typeof value['currency'] === 'string'
         && (value['paymentMethod'] === 'BANK_TRANSFER' || value['paymentMethod'] === 'MERCADO_PAGO')
         && (typeof value['deliveryMethod'] === 'string' || value['deliveryMethod'] === null)
-        && (typeof value['fulfillmentMethod'] === 'string' || value['fulfillmentMethod'] == null)
+        && (value['fulfillmentMethod'] === 'PICKUP' || value['fulfillmentMethod'] === 'DELIVERY' || value['fulfillmentMethod'] == null)
         && (value['pickupLocation'] == null || this.isPickupLocation(value['pickupLocation']))
+        && (value['deliveryAddress'] == null || this.isDeliveryAddress(value['deliveryAddress']))
+        && (value['shipment'] == null || this.isShipmentSummary(value['shipment']))
         ? {
           id: value['id'],
           status: value['status'],
@@ -312,14 +321,17 @@ export class CartService {
           currency: value['currency'],
           paymentMethod: value['paymentMethod'],
           deliveryMethod: value['deliveryMethod'] as string | null,
-          fulfillmentMethod: typeof value['fulfillmentMethod'] === 'string' ? value['fulfillmentMethod'] : null,
+          fulfillmentMethod: value['fulfillmentMethod'] === 'PICKUP' || value['fulfillmentMethod'] === 'DELIVERY' ? value['fulfillmentMethod'] : null,
           pickupLocation: this.isPickupLocation(value['pickupLocation']) ? value['pickupLocation'] : null,
           subtotal: value['subtotal'],
+          shippingCost: typeof value['shippingCost'] === 'number' ? value['shippingCost'] : 0,
           paymentDiscount: typeof value['paymentDiscount'] === 'number' ? value['paymentDiscount'] : 0,
           paymentSurcharge: typeof value['paymentSurcharge'] === 'number' ? value['paymentSurcharge'] : 0,
           total: value['total'],
           createdAt: value['createdAt'],
           reservationExpiresAt: value['reservationExpiresAt'] as string | null,
+          deliveryAddress: this.isDeliveryAddress(value['deliveryAddress']) ? value['deliveryAddress'] : null,
+          shipment: this.isShipmentSummary(value['shipment']) ? value['shipment'] : null,
         }
         : null;
     } catch {
@@ -359,6 +371,24 @@ export class CartService {
       && typeof location['postalCode'] === 'string'
       && typeof location['instructions'] === 'string'
       && typeof location['hours'] === 'string';
+  }
+
+  private isDeliveryAddress(value: unknown): value is DeliveryAddress {
+    if (!value || typeof value !== 'object') return false;
+    const address = value as Record<string, unknown>;
+    return ['recipientName', 'street', 'streetNumber', 'locality', 'province', 'provinceCode', 'postalCode', 'countryCode']
+      .every((field) => typeof address[field] === 'string')
+      && (address['floorApartment'] === null || typeof address['floorApartment'] === 'string')
+      && (address['reference'] === null || typeof address['reference'] === 'string');
+  }
+
+  private isShipmentSummary(value: unknown): value is ShipmentSummary {
+    if (!value || typeof value !== 'object') return false;
+    const shipment = value as Record<string, unknown>;
+    return typeof shipment['status'] === 'string'
+      && ['providerStatus', 'providerSubstatus', 'carrier', 'trackingCode', 'trackingUrl', 'estimatedDeliveryAt']
+        .every((field) => shipment[field] === null || typeof shipment[field] === 'string')
+      && typeof shipment['incident'] === 'boolean';
   }
 
   private isLegacyCartItem(value: unknown): boolean {

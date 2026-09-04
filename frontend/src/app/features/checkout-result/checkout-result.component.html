@@ -47,8 +47,19 @@
         <div><dt>Precio de lista</dt><dd>{{ currentOrder.subtotal | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
         @if (currentOrder.paymentDiscount > 0) { <div><dt>Descuento por transferencia</dt><dd>− {{ currentOrder.paymentDiscount | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
         @if (currentOrder.paymentSurcharge > 0) { <div><dt>Ajuste histórico de pago</dt><dd>{{ currentOrder.paymentSurcharge | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
+        @if (currentOrder.shippingCost > 0) { <div><dt>Envío</dt><dd>{{ currentOrder.shippingCost | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
         <div><dt>Total</dt><dd>{{ currentOrder.total | currency:currentOrder.currency:'symbol-narrow':'1.2-2' }}</dd></div>
       </dl>
+      <section class="fulfillment-summary" aria-labelledby="fulfillment-summary-title">
+        <p class="summary-kicker">Entrega</p>
+        <h2 id="fulfillment-summary-title">{{ methodLabel(currentOrder.fulfillmentMethod) }}</h2>
+        @if (currentOrder.deliveryAddress; as address) {
+          <address><strong>{{ address.recipientName }}</strong><span>{{ address.street }} {{ address.streetNumber }}@if (address.floorApartment) {, {{ address.floorApartment }}}</span><span>{{ address.locality }}, {{ address.province }} · CP {{ address.postalCode }}</span></address>
+          @if (currentOrder.shipment?.estimatedDeliveryAt; as estimate) { <p>Entrega estimada: <strong>{{ estimate | date:'mediumDate' }}</strong></p> }
+        } @else if (currentOrder.pickupLocation; as pickup) {
+          <address><strong>{{ pickup.name }}</strong>@for (line of pickup.addressLines; track $index) { <span>{{ line }}</span> }<span>{{ pickup.locality }} · CP {{ pickup.postalCode }}</span></address>
+        }
+      </section>
     } @else {
       <div class="state pending" role="status">
         <span class="loader" aria-hidden="true"></span>

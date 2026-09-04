@@ -1,4 +1,4 @@
-export type EstadoDominio = 'pedido' | 'pago' | 'entrega' | 'ticket' | 'prioridad-ticket' | 'metodo' | 'resultado-pago';
+export type EstadoDominio = 'pedido' | 'pago' | 'entrega' | 'envio' | 'ticket' | 'prioridad-ticket' | 'metodo' | 'resultado-pago';
 export type EstadoTono = 'neutral' | 'info' | 'accent' | 'success' | 'warning' | 'danger';
 
 const LABELS: Record<EstadoDominio, Readonly<Record<string, string>>> = {
@@ -17,6 +17,13 @@ const LABELS: Record<EstadoDominio, Readonly<Record<string, string>>> = {
     PENDING: 'Preparación pendiente', UNFULFILLED: 'Sin preparar', RESERVED: 'Stock reservado',
     PREPARING: 'En preparación', READY: 'Listo para entregar', SHIPPED: 'Enviado',
     DELIVERED: 'Entregado', CANCELLED: 'Entrega cancelada',
+  },
+  envio: {
+    PENDING_CREATE: 'Preparando el envío', CREATING: 'Generando el envío', ACTIVE: 'En tránsito',
+    RETRY: 'Reintentando la generación', BLOCKED_PAYMENT: 'Pendiente de pago', INCIDENT: 'Envío con incidencia',
+    FAILED: 'No se pudo generar', DELIVERED: 'Entregado', CANCELLED: 'Envío cancelado',
+    new: 'Envío creado', ready_to_ship: 'Listo para despachar', shipped: 'Despachado',
+    in_transit: 'En tránsito', delivered: 'Entregado', cancelled: 'Cancelado',
   },
   ticket: {
     RECEIVED: 'Recibido', UNDER_DIAGNOSIS: 'En diagnóstico', WAITING_FOR_APPROVAL: 'Esperando aprobación',
@@ -46,6 +53,10 @@ const TONES: Partial<Record<EstadoDominio, Readonly<Record<string, EstadoTono>>>
   entrega: {
     PENDING: 'neutral', UNFULFILLED: 'neutral', RESERVED: 'warning', PREPARING: 'accent', READY: 'success',
     SHIPPED: 'info', DELIVERED: 'success', CANCELLED: 'danger',
+  },
+  envio: {
+    PENDING_CREATE: 'neutral', CREATING: 'info', ACTIVE: 'info', RETRY: 'warning', BLOCKED_PAYMENT: 'warning',
+    INCIDENT: 'warning', FAILED: 'danger', DELIVERED: 'success', CANCELLED: 'danger', delivered: 'success', cancelled: 'danger',
   },
   ticket: {
     RECEIVED: 'info', UNDER_DIAGNOSIS: 'accent', WAITING_FOR_APPROVAL: 'accent', APPROVED: 'warning',

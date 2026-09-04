@@ -3,14 +3,15 @@ import { of } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
 import { Product } from '../catalog/catalog.service';
 import { AdminComponent } from './admin.component';
-import { AdminService } from './admin.service';
+import { AdminOrder, AdminService } from './admin.service';
 
 describe('AdminComponent payments', () => {
   const renderedOrder: Order = {
     id: 41, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
     paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 240, paymentDiscount: 0, paymentSurcharge: 24, total: 264,
     createdAt: '2026-08-17T10:00:00Z', reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada Lovelace',
-    customerEmail: 'ada@example.com', items: [{ productId: 4, variantId: 9, productName: 'Mouse', colorName: 'Negro', colorHex: '#000000', unitPrice: 120, quantity: 2, subtotal: 240 }],
+    customerEmail: 'ada@example.com', shippingCost: 0, deliveryAddress: null, shipment: null,
+    items: [{ productId: 4, variantId: 9, productName: 'Mouse', colorName: 'Negro', colorHex: '#000000', unitPrice: 120, quantity: 2, subtotal: 240 }],
   };
 
   async function createSalesFixture(animationsEnabled = false) {
@@ -47,7 +48,8 @@ describe('AdminComponent payments', () => {
     const base: Order = {
       id: 1, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
       paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 100, paymentDiscount: 0, paymentSurcharge: 10, total: 110, createdAt: '2026-08-17T10:00:00Z',
-      reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada', customerEmail: 'ada@example.com', items: [],
+      reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada', customerEmail: 'ada@example.com', shippingCost: 0,
+      deliveryAddress: null, shipment: null, items: [],
     };
 
     component.orders.set([
@@ -64,6 +66,8 @@ describe('AdminComponent payments', () => {
     expect(component.orderActions('PAID').map((action) => action.label)).toEqual(['Preparar pedido']);
     expect(component.orderActions('PREPARING').map((action) => action.label)).toEqual(['Marcar listo']);
     expect(component.orderActions('READY').map((action) => action.label)).toEqual(['Registrar entrega física']);
+    expect(component.orderActions('READY', 'APPROVED', 'DELIVERY')).toEqual([]);
+    expect(component.orderActions('SHIPPED', 'APPROVED', 'DELIVERY')).toEqual([]);
   });
 
   it('initializes real taxonomy selections and does not refresh over dirty product edits without confirmation', async () => {
@@ -128,6 +132,56 @@ describe('AdminComponent payments', () => {
     expect(component.error()).toContain('precio mayor que cero');
   });
 
+  it('hydrates shipping data and rejects shipping values outside the backend ranges', async () => {
+    const createProduct = vi.fn();
+    const product: Product = {
+      id: 5, name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 100,
+      categoryId: 3, categoryName: 'Periféricos', brandId: 8, brandName: 'Pina', images: [], specifications: [],
+      shippingWeightGrams: 450, shippingHeightCm: 8, shippingWidthCm: 12, shippingLengthCm: 18,
+      shippingClassificationId: 2, mustKeepVertical: true,
+      variants: [{ id: 51, colorName: 'Negro', colorHex: '#000000', imageId: null, inStock: true, availableQuantity: 2 }],
+    };
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [product] }), categories: () => of([{ id: 3, name: 'Periféricos', slug: 'perifericos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]), inventories: () => of([]), orders: () => of([]), pendingBankTransferProofs: () => of([]),
+          createProduct,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('catalog');
+    component.select(product);
+    fixture.detectChanges();
+
+    expect(component.form.shippingWeightGrams).toBe(450);
+    expect(component.form.shippingClassificationId).toBe(2);
+    expect(component.form.mustKeepVertical).toBe(true);
+    expect(fixture.nativeElement.querySelectorAll('.shipping-form app-input')).toHaveLength(5);
+
+    component.form.shippingWeightGrams = 451;
+    const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+    component.resetProduct();
+    expect(confirmation).toHaveBeenCalled();
+    expect(component.selected()?.id).toBe(5);
+    expect(component.form.shippingWeightGrams).toBe(451);
+    confirmation.mockRestore();
+
+    component.resetProduct(true);
+    Object.assign(component.form, {
+      name: 'Teclado', slug: 'teclado', description: 'Teclado mecánico', price: 100, categoryId: 3, brandId: 8,
+      shippingWeightGrams: 9, shippingHeightCm: 8, shippingWidthCm: 12, shippingLengthCm: 18, shippingClassificationId: 2,
+    });
+    component.saveProduct();
+
+    expect(createProduct).not.toHaveBeenCalled();
+    expect(component.error()).toContain('peso entero entre 10 y 10000000');
+  });
+
   it('offers saved product images per color and clears associations when an image is deleted', async () => {
     const product: Product = {
       id: 5, name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 100,
@@ -188,6 +242,86 @@ describe('AdminComponent payments', () => {
     expect(detail.hasAttribute('inert')).toBe(false);
     expect(fixture.nativeElement.querySelector('.filter-tabs')?.textContent).toContain('Listos');
     expect(document.activeElement).toBe(summary);
+  });
+
+  it('renders delivery, shipping and shipment details with conservative Zipnova controls', async () => {
+    const deliveryOrder: AdminOrder = {
+      ...renderedOrder,
+      fulfillmentMethod: 'DELIVERY', deliveryMethod: 'ZIPNOVA', shippingCost: 35, total: 299,
+      deliveryAddress: {
+        recipientName: 'Ada Lovelace', street: 'San Martín', streetNumber: '123', floorApartment: '2 B', locality: 'Córdoba',
+        province: 'Córdoba', provinceCode: 'X', postalCode: '5000', countryCode: 'AR', reference: 'Portón azul',
+      },
+      shipment: {
+        status: 'ACTIVE', providerStatus: 'documentation_ready', providerSubstatus: null, carrier: 'Andreani',
+        trackingCode: 'TRACK-41', trackingUrl: 'https://tracking.example/41', estimatedDeliveryAt: '2026-08-20T10:00:00Z', incident: false,
+      },
+    };
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
+          orders: () => of([deliveryOrder]), pendingBankTransferProofs: () => of([]),
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('sales');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const detail = fixture.nativeElement.querySelector('.order-detail') as HTMLElement;
+    expect(detail.textContent).toContain('San Martín 123');
+    expect(detail.textContent).toContain('35 ARS');
+    expect(detail.textContent).toContain('Andreani');
+    expect(detail.textContent).toContain('TRACK-41');
+    expect(detail.textContent).toContain('Etiqueta PDF');
+    expect(detail.textContent).toContain('Documento PDF');
+    expect(detail.textContent).toContain('Cancelar envío');
+    expect(detail.textContent).not.toContain('Registrar entrega física');
+    expect(component.canRetryShipment(deliveryOrder)).toBe(false);
+    expect(component.canRetryShipment({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, status: 'FAILED', providerStatus: null } })).toBe(true);
+    expect(component.canCancelShipment({ ...deliveryOrder, status: 'SHIPPED' })).toBe(false);
+    expect(component.canCancelShipment({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'in_transit' } })).toBe(false);
+    expect(component.canDownloadShipmentDocuments({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'new' } })).toBe(false);
+  });
+
+  it('refreshes orders after requesting an eligible shipment retry', async () => {
+    const failedOrder: AdminOrder = {
+      ...renderedOrder,
+      fulfillmentMethod: 'DELIVERY', deliveryMethod: 'ZIPNOVA',
+      shipment: {
+        status: 'FAILED', providerStatus: null, providerSubstatus: null, carrier: null, trackingCode: null,
+        trackingUrl: null, estimatedDeliveryAt: null, incident: false,
+      },
+    };
+    const refreshedOrder: AdminOrder = { ...failedOrder, shipment: { ...failedOrder.shipment!, status: 'RETRY' } };
+    const orders = vi.fn()
+      .mockReturnValueOnce(of([failedOrder]))
+      .mockReturnValueOnce(of([refreshedOrder]));
+    const retryShipment = vi.fn(() => of(void 0));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
+          orders, pendingBankTransferProofs: () => of([]), retryShipment,
+        },
+      }],
+    }).compileComponents();
+    const component = TestBed.createComponent(AdminComponent).componentInstance;
+
+    component.retryShipment(failedOrder);
+
+    expect(retryShipment).toHaveBeenCalledWith(41);
+    expect(orders).toHaveBeenCalledTimes(2);
+    expect(component.orders()[0].shipment?.status).toBe('RETRY');
+    expect(component.shipmentUpdating()).toBeNull();
   });
 
   it('advances a paid order to preparing from its expanded detail', async () => {

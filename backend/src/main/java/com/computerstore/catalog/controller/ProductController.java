@@ -75,7 +75,9 @@ public class ProductController {
 
     private ProductSummaryResponse toResponse(Product p, List<com.computerstore.catalog.dto.ProductImageResponse> images, List<com.computerstore.catalog.dto.ProductSpecificationResponse> productSpecifications, List<com.computerstore.catalog.dto.ProductVariantResponse> productVariants) {
         return new ProductSummaryResponse(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
-                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(), images, productSpecifications, productVariants);
+                p.getCategory().getId(), p.getCategory().getName(), p.getBrand().getId(), p.getBrand().getName(),
+                p.getShippingWeightGrams(), p.getShippingHeightCm(), p.getShippingWidthCm(), p.getShippingLengthCm(),
+                p.getShippingClassificationId(), p.isMustKeepVertical(), images, productSpecifications, productVariants);
     }
 
     private List<com.computerstore.catalog.dto.ProductSpecificationResponse> specificationResponses(Long productId) {

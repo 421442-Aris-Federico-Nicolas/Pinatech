@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.computerstore.catalog.domain.ProductVariant;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
@@ -15,7 +16,12 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> findByProduct_IdAndActiveTrueOrderByDisplayOrderAscIdAsc(Long productId);
     List<ProductVariant> findByProduct_IdOrderByDisplayOrderAscIdAsc(Long productId);
     @Lock(LockModeType.PESSIMISTIC_READ)
+    @EntityGraph(attributePaths = "product")
     Optional<ProductVariant> findByIdAndActiveTrueAndProduct_ActiveTrue(Long id);
+
+    @EntityGraph(attributePaths = "product")
+    @Query("select variant from ProductVariant variant where variant.id = :id and variant.active and variant.product.active")
+    Optional<ProductVariant> findActiveForShippingQuote(Long id);
 
     @Query("select variant from ProductVariant variant where variant.product.id in :productIds and variant.active order by variant.product.id, variant.displayOrder, variant.id")
     List<ProductVariant> findActiveByProductIds(Collection<Long> productIds);

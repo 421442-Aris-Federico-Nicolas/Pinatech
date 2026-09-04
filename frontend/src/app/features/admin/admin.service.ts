@@ -9,7 +9,23 @@ export interface Brand { id: number; name: string; }
 export interface Inventory { productId: number; variantId: number; colorName: string; colorHex: string | null; availableQuantity: number; reservedQuantity: number; }
 export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
 export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; imageId: number | null; }
-export interface ProductPayload { name: string; slug: string; description: string; price: number; categoryId: number; brandId: number; specifications: ProductSpecificationPayload[]; variants: ProductVariantPayload[]; }
+export interface ProductPayload {
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  categoryId: number;
+  brandId: number;
+  shippingWeightGrams: number;
+  shippingHeightCm: number;
+  shippingWidthCm: number;
+  shippingLengthCm: number;
+  shippingClassificationId: number;
+  mustKeepVertical: boolean;
+  specifications: ProductSpecificationPayload[];
+  variants: ProductVariantPayload[];
+}
+export type AdminOrder = Order;
 export interface PendingBankTransferProof {
   id: string;
   status: 'PENDING_REVIEW';
@@ -61,8 +77,12 @@ export class AdminService {
   adjustInventory(variantId: number, quantity: number, reason: string) {
     return this.http.post<Inventory>(`${environment.apiBaseUrl}/inventory/adjustments`, { variantId, quantity, reason });
   }
-  orders() { return this.http.get<Order[]>(`${environment.apiBaseUrl}/admin/orders`); }
-  updateOrderStatus(id: number, status: string) { return this.http.patch<Order>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }
+  orders() { return this.http.get<AdminOrder[]>(`${environment.apiBaseUrl}/admin/orders`); }
+  updateOrderStatus(id: number, status: string) { return this.http.patch<AdminOrder>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }
+  retryShipment(orderId: number) { return this.http.post<void>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/retry`, null); }
+  cancelShipment(orderId: number) { return this.http.post<{ result: string }>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/cancel`, null); }
+  shipmentLabel(orderId: number) { return this.http.get(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/label`, { responseType: 'blob' }); }
+  shipmentDocument(orderId: number) { return this.http.get(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/document`, { responseType: 'blob' }); }
   pendingBankTransferProofs() {
     return this.http.get<PendingBankTransferProof[]>(`${environment.apiBaseUrl}/admin/bank-transfer-proofs`, {
       params: { status: 'PENDING_REVIEW' },

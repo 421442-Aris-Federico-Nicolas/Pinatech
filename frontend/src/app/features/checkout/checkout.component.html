@@ -19,9 +19,13 @@
         <div><dt>Precio de lista</dt><dd>{{ order.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
         @if (order.paymentDiscount > 0) { <div><dt>Descuento por transferencia</dt><dd>− {{ order.paymentDiscount | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
         @if (order.paymentSurcharge > 0) { <div><dt>Ajuste histórico de pago</dt><dd>{{ order.paymentSurcharge | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
+        @if (order.shippingCost > 0) { <div><dt>Envío</dt><dd>{{ order.shippingCost | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div> }
         <div><dt>Total</dt><dd>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</dd></div>
         <div>@if (order.paymentMethod === 'MERCADO_PAGO') { <dt>Vigencia informada de la reserva</dt><dd>@if (reservationExpiration(order); as expiration) { Hasta {{ expiration | date:'medium' }} } @else { Fecha no disponible }</dd> } @else { <dt>Método de pago</dt><dd>{{ methodLabel(order.paymentMethod) }}</dd> }</div>
       </dl>
+      @if (order.deliveryAddress; as address) {
+        <address class="confirmation-address"><strong>Entrega a domicilio</strong><span>{{ address.street }} {{ address.streetNumber }}@if (address.floorApartment) {, {{ address.floorApartment }}}</span><span>{{ address.locality }}, {{ address.province }} · CP {{ address.postalCode }}</span></address>
+      }
       <div class="result-actions">
         <a appButton="filled" routerLink="/orders">Ir a Mis pedidos</a>
         <a appButton="text" routerLink="/catalog">Volver al catálogo</a>
@@ -38,121 +42,168 @@
   } @else {
     <header class="page-header">
       <div>
-        <p class="eyebrow">Paso final</p>
-        <h1>Revisá tu pedido</h1>
-        <p>Verificá los productos y elegí cómo pagar.</p>
+        <p class="eyebrow">Checkout seguro</p>
+        <h1>{{ checkoutStep() === 'SHIPPING' ? 'Elegí cómo recibir tu compra' : 'Elegí cómo pagar' }}</h1>
+        <p>{{ checkoutStep() === 'SHIPPING' ? 'Compará retiro y envíos disponibles para tu dirección.' : 'Revisá el total y elegí el medio de pago.' }}</p>
       </div>
       <a appButton="text" routerLink="/cart">Editar carrito</a>
     </header>
 
+    <nav class="checkout-steps" aria-label="Progreso del checkout">
+      <button type="button" [class.active]="checkoutStep() === 'SHIPPING'" [attr.aria-current]="checkoutStep() === 'SHIPPING' ? 'step' : null" (click)="returnToShipping()">
+        <span>1</span><span><strong>Entrega</strong><small>Retiro o envío</small></span>
+      </button>
+      <button type="button" [class.active]="checkoutStep() === 'PAYMENT'" [attr.aria-current]="checkoutStep() === 'PAYMENT' ? 'step' : null" [disabled]="!fulfillmentEnabled()" (click)="continueToPayment()">
+        <span>2</span><span><strong>Pago</strong><small>Elegí cómo pagar</small></span>
+      </button>
+    </nav>
+
     <div class="checkout-layout" [attr.aria-busy]="reconciling() || loadingCapabilities() || submitting()">
       <div class="details">
-        <section appCard class="panel products" aria-labelledby="products-title">
-          <div class="section-heading">
-            <span>01</span>
-            <div><p>Tu selección</p><h2 id="products-title">Productos</h2></div>
-          </div>
-          <ul class="product-list">
-            @for (item of cart.items(); track item.variant.id; let first = $first) {
-              <li><article>
-                @if (item.product.images[0]; as image) {
-                  <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'" decoding="async">
-                } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
-                <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span> · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
-                <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }} lista</span>
-              </article></li>
-            }
-          </ul>
-        </section>
+        @if (checkoutStep() === 'SHIPPING') {
+          <section appCard class="panel products" aria-labelledby="products-title">
+            <div class="section-heading section-heading--plain">
+              <div><p>Tu carrito</p><h2 id="products-title">Productos</h2></div>
+            </div>
+            <ul class="product-list">
+              @for (item of cart.items(); track item.variant.id; let first = $first) {
+                <li><article>
+                  @if (item.product.images[0]; as image) {
+                    <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'" decoding="async">
+                  } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
+                  <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span> · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
+                  <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }} lista</span>
+                </article></li>
+              }
+            </ul>
+          </section>
 
-        <section appCard class="panel capability" aria-labelledby="pickup-title">
-          <div class="section-heading">
-            <span>02</span>
-            <div><p>Logística</p><h2 id="pickup-title">Retiro en Córdoba</h2></div>
-          </div>
-          @if (reconciling()) {
-            <p class="loading" role="status">Verificando disponibilidad del carrito…</p>
-          } @else if (loadingCapabilities()) {
-            <p class="loading" role="status">Consultando puntos de retiro…</p>
-          } @else if (capabilities(); as options) {
-            @if (!options.fulfillmentMethods.includes('PICKUP') || !options.pickupLocations.length) {
-              <app-feedback class="notice" tone="warning">No hay un punto de retiro disponible. No es posible completar la compra en este momento.</app-feedback>
-            } @else {
-              <div class="pickup-field">
-                <label for="pickup-location">Punto de retiro</label>
-                <select id="pickup-location" name="pickupLocation" [value]="selectedPickupCode()" (change)="selectPickup($event)" aria-describedby="pickup-help">
-                  @for (location of options.pickupLocations; track location.code) {
-                    <option [value]="location.code">{{ location.name }} · {{ location.locality }}</option>
+          <section appCard class="panel capability" aria-labelledby="fulfillment-title">
+            <div class="section-heading">
+              <span>01</span>
+              <div><p>Método de entrega</p><h2 id="fulfillment-title">¿Cómo querés recibirlo?</h2></div>
+            </div>
+            @if (reconciling()) {
+              <p class="loading" role="status">Verificando disponibilidad del carrito…</p>
+            } @else if (loadingCapabilities()) {
+              <p class="loading" role="status">Consultando opciones de entrega…</p>
+            } @else if (capabilities(); as options) {
+              @if (!pickupEnabled(options) && !deliveryEnabled(options)) {
+                <app-feedback class="notice" tone="warning">No hay un punto de retiro disponible ni opciones de envío. No es posible completar la compra en este momento.</app-feedback>
+              } @else {
+                @if (deliveryEnabled(options)) {
+                  <div class="delivery-heading"><p>Tarifas calculadas para la dirección guardada en tu perfil.</p><a routerLink="/profile">Revisar dirección</a></div>
+                }
+                <fieldset class="delivery-options" [disabled]="submitting()">
+                  <legend>Opciones disponibles</legend>
+                  @if (pickupEnabled(options)) {
+                    @for (location of options.pickupLocations; track location.code) {
+                      <div class="delivery-card delivery-card--pickup" [class.selected]="selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code">
+                        <label class="pickup-choice">
+                          <input type="radio" name="deliveryOption" [value]="location.code" [checked]="selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code" (change)="selectPickup($event)">
+                          <span class="carrier-brand carrier-brand--pickup" aria-hidden="true"><iconify-icon icon="line-md:map-marker"></iconify-icon></span>
+                          <span class="option-copy"><strong>Retiro en el local</strong><small>{{ location.name }}</small></span>
+                          <b>Sin costo</b>
+                        </label>
+                        @if (selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code) {
+                          <div class="pickup-reveal">
+                            <div class="pickup-reveal-content">
+                              <span class="pickup-address">
+                                @for (line of location.addressLines; track $index) { <span>{{ line }}</span> }
+                                <span>{{ location.locality }}, {{ location.provinceCode }} · CP {{ location.postalCode }}</span>
+                              </span>
+                              <span class="pickup-facts"><span><small>Horarios</small>{{ location.hours }}</span><span><small>Indicaciones</small>{{ location.instructions }}</span></span>
+                              <label class="pickup-consent">
+                                <input type="checkbox" [checked]="pickupAccepted()" (change)="setPickupAccepted($event)">
+                                <span>Entiendo que debo retirar en Córdoba</span>
+                              </label>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
                   }
-                </select>
-                <small id="pickup-help">Elegí dónde vas a retirar. No usamos tu dirección personal.</small>
-              </div>
+                  @if (shippingQuotes().length && !quoteExpired()) {
+                    @for (quote of shippingQuotes(); track quote.shippingQuoteId) {
+                      <label class="delivery-card" [class.selected]="selectedFulfillmentMethod() === 'DELIVERY' && selectedShippingQuoteId() === quote.shippingQuoteId">
+                        <input type="radio" name="deliveryOption" [value]="quote.shippingQuoteId" [checked]="selectedFulfillmentMethod() === 'DELIVERY' && selectedShippingQuoteId() === quote.shippingQuoteId" (change)="selectShippingQuote($event)">
+                        <span class="carrier-brand" aria-hidden="true">
+                          @if (carrierLogo(quote.carrier); as logo) {
+                            <img [src]="logo" alt="" width="84" height="46">
+                          } @else { <span>{{ carrierInitials(quote.carrier) }}</span> }
+                        </span>
+                        <span class="option-copy"><strong>{{ quote.carrier }}</strong><small>{{ quote.service }}@if (quote.estimatedDeliveryAt) { · Llega aproximadamente el {{ quote.estimatedDeliveryAt | date:'mediumDate' }}} · Válida hasta {{ quote.expiresAt | date:'shortTime' }}</small></span>
+                        <b>{{ quote.amount | currency:quote.currency:'symbol-narrow':'1.2-2' }}</b>
+                      </label>
+                    }
+                  }
+                </fieldset>
 
-              @if (selectedPickup(); as pickup) {
-                <article class="pickup-card" aria-labelledby="selected-pickup-name">
-                  <div><p class="pickup-kicker">Retiro sin costo</p><h3 id="selected-pickup-name">{{ pickup.name }}</h3></div>
-                  <address>
-                    @for (line of pickup.addressLines; track $index) { <span>{{ line }}</span> }
-                    <span>{{ pickup.locality }}, {{ pickup.provinceCode }} · CP {{ pickup.postalCode }}</span>
-                  </address>
-                  <dl>
-                    <div><dt>Horarios</dt><dd>{{ pickup.hours }}</dd></div>
-                    <div><dt>Indicaciones</dt><dd>{{ pickup.instructions }}</dd></div>
-                  </dl>
-                </article>
-                <label class="pickup-consent">
-                  <input type="checkbox" [checked]="pickupAccepted()" (change)="setPickupAccepted($event)">
-                  <span>Entiendo que debo retirar en Córdoba</span>
-                </label>
+                @if (loadingQuotes()) {
+                  <p class="loading quote-loading" role="status">Calculando envíos con <span translate="no">Zipnova</span>…</p>
+                }
+                @if (quoteError()) {
+                  <app-feedback class="quote-feedback" [tone]="shippingQuotes().length && quoteExpired() ? 'warning' : 'error'" [announce]="loadingQuotes() ? 'polite' : 'assertive'">
+                    {{ quoteError() }}
+                    <span feedback-actions class="quote-actions">@if (quoteNeedsProfile()) { <a appButton="text" routerLink="/profile">Completar perfil</a> }<button appButton="outlined" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes()">{{ loadingQuotes() ? 'Calculando…' : 'Calcular nuevamente' }}</button></span>
+                  </app-feedback>
+                }
+                @if (shippingQuotes().length && quoteExpired() && !quoteError()) {
+                  <app-feedback class="quote-feedback" tone="warning" announce="polite">La cotización venció. Calculá el envío nuevamente antes de continuar.<button feedback-actions appButton="outlined" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes()">{{ loadingQuotes() ? 'Calculando…' : 'Calcular nuevamente' }}</button></app-feedback>
+                }
+
               }
             }
-          }
-        </section>
-
-        <section appCard class="panel capability" aria-labelledby="payment-title">
-          <div class="section-heading">
-            <span>03</span>
-            <div><p>Condiciones comerciales</p><h2 id="payment-title">Pago</h2></div>
-          </div>
-          @if (!reconciling() && !loadingCapabilities()) { @if (capabilities(); as options) {
-            @if (!options.orderRequestsEnabled) {
-              <app-feedback class="notice" tone="warning">No se pueden iniciar pedidos en este momento.</app-feedback>
-            } @else if (!bankTransferEnabled(options) && !mercadoPagoEnabled(options)) {
-              <app-feedback class="notice" tone="warning">No hay métodos de pago disponibles en este momento.</app-feedback>
-            } @else {
-              <fieldset class="payment-methods" [disabled]="submitting()">
-                <legend>Elegí un método de pago</legend>
-                @if (bankTransferEnabled(options)) {
-                  <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'BANK_TRANSFER'">
-                    <input type="radio" name="paymentMethod" value="BANK_TRANSFER" [checked]="selectedPaymentMethod() === 'BANK_TRANSFER'" (change)="selectPaymentMethod($event)">
-                    <span><strong>Transferencia bancaria · {{ options.bankTransferDiscountRate | percent:'1.0-2' }} menos</strong><small>Precio especial: {{ transferPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(transferPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
-                  </label>
-                }
-                @if (mercadoPagoEnabled(options)) {
-                  <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'MERCADO_PAGO'">
-                    <input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="selectedPaymentMethod() === 'MERCADO_PAGO'" (change)="selectPaymentMethod($event)">
-                    <span><strong translate="no">Mercado Pago</strong><small>Precio de lista: {{ mercadoPagoPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(mercadoPagoPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
-                  </label>
-                }
-              </fieldset>
-              <p class="fine-print">La transferencia se revisa después de cargar el comprobante. En <span translate="no">Mercado Pago</span>, la redirección no acredita el pago por sí sola.</p>
+          </section>
+        } @else {
+          <section appCard class="panel capability payment-panel" aria-labelledby="payment-title">
+            <div class="section-heading">
+              <span>02</span>
+              <div><p>Método de pago</p><h2 id="payment-title">¿Cómo querés pagar?</h2></div>
+            </div>
+            @if (capabilities(); as options) {
+              @if (!options.orderRequestsEnabled) {
+                <app-feedback class="notice" tone="warning">No se pueden iniciar pedidos en este momento.</app-feedback>
+              } @else if (!bankTransferEnabled(options) && !mercadoPagoEnabled(options)) {
+                <app-feedback class="notice" tone="warning">No hay métodos de pago disponibles en este momento.</app-feedback>
+              } @else {
+                <fieldset class="payment-methods" [disabled]="submitting()">
+                  <legend>Opciones disponibles</legend>
+                  @if (bankTransferEnabled(options)) {
+                    <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'BANK_TRANSFER'">
+                      <input type="radio" name="paymentMethod" value="BANK_TRANSFER" [checked]="selectedPaymentMethod() === 'BANK_TRANSFER'" (change)="selectPaymentMethod($event)">
+                      <span class="payment-brand payment-brand--transfer" aria-hidden="true">−{{ options.bankTransferDiscountRate | percent:'1.0-0' }}</span>
+                      <span class="option-copy"><strong>Transferencia bancaria</strong><small>Precio especial: {{ transferPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(transferPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
+                    </label>
+                  }
+                  @if (mercadoPagoEnabled(options)) {
+                    <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'MERCADO_PAGO'">
+                      <input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="selectedPaymentMethod() === 'MERCADO_PAGO'" (change)="selectPaymentMethod($event)">
+                      <span class="payment-brand" aria-hidden="true"><img src="/mercadopago-logo.png" alt="" width="84" height="46"></span>
+                      <span class="option-copy"><strong translate="no">Mercado Pago</strong><small>Precio de lista: {{ mercadoPagoPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(mercadoPagoPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
+                    </label>
+                  }
+                </fieldset>
+                <p class="fine-print">La transferencia se revisa después de cargar el comprobante. En <span translate="no">Mercado Pago</span>, la redirección no acredita el pago por sí sola.</p>
+              }
             }
-          } }
-        </section>
+            <button class="step-back" appButton="text" type="button" (click)="returnToShipping()" [disabled]="submitting()">Volver a entrega</button>
+          </section>
+        }
       </div>
 
       <aside appCard class="summary" aria-labelledby="summary-title">
         <p class="eyebrow">Resumen</p>
         <h2 id="summary-title">Tu pedido</h2>
         <div><span>Precio de lista / Mercado Pago</span><strong>{{ selectedPricing().subtotal | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
-        <div><span>Retiro en Córdoba</span><strong>Sin costo</strong></div>
+        <div><span>{{ selectedFulfillmentMethod() === 'DELIVERY' ? 'Envío' : selectedFulfillmentMethod() === 'PICKUP' ? 'Retiro en el local' : 'Entrega' }}</span><strong>{{ selectedFulfillmentMethod() === 'DELIVERY' ? (selectedShippingCost() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2') : selectedFulfillmentMethod() === 'PICKUP' ? 'Sin costo' : 'A definir' }}</strong></div>
         @if (selectedPaymentMethod() === 'BANK_TRANSFER') {
           <div class="discount"><span>Descuento por transferencia ({{ (capabilities()?.bankTransferDiscountRate ?? 0.1) | percent:'1.0-2' }})</span><strong>− {{ selectedPricing().discount | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         }
-        <div class="total"><span>{{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Precio especial por transferencia' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Total con Mercado Pago' : 'Total de lista' }}</span><strong>{{ selectedPricing().total | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
-        <p class="summary-note">La transferencia aplica el descuento una sola vez sobre el precio de lista.</p>
+        <div class="total"><span>{{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Total por transferencia' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Total con Mercado Pago' : 'Total de lista' }}</span><strong>{{ selectedTotal() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+        <p class="summary-note">La transferencia aplica el descuento una sola vez sobre los productos. El envío no tiene descuento.</p>
 
-        @if (!emailVerified()) {
+        @if (checkoutStep() === 'PAYMENT' && !emailVerified()) {
           <app-feedback class="verification-required" tone="warning">
             <strong>Verificá tu email para comprar</strong>
             <p>Por seguridad, necesitás confirmar tu email antes de crear el pedido.</p>
@@ -170,22 +221,27 @@
           <app-feedback class="error" tone="error" [announce]="loadingCapabilities() ? 'polite' : 'assertive'" [attr.aria-busy]="loadingCapabilities()">{{ loadingCapabilities() ? 'Volviendo a consultar las opciones disponibles.' : capabilitiesError() }}<button feedback-actions appButton="outlined" type="button" (click)="loadCapabilities()" [disabled]="loadingCapabilities()" [attr.aria-busy]="loadingCapabilities()" [attr.aria-label]="loadingCapabilities() ? 'Consultando opciones disponibles' : 'Reintentar consulta de opciones'">{{ loadingCapabilities() ? 'Consultando…' : 'Reintentar consulta' }}</button></app-feedback>
         } @else if (capabilities() && !bankTransferEnabled() && !mercadoPagoEnabled()) {
           <app-feedback class="error" tone="warning">No hay métodos de pago disponibles en este momento.</app-feedback>
-        } @else if (capabilities() && !pickupEnabled()) {
-          <app-feedback class="error" tone="warning">No hay un punto de retiro habilitado para completar la compra.</app-feedback>
+        } @else if (capabilities() && !pickupEnabled() && !deliveryEnabled()) {
+          <app-feedback class="error" tone="warning">No hay una modalidad de entrega habilitada para completar la compra.</app-feedback>
         }
 
         @if (capabilities()) {
-          <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Registrando pedido, esperá' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí un método de pago para continuar'">
-            @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
-            <span>{{ submitting() ? 'Registrando pedido…' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí cómo pagar' }}</span>
-          </button>
-          @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y registrando tu elección de pago.</p> }
-          <small>{{ !selectedPaymentMethod() ? 'Elegí un método de pago para continuar.' : !pickupAccepted() && pickupEnabled() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
+          @if (checkoutStep() === 'SHIPPING') {
+            <button appButton="filled" type="button" (click)="continueToPayment()" [disabled]="reconciling() || loadingCapabilities() || !fulfillmentEnabled()">Continuar al pago</button>
+            <small>{{ selectedFulfillmentMethod() === 'PICKUP' && !pickupAccepted() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : selectedFulfillmentMethod() === 'DELIVERY' && (!selectedShippingQuote() || quoteExpired()) ? 'Elegí una opción de envío vigente para continuar.' : 'En el próximo paso vas a elegir cómo pagar.' }}</small>
+          } @else {
+            <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Registrando pedido, esperá' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí un método de pago para continuar'">
+              @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
+              <span>{{ submitting() ? 'Registrando pedido…' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí cómo pagar' }}</span>
+            </button>
+            @if (submitting()) { <p class="payment-progress" role="status" aria-live="polite">Estamos reservando el stock y registrando tu elección de pago.</p> }
+            <small>{{ !selectedPaymentMethod() ? 'Elegí un método de pago para continuar.' : 'El pago se confirma únicamente después de que nuestro sistema lo verifique.' }}</small>
+          }
         }
-        @if (submitError()) {
+        @if (checkoutStep() === 'PAYMENT' && submitError()) {
           <app-feedback class="submit-error" tone="error" announce="assertive">
             <p>{{ submitError() }}</p>
-             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'pending-transfer') { <a routerLink="/orders">Ver pedido pendiente</a> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
+             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'pending-transfer') { <a routerLink="/orders">Ver pedido pendiente</a> } @if (submitErrorKind() === 'shipping') { <button appButton="text" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes()">Calcular envío nuevamente</button> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
           </app-feedback>
         }
       </aside>

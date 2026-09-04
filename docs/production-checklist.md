@@ -1,6 +1,6 @@
 # Production checklist
 
-Mercado Pago Checkout Pro is implemented but must remain disabled or on sandbox credentials
+Mercado Pago Checkout Pro and Zipnova delivery are implemented but must remain disabled or on test credentials where available
 until every applicable release gate below is complete. Passing this list is a manual release
 decision, not an automatic claim that the application is production-ready.
 
@@ -9,6 +9,7 @@ decision, not an automatic claim that the application is production-ready.
 - Real catalog, prices and stock replace the development sample data.
 - The first production administrator is provisioned through a controlled one-time procedure.
 - Payment and delivery providers are selected and tested in sandbox.
+- Every active delivery product has reviewed weight, dimensions, classification and vertical-handling data.
 - Legal, privacy, warranty, return and cancellation content is reviewed for Argentina.
 - Fiscal data and invoicing requirements are reviewed with an accountant or invoicing provider.
 
@@ -56,13 +57,16 @@ decision, not an automatic claim that the application is production-ready.
 - Container images build successfully.
 - Desktop and mobile checkout tests pass.
 - Duplicate order and duplicate webhook scenarios are safe.
+- Zipnova quote expiry, empty quotes, provider outage, ambiguous create, reconciliation and damaged delivery are verified.
+- Zipnova account/origin IDs, exact webhook URL, URL-safe webhook secret and production confirmation are independently reviewed.
+- Label and dispatch-document downloads, tracking links and customer ownership checks pass end-to-end.
 - Customer and seller email outbox events retry independently without duplicate notifications.
 - Payment rejection, expiration, cancellation and refund scenarios are verified.
 - Registration, email verification, password recovery and email change pass end-to-end.
 - An open tab detects a new frontend version and offers an explicit update without discarding unsaved work automatically.
 - Verified customers can create pickup orders and the selected pickup snapshot remains immutable.
 - A backup restore and deployment rollback have been demonstrated.
-- The exact production webhook URL and production collector ID were independently verified.
+- The exact production payment and shipping webhook URLs, Mercado Pago collector ID and Zipnova account/origin IDs were independently verified.
 - On-call ownership, monitoring, alerts, incident response and secret rotation were tested.
 
 Operational procedure: [`production-deployment.md`](production-deployment.md).
