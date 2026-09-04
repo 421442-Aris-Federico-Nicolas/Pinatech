@@ -267,6 +267,10 @@ public class CustomerOrder {
                 && paymentStatus != PaymentStatus.APPROVED) {
             throw new InvalidStateTransitionException("Fulfillment requires an approved payment without disputes.");
         }
+        if (fulfillmentMethod == FulfillmentMethod.DELIVERY && fulfillmentStatus == FulfillmentStatus.CANCELLED
+                && target != OrderStatus.CANCELLED) {
+            throw new InvalidStateTransitionException("A cancelled shipment must be replaced before fulfillment can continue.");
+        }
 
         status = target;
         switch (target) {
@@ -351,8 +355,29 @@ public class CustomerOrder {
         paymentStatus = PaymentStatus.CHARGEBACK;
     }
 
+    public void markShipmentCancelled() {
+        if (fulfillmentMethod == FulfillmentMethod.DELIVERY
+                && status != OrderStatus.CANCELLED && status != OrderStatus.DELIVERED) {
+            fulfillmentStatus = FulfillmentStatus.CANCELLED;
+        }
+    }
+
+    public void markShipmentReplacementPending() {
+        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || fulfillmentStatus != FulfillmentStatus.CANCELLED) {
+            return;
+        }
+        fulfillmentStatus = switch (status) {
+            case PAID -> FulfillmentStatus.PENDING;
+            case PREPARING -> FulfillmentStatus.PREPARING;
+            case READY -> FulfillmentStatus.READY;
+            case SHIPPED -> FulfillmentStatus.SHIPPED;
+            default -> fulfillmentStatus;
+        };
+    }
+
     public void markAuthoritativelyShipped() {
-        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED) return;
+        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED
+                || fulfillmentStatus == FulfillmentStatus.CANCELLED) return;
         if (status == OrderStatus.PREPARING || status == OrderStatus.READY) {
             status = OrderStatus.SHIPPED;
             fulfillmentStatus = FulfillmentStatus.SHIPPED;
@@ -360,7 +385,8 @@ public class CustomerOrder {
     }
 
     public boolean markAuthoritativelyDelivered() {
-        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED) return false;
+        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED
+                || fulfillmentStatus == FulfillmentStatus.CANCELLED) return false;
         if (status == OrderStatus.PREPARING || status == OrderStatus.READY) markAuthoritativelyShipped();
         if (status == OrderStatus.SHIPPED) {
             status = OrderStatus.DELIVERED;

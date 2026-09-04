@@ -618,8 +618,20 @@ main {
   border-color: #713046;
 }
 .shipment-heading {
+  align-items: center;
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   justify-content: space-between;
+}
+.shipment-heading h3 {
+  margin: 0;
+}
+.shipment-heading .status-badge {
+  flex-shrink: 0;
+}
+.shipment-cancelled {
+  margin-top: 0.75rem;
 }
 .shipment-detail dl div {
   display: flex;

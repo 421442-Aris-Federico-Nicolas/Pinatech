@@ -142,7 +142,8 @@
               @if (trackingLoading().includes(order.id) && !shipmentFor(order)) { <p class="tracking-loading" role="status">Consultando el seguimiento con el correo…</p> }
               @if (trackingErrors()[order.id]) { <app-feedback class="tracking-error" [tone]="shipmentFor(order) ? 'warning' : 'info'">{{ trackingErrors()[order.id] }}</app-feedback> }
               @if (shipmentFor(order); as shipment) {
-                @if (shipment.incident) { <app-feedback class="incident" tone="warning" announce="polite"><strong>El envío registra una incidencia.</strong> Actualizá el seguimiento para consultar el último estado y contactanos si necesitás ayuda.</app-feedback> }
+                @if (shipment.status === 'CANCELLED') { <app-feedback class="incident" tone="warning" announce="polite"><strong>Este envío fue cancelado.</strong> Tu pedido sigue vigente. Te avisaremos cuando tenga un nuevo seguimiento; contactanos si necesitás ayuda.</app-feedback> }
+                @else if (shipment.incident) { <app-feedback class="incident" tone="warning" announce="polite"><strong>El envío registra una incidencia.</strong> Actualizá el seguimiento para consultar el último estado y contactanos si necesitás ayuda.</app-feedback> }
                 <dl class="tracking-summary">
                   <div><dt>Estado</dt><dd>{{ shipmentStatusLabel(shipment.status) }}</dd></div>
                   @if (shipment.carrier) { <div><dt>Correo</dt><dd>{{ shipment.carrier }}</dd></div> }

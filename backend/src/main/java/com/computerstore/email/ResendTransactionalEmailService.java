@@ -137,16 +137,7 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                                      ShipmentTrackingSnapshot snapshot) {
         if (!enabled) { LOGGER.info("Transactional email disabled; completed outbox event={}",
                 OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE); return; }
-        String orderUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl).path("/orders")
-                .queryParam("order", orderId).build().encode().toUriString();
-        String detail = "Transportista: " + display(snapshot.carrier()) + "\nCodigo de seguimiento: "
-                + display(snapshot.code()) + "\nEntrega estimada: " + instant(snapshot.estimatedDeliveryAt());
-        send(recipient, renderBrandedEmail(new EmailTemplate(
-                "Tu envio ya tiene seguimiento", "Ya podes seguir el envio de tu pedido #" + orderId + ".",
-                "Seguimiento disponible", greeting(customerName),
-                List.of("La documentacion de tu envio esta lista.", detail), null,
-                "Ver mi pedido", orderUrl,
-                "El seguimiento seguro y actualizado esta disponible desde tu pedido Pinatech."), emailLogoUrl), idempotencyKey);
+        send(recipient, contentForShipmentTracking(customerName, orderId, snapshot), idempotencyKey);
     }
 
     EmailContent contentFor(AccountActionPurpose purpose, String firstName, String actionUrl) {
@@ -194,6 +185,9 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     EmailContent contentForOrderEvent(String customerName, OrderEmailEventType eventType, Long orderId,
                                       String rejectionReason, String orderUrl) {
         String orderNumber = "#" + orderId;
+        if (eventType == OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE) {
+            return renderShipmentTracking(customerName, orderId, null, orderUrl, emailLogoUrl);
+        }
         EmailTemplate template = switch (eventType) {
             case ORDER_CREATED -> new EmailTemplate(
                     "Recibimos tu pedido Pinatech",
@@ -235,15 +229,79 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     "Ver mi pedido",
                     orderUrl,
                     "Conserva este email como confirmacion de la entrega.");
-            case SHIPMENT_TRACKING_AVAILABLE -> new EmailTemplate(
-                    "Tu envio ya tiene seguimiento", "Ya podes seguir el envio de tu pedido " + orderNumber + ".",
-                    "Seguimiento disponible", greeting(customerName),
-                    List.of("La documentacion de tu envio esta lista. Consulta el codigo de seguimiento desde tu pedido."),
-                    null, "Ver mi pedido", orderUrl, "Segui siempre tu envio desde tu cuenta Pinatech.");
+            case SHIPMENT_TRACKING_AVAILABLE -> throw new IllegalStateException("Tracking event handled separately.");
             case SELLER_ORDER_CREATED, SELLER_PAYMENT_APPROVED ->
                     throw new IllegalArgumentException("Seller events require a seller order snapshot.");
         };
         return renderBrandedEmail(template, emailLogoUrl);
+    }
+
+    EmailContent contentForShipmentTracking(String customerName, Long orderId, ShipmentTrackingSnapshot snapshot) {
+        String trackingUrl = snapshot.trackingUrl() == null || snapshot.trackingUrl().isBlank()
+                ? null : snapshot.trackingUrl();
+        return renderShipmentTracking(customerName, orderId, snapshot, trackingUrl, emailLogoUrl);
+    }
+
+    private static EmailContent renderShipmentTracking(String customerName, Long orderId,
+                                                        ShipmentTrackingSnapshot snapshot, String actionUrl,
+                                                        String logoUrl) {
+        String orderNumber = "#" + orderId;
+        String carrier = snapshot == null ? "No informado" : display(snapshot.carrier());
+        String code = snapshot == null ? "No informado" : display(snapshot.code());
+        String estimatedDelivery = snapshot == null ? "No informada" : instant(snapshot.estimatedDeliveryAt());
+        String intro = "La documentacion de tu envio esta lista. Ya podes consultar su seguimiento.";
+        EmailTemplate template = new EmailTemplate(
+                "Tu envio ya tiene seguimiento",
+                "Ya podes seguir el envio de tu pedido " + orderNumber + ".",
+                "Tu pedido esta en camino",
+                greeting(customerName),
+                List.of(),
+                null,
+                actionUrl == null ? null : snapshot == null ? "Ver mi pedido" : "Seguir mi envio",
+                actionUrl,
+                "El seguimiento seguro y actualizado de tu envio esta disponible en Pinatech.");
+        StringBuilder text = new StringBuilder(template.greeting()).append(",\n\n")
+                .append(intro).append("\n\n")
+                .append("ESTADO DEL ENVIO\nSeguimiento disponible\n\n")
+                .append("DATOS DEL ENVIO\n")
+                .append("Pedido: ").append(orderNumber).append("\n")
+                .append("Transportista: ").append(carrier).append("\n")
+                .append("Codigo de seguimiento: ").append(code).append("\n")
+                .append("Entrega estimada: ").append(estimatedDelivery).append("\n\n");
+        String bodyHtml = """
+                <p style="margin:0 0 24px;font-size:16px;line-height:25px;color:#33465f;">%s</p>
+                <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="width:100%%;margin:0 0 20px;border-collapse:separate;background-color:#e9fbfd;border:1px solid #b9edf2;border-radius:6px;">
+                  <tr>
+                    <td style="padding:17px 18px;font-family:Arial,Helvetica,sans-serif;">
+                      <p style="margin:0 0 4px;font-size:11px;line-height:17px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#087f8c;">Estado del envio</p>
+                      <p style="margin:0;font-size:18px;line-height:25px;font-weight:700;color:#0b1f3a;">Seguimiento disponible</p>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="width:100%%;margin:0 0 26px;border-collapse:collapse;border:1px solid #d8e5e8;">
+                  <tr>
+                    <td colspan="2" style="padding:13px 18px;background-color:#0b1f3a;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;">Datos del envio</td>
+                  </tr>
+                  <tr>
+                    <td width="42%%" style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#607086;">Pedido</td>
+                    <td style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#0b1f3a;">%s</td>
+                  </tr>
+                  <tr>
+                    <td width="42%%" style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#607086;">Transportista</td>
+                    <td style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#0b1f3a;">%s</td>
+                  </tr>
+                  <tr>
+                    <td width="42%%" style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#607086;">Codigo de seguimiento</td>
+                    <td style="padding:13px 18px;border-bottom:1px solid #d8e5e8;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#0b1f3a;word-break:break-word;">%s</td>
+                  </tr>
+                  <tr>
+                    <td width="42%%" style="padding:13px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#607086;">Entrega estimada</td>
+                    <td style="padding:13px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#0b1f3a;">%s</td>
+                  </tr>
+                </table>
+                """.formatted(escapeHtml(intro), escapeHtml(orderNumber), escapeHtml(carrier),
+                escapeHtml(code), escapeHtml(estimatedDelivery));
+        return renderCorporateEmail(template, logoUrl, text, bodyHtml);
     }
 
     EmailContent contentForSellerOrderEvent(OrderEmailEventType eventType, SellerOrderSnapshot snapshot,
@@ -366,10 +424,6 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     }
 
     private static EmailContent renderBrandedEmail(EmailTemplate template, String logoUrl) {
-        String safeLogoUrl = escapeHtml(logoUrl == null ? "" : logoUrl);
-        String safePreheader = escapeHtml(template.preheader());
-        String safeTitle = escapeHtml(template.title());
-        String safeGreeting = escapeHtml(template.greeting());
         StringBuilder text = new StringBuilder(template.greeting()).append(",\n\n");
         StringBuilder paragraphs = new StringBuilder();
         for (String paragraph : template.paragraphs()) {
@@ -387,6 +441,15 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     </div>
                     """.formatted(escapeHtml(template.callout().label()), escapeHtml(template.callout().value()));
         }
+        return renderCorporateEmail(template, logoUrl, text, paragraphs.append(calloutHtml).toString());
+    }
+
+    private static EmailContent renderCorporateEmail(EmailTemplate template, String logoUrl, StringBuilder text,
+                                                       String bodyHtml) {
+        String safeLogoUrl = escapeHtml(logoUrl == null ? "" : logoUrl);
+        String safePreheader = escapeHtml(template.preheader());
+        String safeTitle = escapeHtml(template.title());
+        String safeGreeting = escapeHtml(template.greeting());
         String actionHtml = "";
         String fallbackHtml = "";
         if (template.actionLabel() != null && template.actionUrl() != null) {
@@ -441,7 +504,6 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                                 <p style="margin:0 0 16px;font-size:16px;line-height:25px;color:#0b1f3a;">%s,</p>
                                 %s
                                 %s
-                                %s
                               </td>
                             </tr>
                             %s
@@ -457,7 +519,7 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                   </body>
                 </html>
                 """.formatted(escapeHtml(template.subject()), safePreheader, safeLogoUrl, safeTitle,
-                safeGreeting, paragraphs, calloutHtml, actionHtml, fallbackHtml, escapeHtml(template.notice()));
+                safeGreeting, bodyHtml, actionHtml, fallbackHtml, escapeHtml(template.notice()));
         return new EmailContent(template.subject(), text.toString(), html);
     }
 

@@ -6,6 +6,7 @@ import java.time.*;
 import java.util.*;
 import com.computerstore.shipping.config.ZipnovaProperties;
 import com.computerstore.shipping.gateway.ZipnovaGateway;
+import com.computerstore.shipping.gateway.ShippingProviderException;
 import org.junit.jupiter.api.Test;
 
 class ShipmentWorkerTest {
@@ -25,6 +26,24 @@ class ShipmentWorkerTest {
         ShipmentWorker worker = new ShipmentWorker(transactions, gateway, properties());
         worker.createDue();
         verify(gateway, never()).createShipment(any()); verify(transactions).creationSucceeded(id, token, existing);
+    }
+
+    @Test
+    void reconciliationAppliesProviderStateWhenTrackingLookupFails() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.ReconcileInstruction(id, token, 99L);
+        var cancelled = new ZipnovaGateway.ProviderShipment(99L, "PIN-42", "canceled", null, null, null, null,
+                Instant.now(), "Andreani");
+        when(transactions.claimReconciliation()).thenReturn(Optional.of(instruction), Optional.empty());
+        when(gateway.getShipment(99L)).thenReturn(cancelled);
+        when(gateway.tracking(99L)).thenThrow(new ShippingProviderException("tracking unavailable", null, false, true, null));
+
+        new ShipmentWorker(transactions, gateway, properties()).reconcileDue();
+
+        verify(transactions).reconciled(id, token, cancelled, List.of());
+        verify(transactions, never()).reconciliationFailed(any(), any());
     }
     private ZipnovaProperties properties() { return new ZipnovaProperties(true, true, "token", "secret", 7L, 12L,
             "pinatech", "dynamic", Duration.ofMinutes(15), Duration.ofSeconds(1), Duration.ofSeconds(2),
