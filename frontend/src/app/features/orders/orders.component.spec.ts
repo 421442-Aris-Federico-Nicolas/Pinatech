@@ -266,4 +266,37 @@ describe('OrdersComponent', () => {
     expect(link.rel).toBe('noopener noreferrer');
     expect(fixture.componentInstance.safeTrackingUrl('javascript:alert(1)')).toBeNull();
   });
+
+  it('shows cancelled shipments as a specific customer update and labels canceled consistently', async () => {
+    const cancelled: Order = {
+      ...order,
+      status: 'PAID', paymentStatus: 'APPROVED', fulfillmentMethod: 'DELIVERY', pickupLocation: null,
+      shipment: {
+        status: 'CANCELLED', providerStatus: 'canceled', providerSubstatus: null, carrier: 'Andreani',
+        trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null, incident: true,
+      },
+    };
+    const tracking = vi.fn(() => of({
+      ...cancelled.shipment!,
+      history: [{ status: 'canceled', substatus: null, occurredAt: '2026-08-02T10:00:00Z' }],
+    }));
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([cancelled]), tracking } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Este envío fue cancelado.');
+    expect(fixture.nativeElement.textContent).toContain('Tu pedido sigue vigente.');
+    expect(fixture.nativeElement.textContent).not.toContain('El envío registra una incidencia.');
+    expect(fixture.componentInstance.shipmentStatusLabel('canceled')).toBe('Cancelado');
+    expect(fixture.componentInstance.estadoTono('canceled', 'envio')).toBe('danger');
+  });
 });

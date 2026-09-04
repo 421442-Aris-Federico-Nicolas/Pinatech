@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,12 +16,15 @@ import com.computerstore.shipping.gateway.*;
 import com.computerstore.shipping.repository.ShippingWebhookInboxRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ZipnovaWebhookService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ZipnovaWebhookService.class);
     private final ZipnovaProperties properties; private final ShippingWebhookInboxRepository inbox;
     private final ShipmentDispatchService shipments; private final ZipnovaGateway gateway; private final Clock clock;
     private final ZipnovaWebhookCompletionService completion;
@@ -50,7 +54,14 @@ public class ZipnovaWebhookService {
     public void process(Instruction item) {
         try {
             var provider = gateway.getShipment(item.providerId());
-            shipments.applyWebhook(item.providerId(), provider, gateway.tracking(item.providerId()));
+            List<ZipnovaGateway.TrackingEvent> history = List.of();
+            try {
+                history = gateway.tracking(item.providerId());
+            } catch (ShippingProviderException error) {
+                LOGGER.warn("Zipnova tracking lookup failed for webhook shipment {}; applying provider state without history.",
+                        item.providerId());
+            }
+            shipments.applyWebhook(item.providerId(), provider, history);
             completion.complete(item, true, null);
         } catch (ShippingProviderException error) { completion.complete(item, false, error.getMessage()); }
     }

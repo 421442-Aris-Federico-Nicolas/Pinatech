@@ -23,7 +23,7 @@ const LABELS: Record<EstadoDominio, Readonly<Record<string, string>>> = {
     RETRY: 'Reintentando la generación', BLOCKED_PAYMENT: 'Pendiente de pago', INCIDENT: 'Envío con incidencia',
     FAILED: 'No se pudo generar', DELIVERED: 'Entregado', CANCELLED: 'Envío cancelado',
     new: 'Envío creado', ready_to_ship: 'Listo para despachar', shipped: 'Despachado',
-    in_transit: 'En tránsito', delivered: 'Entregado', cancelled: 'Cancelado',
+    in_transit: 'En tránsito', delivered: 'Entregado', cancelled: 'Cancelado', canceled: 'Cancelado',
   },
   ticket: {
     RECEIVED: 'Recibido', UNDER_DIAGNOSIS: 'En diagnóstico', WAITING_FOR_APPROVAL: 'Esperando aprobación',
@@ -56,7 +56,7 @@ const TONES: Partial<Record<EstadoDominio, Readonly<Record<string, EstadoTono>>>
   },
   envio: {
     PENDING_CREATE: 'neutral', CREATING: 'info', ACTIVE: 'info', RETRY: 'warning', BLOCKED_PAYMENT: 'warning',
-    INCIDENT: 'warning', FAILED: 'danger', DELIVERED: 'success', CANCELLED: 'danger', delivered: 'success', cancelled: 'danger',
+    INCIDENT: 'warning', FAILED: 'danger', DELIVERED: 'success', CANCELLED: 'danger', delivered: 'success', cancelled: 'danger', canceled: 'danger',
   },
   ticket: {
     RECEIVED: 'info', UNDER_DIAGNOSIS: 'accent', WAITING_FOR_APPROVAL: 'accent', APPROVED: 'warning',

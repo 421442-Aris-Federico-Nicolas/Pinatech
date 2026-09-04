@@ -53,11 +53,62 @@ class ShippingOrderDomainTest {
         assertEquals(OrderShipmentStatus.INCIDENT, shipment.getStatus());
     }
 
+    @Test
+    void americanCancellationSpellingIsTerminalUntilExplicitReplacement() {
+        CustomerOrder order = mock(CustomerOrder.class);
+        when(order.getId()).thenReturn(42L);
+        Instant now = Instant.parse("2026-09-04T12:00:00Z");
+        OrderShipment shipment = new OrderShipment(order, "pinatech", now);
+        var token = shipment.lease(now);
+        shipment.created(provider("new", now), token, now);
+        String originalExternalId = shipment.getExternalId();
+
+        assertTrue(shipment.update(provider("canceled", now.plusSeconds(1)), now.plusSeconds(1)));
+        assertEquals(OrderShipmentStatus.CANCELLED, shipment.getStatus());
+        assertTrue(shipment.isIncident());
+        assertFalse(shipment.update(provider("in_transit", now.plusSeconds(2)), now.plusSeconds(2)));
+        assertEquals(OrderShipmentStatus.CANCELLED, shipment.getStatus());
+
+        shipment.replaceCancelled("pinatech", now.plusSeconds(3));
+        assertEquals(OrderShipmentStatus.PENDING_CREATE, shipment.getStatus());
+        assertNull(shipment.getProviderShipmentId());
+        assertFalse(shipment.isIncident());
+        assertNotEquals(originalExternalId, shipment.getExternalId());
+        assertEquals(shipment.getExternalId(), replacementExternalId(order, now));
+    }
+
+    @Test
+    void cancelledDeliveryBlocksFulfillmentUntilReplacementIsQueued() {
+        CustomerOrder order = mockDeliveryOrder();
+        order.transitionTo(OrderStatus.PAID);
+
+        order.markShipmentCancelled();
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
+        assertThrows(InvalidStateTransitionException.class, () -> order.transitionTo(OrderStatus.PREPARING));
+
+        order.markShipmentReplacementPending();
+        assertEquals(FulfillmentStatus.PENDING, order.getFulfillmentStatus());
+        order.transitionTo(OrderStatus.PREPARING);
+        assertEquals(FulfillmentStatus.PREPARING, order.getFulfillmentStatus());
+    }
+
     private ZipnovaGateway.ProviderShipment provider(String status, Instant updatedAt) {
         CustomerOrder order = mock(CustomerOrder.class); when(order.getId()).thenReturn(42L);
         String externalId = new OrderShipment(order, "pinatech", Instant.EPOCH).getExternalId();
         return new ZipnovaGateway.ProviderShipment(99L, externalId, status, null, null, null, null,
                 updatedAt, "Andreani");
+    }
+
+    private String replacementExternalId(CustomerOrder order, Instant now) {
+        OrderShipment expected = new OrderShipment(order, "pinatech", now);
+        var token = expected.lease(now);
+        expected.created(provider("new", now), token, now);
+        expected.cancelled(now);
+        expected.replaceCancelled("pinatech", now);
+        return expected.getExternalId();
     }
 
     private CustomerOrder mockDeliveryOrder() {

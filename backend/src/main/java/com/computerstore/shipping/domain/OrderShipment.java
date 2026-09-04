@@ -57,13 +57,14 @@ public class OrderShipment {
         status = OrderShipmentStatus.FAILED; leaseUntil = null; leaseToken = null; lastError = truncate(error); updatedAt = now; }
     public boolean update(ZipnovaGateway.ProviderShipment provider, Instant now) {
         if (providerShipmentId != null && provider.id() != providerShipmentId) throw new IllegalArgumentException("Shipment mismatch.");
+        if (status == OrderShipmentStatus.CANCELLED && !isCancellation(provider.status())) return false;
         if (providerUpdatedAt != null && provider.updatedAt().isBefore(providerUpdatedAt)) return false;
         providerShipmentId = provider.id(); rawStatus = truncate(provider.status(), 100); rawSubstatus = truncate(provider.substatus(), 100);
         carrierTrackingId = truncate(provider.carrierTrackingId(), 200); trackingUrl = truncate(provider.trackingUrl(), 2048);
         estimatedDeliveryAt = provider.estimatedDelivery();
         providerUpdatedAt = provider.updatedAt(); nextAttemptAt = now; updatedAt = now;
         if (isDamage(provider.status(), provider.substatus())) incident = true;
-        if ("cancelled".equalsIgnoreCase(provider.status())) {
+        if (isCancellation(provider.status())) {
             incident = true;
             status = OrderShipmentStatus.CANCELLED;
         }
@@ -85,11 +86,23 @@ public class OrderShipment {
             leaseUntil = null; leaseToken = null; lastError = "Provider shipment exists without an approved payment."; updatedAt = now;
         }
     }
-    public void cancelled(Instant now) { status = OrderShipmentStatus.CANCELLED; incident = true;
+    public void cancelled(Instant now) { status = OrderShipmentStatus.CANCELLED; incident = true; rawStatus = "cancelled";
+        leaseUntil = null; leaseToken = null; nextAttemptAt = now;
         lastError = "Provider shipment cancelled; the order requires operational resolution."; updatedAt = now; }
+    public void replaceCancelled(String source, Instant now) {
+        if (status != OrderShipmentStatus.CANCELLED || providerShipmentId == null) {
+            throw new IllegalStateException("Only a cancelled provider shipment can be replaced.");
+        }
+        externalId = externalId(source + "|replacement|" + providerShipmentId, order.getId());
+        status = OrderShipmentStatus.PENDING_CREATE; providerShipmentId = null; rawStatus = null; rawSubstatus = null;
+        carrierTrackingId = null; trackingUrl = null; estimatedDeliveryAt = null; providerUpdatedAt = null;
+        incident = false; attemptCount = 0; nextAttemptAt = now; leaseUntil = null; leaseToken = null;
+        lastError = null; updatedAt = now;
+    }
     private void requireLease(UUID token) { if (token == null || !token.equals(leaseToken)) throw new IllegalStateException("Stale shipping lease."); }
     private boolean isDamage(String value, String substatus) { return "delivered_with_damage".equalsIgnoreCase(value)
             || "delivered_with_damage".equalsIgnoreCase(substatus); }
+    private boolean isCancellation(String value) { return "cancelled".equalsIgnoreCase(value) || "canceled".equalsIgnoreCase(value); }
     private String truncate(String value) { return truncate(value, 500); }
     private String truncate(String value, int length) { return value == null ? null : value.substring(0, Math.min(length, value.length())); }
     private String externalId(String source, Long orderId) {

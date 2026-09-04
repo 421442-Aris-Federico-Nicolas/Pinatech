@@ -253,6 +253,67 @@ class ResendTransactionalEmailServiceTest {
     }
 
     @Test
+    void shipmentTrackingUsesCorporateLayoutEscapedDetailsAndProviderCta() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+        String trackingUrl = "https://tracking.example.com/ship?code=<42>&customer=Ana";
+        ShipmentTrackingSnapshot snapshot = new ShipmentTrackingSnapshot(
+                "Andreani & <Express>", "TRACK-<42> & listo",
+                java.time.Instant.parse("2026-09-08T15:30:00Z"), trackingUrl);
+
+        ResendTransactionalEmailService.EmailContent content = service.contentForShipmentTracking(
+                "Ana & <Admin>", 42L, snapshot);
+
+        assertEquals("Tu envio ya tiene seguimiento", content.subject());
+        assertTrue(content.html().startsWith("<!doctype html>"));
+        assertTrue(content.html().contains("Hola Ana &amp; &lt;Admin&gt;,"));
+        assertTrue(content.html().contains("Estado del envio"));
+        assertTrue(content.html().contains("Seguimiento disponible"));
+        assertTrue(content.html().contains("Datos del envio"));
+        assertTrue(content.html().contains("Andreani &amp; &lt;Express&gt;"));
+        assertTrue(content.html().contains("TRACK-&lt;42&gt; &amp; listo"));
+        assertTrue(content.html().contains("2026-09-08T15:30:00Z"));
+        assertTrue(content.html().contains("Seguir mi envio"));
+        assertTrue(content.html().contains(">" + trackingUrl.replace("&", "&amp;")
+                .replace("<", "&lt;").replace(">", "&gt;") + "</a>"));
+        assertFalse(content.html().contains("Andreani & <Express>"));
+        assertFalse(content.html().contains("TRACK-<42> & listo"));
+        assertTrue(content.html().contains("#0b1f3a"));
+        assertTrue(content.html().contains("#f97316"));
+        assertTrue(content.html().contains("#22d3ee"));
+        assertTrue(content.text().startsWith("Hola Ana & <Admin>,\n\n"));
+        assertTrue(content.text().contains("ESTADO DEL ENVIO\nSeguimiento disponible"));
+        assertTrue(content.text().contains("DATOS DEL ENVIO\nPedido: #42"));
+        assertTrue(content.text().contains("Transportista: Andreani & <Express>"));
+        assertTrue(content.text().contains("Codigo de seguimiento: TRACK-<42> & listo"));
+        assertTrue(content.text().contains("Entrega estimada: 2026-09-08T15:30:00Z"));
+        assertTrue(content.text().contains("Seguir mi envio:\n" + trackingUrl));
+    }
+
+    @Test
+    void shipmentTrackingPreservesOptionalDetailsWithoutInventingACta() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+        ShipmentTrackingSnapshot snapshot = new ShipmentTrackingSnapshot(null, " ", null, " ");
+
+        ResendTransactionalEmailService.EmailContent content = service.contentForShipmentTracking(
+                null, 42L, snapshot);
+
+        assertTrue(content.html().contains("Hola,"));
+        assertTrue(content.html().contains("No informado"));
+        assertTrue(content.html().contains("No informada"));
+        assertFalse(content.html().contains("Seguir mi envio"));
+        assertFalse(content.html().contains("<a href="));
+        assertTrue(content.text().startsWith("Hola,\n\n"));
+        assertTrue(content.text().contains("Transportista: No informado"));
+        assertTrue(content.text().contains("Codigo de seguimiento: No informado"));
+        assertTrue(content.text().contains("Entrega estimada: No informada"));
+        assertFalse(content.text().contains("Seguir mi envio:"));
+    }
+
+    @Test
     void changedEmailNoticeUsesBrandingWithoutInventingAnActionLink() {
         ResendTransactionalEmailService service = new ResendTransactionalEmailService(
                 true, "key", "Pinatech <accounts@example.com>", "https://store.example.com",

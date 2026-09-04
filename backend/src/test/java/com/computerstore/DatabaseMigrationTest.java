@@ -216,7 +216,7 @@ class DatabaseMigrationTest {
                 WHERE conrelid = 'email_outbox'::regclass
                   AND conname = 'chk_email_outbox_seller_payload'
                 """, Integer.class));
-        assertEquals("27", jdbc.queryForObject(
+        assertEquals("28", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

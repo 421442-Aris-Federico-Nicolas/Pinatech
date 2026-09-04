@@ -35,10 +35,10 @@ public class ShippingController {
     public ResponseEntity<byte[]> label(@PathVariable Long orderId) { return pdf(orderId, true); }
     @GetMapping("/api/admin/shipping/orders/{orderId}/document") @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<byte[]> document(@PathVariable Long orderId) { return pdf(orderId, false); }
-    @PostMapping("/api/admin/shipping/orders/{orderId}/cancel") @PreAuthorize("hasRole('ADMIN')") @Transactional
+    @PostMapping("/api/admin/shipping/orders/{orderId}/cancel") @PreAuthorize("hasRole('ADMIN')")
     public java.util.Map<String,String> cancel(@PathVariable Long orderId) {
         OrderShipment shipment = providerShipment(orderId); String result = gateway.cancel(shipment.getProviderShipmentId());
-        shipment.cancelled(java.time.Instant.now()); return java.util.Map.of("result", result);
+        dispatch.cancelled(orderId, shipment.getProviderShipmentId()); return java.util.Map.of("result", result);
     }
     private ResponseEntity<byte[]> pdf(Long orderId, boolean label) {
         OrderShipment shipment = providerShipment(orderId);

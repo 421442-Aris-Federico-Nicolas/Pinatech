@@ -6,6 +6,7 @@ import java.time.*;
 import java.util.*;
 
 import com.computerstore.email.*;
+import com.computerstore.common.exception.InvalidStateTransitionException;
 import com.computerstore.order.domain.*;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
@@ -93,8 +94,9 @@ public class ShipmentDispatchService {
     public void reconciled(UUID id, UUID token, ZipnovaGateway.ProviderShipment provider,
                            List<ZipnovaGateway.TrackingEvent> history) {
         OrderShipment shipment = shipments.findByIdForUpdate(id).orElseThrow();
-        if (!Objects.equals(shipment.getProviderShipmentId(), provider.id())) throw new IllegalArgumentException("Zipnova shipment mismatch.");
+        if (!Objects.equals(shipment.getProviderShipmentId(), provider.id())) return;
         if (shipment.update(provider, Instant.now(clock))) {
+            persistProviderCancellation(shipment, provider);
             for (var event : history) persistEvent(shipment, event.status(), event.substatus(), event.occurredAt());
             applyOrderState(shipment, provider, documentationReady(provider, history));
         }
@@ -113,15 +115,46 @@ public class ShipmentDispatchService {
         OrderShipment shipment = shipments.findByProviderShipmentId(providerId).orElse(null);
         if (shipment == null) return;
         shipment = shipments.findByIdForUpdate(shipment.getId()).orElseThrow();
+        if (!Objects.equals(shipment.getProviderShipmentId(), providerId) || provider.id() != providerId) return;
         if (!shipment.update(provider, Instant.now(clock))) return;
+        persistProviderCancellation(shipment, provider);
         for (var event : history) persistEvent(shipment, event.status(), event.substatus(), event.occurredAt());
         applyOrderState(shipment, provider, documentationReady(provider, history));
     }
 
     @Transactional public void retry(Long orderId) {
-        OrderShipment shipment = shipments.findByOrderId(orderId).orElseThrow(() ->
+        OrderShipment candidate = shipments.findByOrderId(orderId).orElseThrow(() ->
                 new com.computerstore.common.exception.ResourceNotFoundException("Shipment not found."));
-        shipments.findByIdForUpdate(shipment.getId()).orElseThrow().retryNow(Instant.now(clock));
+        OrderShipment shipment = shipments.findByIdForUpdate(candidate.getId()).orElseThrow();
+        CustomerOrder order = orders.findByIdForUpdate(shipment.getOrder().getId()).orElseThrow();
+        if (order.getFulfillmentMethod() != FulfillmentMethod.DELIVERY
+                || order.getPaymentStatus() != PaymentStatus.APPROVED
+                || order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
+            throw new InvalidStateTransitionException("This order is not eligible for shipment retry.");
+        }
+        if (shipment.getStatus() == OrderShipmentStatus.CANCELLED) {
+            shipment.replaceCancelled(properties.source(), Instant.now(clock));
+            order.markShipmentReplacementPending();
+        } else if (shipment.getStatus() == OrderShipmentStatus.RETRY
+                || shipment.getStatus() == OrderShipmentStatus.FAILED) {
+            shipment.retryNow(Instant.now(clock));
+        } else {
+            throw new InvalidStateTransitionException("Only failed, retrying or cancelled shipments can be retried.");
+        }
+    }
+
+    @Transactional
+    public void cancelled(Long orderId, long providerId) {
+        OrderShipment candidate = shipments.findByOrderId(orderId).orElseThrow(() ->
+                new com.computerstore.common.exception.ResourceNotFoundException("Shipment not found."));
+        OrderShipment shipment = shipments.findByIdForUpdate(candidate.getId()).orElseThrow();
+        if (!Objects.equals(shipment.getProviderShipmentId(), providerId)) {
+            throw new InvalidStateTransitionException("The shipment changed while cancellation was being processed.");
+        }
+        Instant now = Instant.now(clock);
+        shipment.cancelled(now);
+        persistEvent(shipment, "cancelled", null, now);
+        orders.findByIdForUpdate(shipment.getOrder().getId()).orElseThrow().markShipmentCancelled();
     }
 
     @Transactional
@@ -139,6 +172,10 @@ public class ShipmentDispatchService {
             return;
         }
         String status = provider.status().toLowerCase(Locale.ROOT);
+        if (Set.of("cancelled", "canceled").contains(status)) {
+            order.markShipmentCancelled();
+            return;
+        }
         boolean damaged = shipment.isIncident() || "delivered_with_damage".equals(status)
                 || "delivered_with_damage".equalsIgnoreCase(provider.substatus());
         boolean moving = Set.of("shipped", "in_transit", "out_for_delivery", "delivered", "delivered_with_damage").contains(status);
@@ -167,6 +204,13 @@ public class ShipmentDispatchService {
     private void persistEvent(OrderShipment shipment, String status, String substatus, Instant occurred) {
         String key = hash(shipment.getProviderShipmentId() + "|" + status + "|" + Objects.toString(substatus, "") + "|" + occurred);
         if (!events.existsByEventKey(key)) events.save(new ShipmentEvent(shipment, key, status, substatus, occurred, Instant.now(clock)));
+    }
+    private void persistProviderCancellation(OrderShipment shipment, ZipnovaGateway.ProviderShipment provider) {
+        String status = provider.status().toLowerCase(Locale.ROOT);
+        if (Set.of("cancelled", "canceled").contains(status)) {
+            persistEvent(shipment, provider.status(), provider.substatus(),
+                    provider.updatedAt() == null ? Instant.now(clock) : provider.updatedAt());
+        }
     }
     private String hash(String value) { try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
             .digest(value.getBytes(StandardCharsets.UTF_8))); } catch (Exception error) { throw new IllegalStateException(error); } }

@@ -1,12 +1,17 @@
 package com.computerstore.shipping.service;
 
+import java.util.List;
+
 import com.computerstore.shipping.config.ZipnovaProperties;
 import com.computerstore.shipping.gateway.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ShipmentWorker {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ShipmentWorker.class);
     private static final int BATCH_SIZE = 25;
     private final ShipmentDispatchService transactions; private final ZipnovaGateway gateway;
     private final ZipnovaProperties properties;
@@ -41,7 +46,14 @@ public class ShipmentWorker {
     private void reconcile(ShipmentDispatchService.ReconcileInstruction instruction) {
         try {
             var shipment = gateway.getShipment(instruction.providerId());
-            transactions.reconciled(instruction.id(), instruction.token(), shipment, gateway.tracking(instruction.providerId()));
+            List<ZipnovaGateway.TrackingEvent> history = List.of();
+            try {
+                history = gateway.tracking(instruction.providerId());
+            } catch (ShippingProviderException error) {
+                LOGGER.warn("Zipnova tracking lookup failed for shipment {}; applying provider state without history.",
+                        instruction.providerId());
+            }
+            transactions.reconciled(instruction.id(), instruction.token(), shipment, history);
         } catch (ShippingProviderException error) { transactions.reconciliationFailed(instruction.id(), instruction.token()); }
     }
 }

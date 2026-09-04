@@ -68,6 +68,8 @@ describe('AdminComponent payments', () => {
     expect(component.orderActions('READY').map((action) => action.label)).toEqual(['Registrar entrega física']);
     expect(component.orderActions('READY', 'APPROVED', 'DELIVERY')).toEqual([]);
     expect(component.orderActions('SHIPPED', 'APPROVED', 'DELIVERY')).toEqual([]);
+    expect(component.orderActions('PAID', 'APPROVED', 'DELIVERY', 'CANCELLED')).toEqual([]);
+    expect(component.orderActions('PAID', 'APPROVED', 'DELIVERY', 'PENDING', 'CANCELLED')).toEqual([]);
   });
 
   it('initializes real taxonomy selections and does not refresh over dirty product edits without confirmation', async () => {
@@ -285,9 +287,55 @@ describe('AdminComponent payments', () => {
     expect(detail.textContent).not.toContain('Registrar entrega física');
     expect(component.canRetryShipment(deliveryOrder)).toBe(false);
     expect(component.canRetryShipment({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, status: 'FAILED', providerStatus: null } })).toBe(true);
+    expect(component.canRetryShipment({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, status: 'CANCELLED', providerStatus: 'cancelled' } })).toBe(true);
     expect(component.canCancelShipment({ ...deliveryOrder, status: 'SHIPPED' })).toBe(false);
     expect(component.canCancelShipment({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'in_transit' } })).toBe(false);
     expect(component.canDownloadShipmentDocuments({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'new' } })).toBe(false);
+  });
+
+  it('warns about a cancelled shipment and explicitly confirms its replacement', async () => {
+    const cancelledOrder: AdminOrder = {
+      ...renderedOrder,
+      fulfillmentMethod: 'DELIVERY', deliveryMethod: 'ZIPNOVA',
+      shipment: {
+        status: 'CANCELLED', providerStatus: 'cancelled', providerSubstatus: null, carrier: 'Andreani',
+        trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null, incident: true,
+      },
+    };
+    const retryShipment = vi.fn(() => of(void 0));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
+          orders: () => of([cancelledOrder]), pendingBankTransferProofs: () => of([]), retryShipment,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    fixture.componentInstance.section.set('sales');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const detail = fixture.nativeElement.querySelector('.order-detail') as HTMLElement;
+    const replacementButton = Array.from(detail.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Crear envío de reemplazo'));
+    expect(detail.textContent).toContain('Zipnova canceló este envío.');
+    expect(detail.textContent).toContain('El pedido y el pago siguen vigentes.');
+    expect(detail.textContent).not.toContain('Preparar pedido');
+    expect(replacementButton).toBeTruthy();
+
+    const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+    replacementButton?.click();
+    expect(confirmation).toHaveBeenCalledWith(expect.stringContaining('Crear un envío de reemplazo'));
+    expect(retryShipment).not.toHaveBeenCalled();
+
+    confirmation.mockReturnValue(true);
+    replacementButton?.click();
+    expect(retryShipment).toHaveBeenCalledWith(41);
+    confirmation.mockRestore();
   });
 
   it('refreshes orders after requesting an eligible shipment retry', async () => {

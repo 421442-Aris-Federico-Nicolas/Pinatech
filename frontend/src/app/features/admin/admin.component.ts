@@ -543,7 +543,8 @@ export class AdminComponent {
     });
   }
 
-  orderActions(status: string, paymentStatus?: string, fulfillmentMethod?: string | null): OrderAction[] {
+  orderActions(status: string, paymentStatus?: string, fulfillmentMethod?: string | null, fulfillmentStatus?: string, shipmentStatus?: string): OrderAction[] {
+    if (fulfillmentMethod === 'DELIVERY' && (fulfillmentStatus === 'CANCELLED' || shipmentStatus === 'CANCELLED')) return [];
     switch (status as OrderStatus) {
       case 'PENDING_PAYMENT': return paymentStatus === 'UNDER_REVIEW'
         ? []
@@ -559,7 +560,7 @@ export class AdminComponent {
     return order.fulfillmentMethod === 'DELIVERY'
       && order.paymentStatus === 'APPROVED'
       && !['DELIVERED', 'CANCELLED'].includes(order.status)
-      && ['RETRY', 'FAILED'].includes(order.shipment?.status ?? '');
+      && ['RETRY', 'FAILED', 'CANCELLED'].includes(order.shipment?.status ?? '');
   }
 
   canCancelShipment(order: AdminOrder): boolean {
@@ -578,14 +579,20 @@ export class AdminComponent {
 
   retryShipment(order: AdminOrder): void {
     if (!this.canRetryShipment(order) || this.shipmentUpdating() !== null) return;
+    const replacement = order.shipment?.status === 'CANCELLED';
+    if (replacement && !confirm(`¿Crear un envío de reemplazo para el pedido #${order.id}? El pedido y el pago actuales seguirán vigentes.`)) return;
     this.clearMessages();
     this.shipmentUpdating.set(order.id);
     this.service.retryShipment(order.id).pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
       next: () => {
-        this.succeed(`Reintento de envío solicitado para el pedido #${order.id}.`);
+        this.succeed(replacement
+          ? `Envío de reemplazo solicitado para el pedido #${order.id}.`
+          : `Reintento de envío solicitado para el pedido #${order.id}.`);
         this.refreshOrdersAfterShipmentAction();
       },
-      error: () => this.fail('No se pudo reintentar la creación del envío.'),
+      error: () => this.fail(replacement
+        ? 'No se pudo crear el envío de reemplazo.'
+        : 'No se pudo reintentar la creación del envío.'),
     });
   }
 
