@@ -38,7 +38,7 @@ public class UserAddress {
     @Column(nullable = false, length = 120)
     private String locality;
 
-    @Column(name = "province_code", nullable = false, length = 3)
+    @Column(name = "province_code", nullable = false, length = 4)
     private String provinceCode;
 
     @Column(name = "postal_code", nullable = false, length = 12)

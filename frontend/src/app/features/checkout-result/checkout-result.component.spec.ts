@@ -16,6 +16,7 @@ describe('CheckoutResultComponent', () => {
     fulfillmentMethod: 'PICKUP',
     pickupLocation: { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' },
     subtotal: 3000,
+    shippingCost: 0,
     paymentDiscount: 0,
     paymentSurcharge: 300,
     total: 3300,
@@ -24,6 +25,8 @@ describe('CheckoutResultComponent', () => {
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
     items: [],
+    deliveryAddress: null,
+    shipment: null,
   };
 
   afterEach(() => vi.useRealTimers());
@@ -166,6 +169,32 @@ describe('CheckoutResultComponent', () => {
     expect(mascot.querySelector('.order-number')?.textContent).toContain('Pedido #42');
     expect(fixture.nativeElement.querySelector('dl dd')?.textContent).toContain('3');
     expect(fixture.nativeElement.querySelectorAll('dl dt')).toHaveLength(3);
+    fixture.destroy();
+  });
+
+  it('summarizes the delivery cost and destination from the backend order', async () => {
+    const delivery: Order = {
+      ...order, fulfillmentMethod: 'DELIVERY', pickupLocation: null, shippingCost: 850, total: 3850,
+      deliveryAddress: { recipientName: 'Ada Lovelace', street: 'San Martín', streetNumber: '123', floorApartment: null, locality: 'Córdoba', province: 'Córdoba', provinceCode: 'X', postalCode: '5000', countryCode: 'AR', reference: null },
+      shipment: { status: 'PENDING_CREATE', providerStatus: null, providerSubstatus: null, carrier: 'Andreani', trackingCode: null, trackingUrl: null, estimatedDeliveryAt: '2099-08-03T20:00:00Z', incident: false },
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutResultComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ orderId: '42' }) } } },
+        { provide: OrderService, useValue: { get: () => of(delivery) } },
+      ],
+    }).compileComponents();
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(CheckoutResultComponent);
+    vi.advanceTimersByTime(0);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Envío');
+    expect(fixture.nativeElement.textContent).toContain('$850.00');
+    expect(fixture.nativeElement.textContent).toContain('San Martín 123');
+    expect(fixture.nativeElement.textContent).toContain('Entrega estimada');
     fixture.destroy();
   });
 });

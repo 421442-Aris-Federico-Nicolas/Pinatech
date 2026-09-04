@@ -16,13 +16,16 @@
 
     <div class="profile-grid" [class.with-sidebar]="account.roles.includes('CUSTOMER')">
       <section appCard aria-labelledby="personal-title">
-        <div class="section-heading"><p>Información personal</p><h2 id="personal-title">Datos de contacto</h2></div>
+        <div class="section-heading"><p>Información personal</p><h2 id="personal-title">Datos personales y de contacto</h2></div>
         <form id="personal-form" [formGroup]="personalForm" (ngSubmit)="savePersonal()" novalidate>
           <div class="form-row">
             <app-input label="Nombre" name="firstName" formControlName="firstName" autocomplete="given-name" [maxLength]="100" required [error]="fieldError(personalForm.controls.firstName, 'Nombre')" />
             <app-input label="Apellido" name="lastName" formControlName="lastName" autocomplete="family-name" [maxLength]="100" required [error]="fieldError(personalForm.controls.lastName, 'Apellido')" />
           </div>
-          <app-input label="Teléfono (opcional)" type="tel" name="phone" formControlName="phone" autocomplete="tel" inputMode="tel" [maxLength]="30" hint="Entre 6 y 30 dígitos; podés usar +, espacios, paréntesis o guiones." [error]="fieldError(personalForm.controls.phone, 'Teléfono', 'Ingresá un teléfono válido.')" />
+          <div class="form-row">
+            <app-input label="Teléfono (opcional)" type="tel" name="phone" formControlName="phone" autocomplete="tel" inputMode="tel" [maxLength]="30" hint="Entre 6 y 30 dígitos; podés usar +, espacios, paréntesis o guiones." [error]="fieldError(personalForm.controls.phone, 'Teléfono', 'Ingresá un teléfono válido.')" />
+            <app-input label="Documento (opcional)" name="documentNumber" formControlName="documentNumber" autocomplete="off" inputMode="numeric" [maxLength]="30" hint="DNI o CUIT de 7 a 11 dígitos; podés usar puntos, espacios o guiones." [error]="fieldError(personalForm.controls.documentNumber, 'Documento', 'Ingresá entre 7 y 11 dígitos; podés usar puntos, espacios o guiones.')" />
+          </div>
           <button appButton="filled" type="submit" [disabled]="pending() !== null" [attr.aria-busy]="pending() === 'profile'">{{ pending() === 'profile' ? 'Guardando…' : 'Guardar datos' }}</button>
         </form>
       </section>
@@ -67,7 +70,7 @@
             <app-input label="Piso / departamento (opcional)" name="floorApartment" formControlName="floorApartment" autocomplete="address-line3" [maxLength]="50" [error]="fieldError(addressForm.controls.floorApartment, 'Piso o departamento')" />
             <div class="form-row">
               <app-input label="Localidad" name="locality" formControlName="locality" autocomplete="address-level2" [maxLength]="120" required [error]="fieldError(addressForm.controls.locality, 'Localidad')" />
-              <app-input label="Provincia (código)" name="provinceCode" formControlName="provinceCode" autocomplete="address-level1" [maxLength]="3" required hint="Ejemplo: BA, C o SF." [error]="fieldError(addressForm.controls.provinceCode, 'Provincia', 'Usá un código de 1 a 3 letras.')" />
+              <app-select label="Provincia" name="provinceCode" formControlName="provinceCode" placeholder="Seleccioná una provincia" [options]="provinceOptions" required hint="Se guardará el código oficial de una letra compatible con envíos." [error]="fieldError(addressForm.controls.provinceCode, 'Provincia', 'Usá un código de provincia de 1 a 4 letras.')" />
             </div>
             <div class="form-row">
               <app-input label="Código postal" name="postalCode" formControlName="postalCode" autocomplete="postal-code" [maxLength]="12" required [error]="fieldError(addressForm.controls.postalCode, 'Código postal', 'Ingresá un código postal de 4 a 12 caracteres.')" />

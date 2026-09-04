@@ -8,6 +8,7 @@ public record ProfileResponse(
         String lastName,
         String email,
         String phone,
+        String documentNumber,
         boolean emailVerified,
         Set<String> roles,
         AddressResponse address

@@ -8,6 +8,8 @@ import java.util.Objects;
 
 import com.computerstore.common.exception.InvalidStateTransitionException;
 import com.computerstore.user.domain.UserAccount;
+import com.computerstore.shipping.domain.OrderShipment;
+import com.computerstore.shipping.domain.ShippingQuote;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,6 +23,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -77,6 +80,23 @@ public class CustomerOrder {
     @Column(name = "payment_discount", nullable = false, precision = 19, scale = 2)
     private BigDecimal paymentDiscount;
 
+    @Column(name = "shipping_cost", nullable = false, precision = 19, scale = 2)
+    private BigDecimal shippingCost;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipping_quote_id")
+    private ShippingQuote shippingQuote;
+
+    @Column(name = "shipping_carrier_id") private Long shippingCarrierId;
+    @Column(name = "shipping_carrier_name", length = 150) private String shippingCarrierName;
+    @Column(name = "shipping_service_code", length = 100) private String shippingServiceCode;
+    @Column(name = "shipping_service_name", length = 150) private String shippingServiceName;
+    @Column(name = "shipping_logistic_type", length = 100) private String shippingLogisticType;
+    @Column(name = "shipping_eta") private Instant shippingEta;
+
+    @Embedded
+    private DeliveryAddressSnapshot deliveryAddress;
+
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal total;
 
@@ -104,50 +124,41 @@ public class CustomerOrder {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
+    @OneToOne(mappedBy = "order", fetch = FetchType.LAZY)
+    private OrderShipment shipment;
+
     protected CustomerOrder() {
     }
 
-    public CustomerOrder(
-            UserAccount user,
-            List<OrderItem> items,
-            BigDecimal total,
-            Instant reservationExpiresAt,
-            String idempotencyKey,
-            String requestHash
-    ) {
-        this(user, items, total, BigDecimal.ZERO, BigDecimal.ZERO, PaymentMethod.MERCADO_PAGO, reservationExpiresAt,
-                null, null, idempotencyKey, requestHash, null, null);
+    public CustomerOrder(UserAccount user, List<OrderItem> items, BigDecimal total, Instant reservationExpiresAt,
+                         String idempotencyKey, String requestHash) {
+        this(user, items, total, BigDecimal.ZERO, BigDecimal.ZERO, PaymentMethod.MERCADO_PAGO,
+                reservationExpiresAt, null, null, idempotencyKey, requestHash, null, null);
     }
 
-    public CustomerOrder(
-            UserAccount user,
-            List<OrderItem> items,
-            BigDecimal total,
-            Instant reservationExpiresAt,
-            String idempotencyKey,
-            String requestHash,
-            FulfillmentMethod fulfillmentMethod,
-            PickupLocationSnapshot pickupLocation
-    ) {
-        this(user, items, total, BigDecimal.ZERO, BigDecimal.ZERO, PaymentMethod.MERCADO_PAGO, reservationExpiresAt,
-                null, null, idempotencyKey, requestHash, fulfillmentMethod, pickupLocation);
+    public CustomerOrder(UserAccount user, List<OrderItem> items, BigDecimal total, Instant reservationExpiresAt,
+                         String idempotencyKey, String requestHash, FulfillmentMethod fulfillmentMethod,
+                         PickupLocationSnapshot pickupLocation) {
+        this(user, items, total, BigDecimal.ZERO, BigDecimal.ZERO, PaymentMethod.MERCADO_PAGO,
+                reservationExpiresAt, null, null, idempotencyKey, requestHash, fulfillmentMethod, pickupLocation);
     }
 
-    public CustomerOrder(
-            UserAccount user,
-            List<OrderItem> items,
-            BigDecimal subtotal,
-            BigDecimal paymentSurcharge,
-            BigDecimal paymentDiscount,
-            PaymentMethod paymentMethod,
-            Instant reservationExpiresAt,
-            Instant paymentDueAt,
-            BankAccountSnapshot bankAccount,
-            String idempotencyKey,
-            String requestHash,
-            FulfillmentMethod fulfillmentMethod,
-            PickupLocationSnapshot pickupLocation
-    ) {
+    public CustomerOrder(UserAccount user, List<OrderItem> items, BigDecimal subtotal, BigDecimal paymentSurcharge,
+                         BigDecimal paymentDiscount, PaymentMethod paymentMethod, Instant reservationExpiresAt,
+                         Instant paymentDueAt, BankAccountSnapshot bankAccount, String idempotencyKey,
+                         String requestHash, FulfillmentMethod fulfillmentMethod,
+                         PickupLocationSnapshot pickupLocation) {
+        this(user, items, subtotal, paymentSurcharge, paymentDiscount, BigDecimal.ZERO, paymentMethod,
+                reservationExpiresAt, paymentDueAt, bankAccount, idempotencyKey, requestHash,
+                fulfillmentMethod, pickupLocation, null, null);
+    }
+
+    public CustomerOrder(UserAccount user, List<OrderItem> items, BigDecimal subtotal, BigDecimal paymentSurcharge,
+                         BigDecimal paymentDiscount, BigDecimal shippingCost, PaymentMethod paymentMethod,
+                         Instant reservationExpiresAt, Instant paymentDueAt, BankAccountSnapshot bankAccount,
+                         String idempotencyKey, String requestHash, FulfillmentMethod fulfillmentMethod,
+                         PickupLocationSnapshot pickupLocation, ShippingQuote shippingQuote,
+                         DeliveryAddressSnapshot deliveryAddress) {
         this.user = Objects.requireNonNull(user);
         this.status = OrderStatus.PENDING_PAYMENT;
         this.paymentStatus = PaymentStatus.PENDING;
@@ -157,11 +168,13 @@ public class CustomerOrder {
         this.subtotal = Objects.requireNonNull(subtotal);
         this.paymentSurcharge = Objects.requireNonNull(paymentSurcharge);
         this.paymentDiscount = Objects.requireNonNull(paymentDiscount);
+        this.shippingCost = Objects.requireNonNull(shippingCost);
         if (subtotal.signum() < 0 || paymentSurcharge.signum() < 0
-                || paymentDiscount.signum() < 0 || paymentDiscount.compareTo(subtotal) > 0) {
+                || paymentDiscount.signum() < 0 || paymentDiscount.compareTo(subtotal) > 0
+                || shippingCost.signum() < 0) {
             throw new IllegalArgumentException("Order amounts are invalid.");
         }
-        this.total = subtotal.add(paymentSurcharge).subtract(paymentDiscount);
+        this.total = subtotal.add(shippingCost).add(paymentSurcharge).subtract(paymentDiscount);
         this.reservationExpiresAt = reservationExpiresAt;
         this.paymentDueAt = paymentDueAt;
         this.bankAccount = bankAccount;
@@ -179,6 +192,22 @@ public class CustomerOrder {
         this.requestHash = requestHash;
         this.fulfillmentMethod = fulfillmentMethod;
         this.pickupLocation = pickupLocation;
+        this.shippingQuote = shippingQuote;
+        this.deliveryAddress = deliveryAddress;
+        if (fulfillmentMethod == FulfillmentMethod.DELIVERY) {
+            if (shippingQuote == null || deliveryAddress == null) {
+                throw new IllegalArgumentException("Delivery orders require a quote and address snapshot.");
+            }
+            this.deliveryMethod = "ZIPNOVA";
+            this.shippingCarrierId = shippingQuote.getCarrierId();
+            this.shippingCarrierName = shippingQuote.getCarrierName();
+            this.shippingServiceCode = shippingQuote.getServiceCode();
+            this.shippingServiceName = shippingQuote.getServiceName();
+            this.shippingLogisticType = shippingQuote.getLogisticType();
+            this.shippingEta = shippingQuote.getEstimatedDeliveryAt();
+        } else if (shippingCost.signum() != 0 || shippingQuote != null || deliveryAddress != null) {
+            throw new IllegalArgumentException("Pickup orders cannot contain delivery data.");
+        }
         items.forEach(this::addItem);
     }
 
@@ -219,13 +248,22 @@ public class CustomerOrder {
             case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;
             case PAID -> target == OrderStatus.PREPARING;
             case PREPARING -> target == OrderStatus.READY || target == OrderStatus.CANCELLED;
-            case READY -> target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
+            case READY -> target == OrderStatus.SHIPPED || target == OrderStatus.DELIVERED || target == OrderStatus.CANCELLED;
+            case SHIPPED -> target == OrderStatus.DELIVERED;
             default -> false;
         };
         if (!valid) {
             throw new InvalidStateTransitionException("The requested order status transition is not allowed.");
         }
-        if ((target == OrderStatus.PREPARING || target == OrderStatus.READY || target == OrderStatus.DELIVERED)
+        if (target == OrderStatus.SHIPPED && fulfillmentMethod != FulfillmentMethod.DELIVERY) {
+            throw new InvalidStateTransitionException("Pickup orders cannot be shipped.");
+        }
+        if (target == OrderStatus.DELIVERED && status == OrderStatus.READY
+                && fulfillmentMethod == FulfillmentMethod.DELIVERY) {
+            throw new InvalidStateTransitionException("Delivery completion must be reported by Zipnova.");
+        }
+        if ((target == OrderStatus.PREPARING || target == OrderStatus.READY || target == OrderStatus.SHIPPED
+                || target == OrderStatus.DELIVERED)
                 && paymentStatus != PaymentStatus.APPROVED) {
             throw new InvalidStateTransitionException("Fulfillment requires an approved payment without disputes.");
         }
@@ -235,6 +273,7 @@ public class CustomerOrder {
             case PAID -> paymentStatus = PaymentStatus.APPROVED;
             case PREPARING -> fulfillmentStatus = FulfillmentStatus.PREPARING;
             case READY -> fulfillmentStatus = FulfillmentStatus.READY;
+            case SHIPPED -> fulfillmentStatus = FulfillmentStatus.SHIPPED;
             case DELIVERED -> fulfillmentStatus = FulfillmentStatus.DELIVERED;
             case CANCELLED -> {
                 fulfillmentStatus = FulfillmentStatus.CANCELLED;
@@ -312,6 +351,25 @@ public class CustomerOrder {
         paymentStatus = PaymentStatus.CHARGEBACK;
     }
 
+    public void markAuthoritativelyShipped() {
+        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED) return;
+        if (status == OrderStatus.PREPARING || status == OrderStatus.READY) {
+            status = OrderStatus.SHIPPED;
+            fulfillmentStatus = FulfillmentStatus.SHIPPED;
+        }
+    }
+
+    public boolean markAuthoritativelyDelivered() {
+        if (fulfillmentMethod != FulfillmentMethod.DELIVERY || paymentStatus != PaymentStatus.APPROVED) return false;
+        if (status == OrderStatus.PREPARING || status == OrderStatus.READY) markAuthoritativelyShipped();
+        if (status == OrderStatus.SHIPPED) {
+            status = OrderStatus.DELIVERED;
+            fulfillmentStatus = FulfillmentStatus.DELIVERED;
+            return true;
+        }
+        return false;
+    }
+
     public Long getId() { return id; }
     public OrderStatus getStatus() { return status; }
     public PaymentStatus getPaymentStatus() { return paymentStatus; }
@@ -325,6 +383,16 @@ public class CustomerOrder {
     public BigDecimal getSubtotal() { return subtotal; }
     public BigDecimal getPaymentSurcharge() { return paymentSurcharge; }
     public BigDecimal getPaymentDiscount() { return paymentDiscount; }
+    public BigDecimal getShippingCost() { return shippingCost; }
+    public ShippingQuote getShippingQuote() { return shippingQuote; }
+    public Long getShippingCarrierId() { return shippingCarrierId; }
+    public String getShippingCarrierName() { return shippingCarrierName; }
+    public String getShippingServiceCode() { return shippingServiceCode; }
+    public String getShippingServiceName() { return shippingServiceName; }
+    public String getShippingLogisticType() { return shippingLogisticType; }
+    public Instant getShippingEta() { return shippingEta; }
+    public DeliveryAddressSnapshot getDeliveryAddress() { return deliveryAddress; }
+    public OrderShipment getShipment() { return shipment; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getReservationExpiresAt() { return reservationExpiresAt; }
     public Instant getPaymentDueAt() { return paymentDueAt; }

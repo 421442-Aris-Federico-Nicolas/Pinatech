@@ -14,6 +14,7 @@ import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
+import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 
 type PendingAction = 'profile' | 'email' | 'verification' | 'address' | 'delete-address' | null;
@@ -21,7 +22,7 @@ type PendingAction = 'profile' | 'email' | 'verification' | 'address' | 'delete-
 @Component({
   selector: 'app-profile',
   imports: [
-    AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppTextareaComponent,
+    AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent,
     ReactiveFormsModule, RouterLink,
   ],
   templateUrl: './profile.component.html',
@@ -44,11 +45,38 @@ export class ProfileComponent implements OnInit {
   readonly pending = signal<PendingAction>(null);
   readonly editingAddress = signal(false);
   readonly confirmingDelete = signal(false);
+  readonly provinceOptions: readonly AppSelectOption[] = [
+    { value: 'C', label: 'Ciudad Autónoma de Buenos Aires' },
+    { value: 'B', label: 'Buenos Aires' },
+    { value: 'K', label: 'Catamarca' },
+    { value: 'H', label: 'Chaco' },
+    { value: 'U', label: 'Chubut' },
+    { value: 'X', label: 'Córdoba' },
+    { value: 'W', label: 'Corrientes' },
+    { value: 'E', label: 'Entre Ríos' },
+    { value: 'P', label: 'Formosa' },
+    { value: 'Y', label: 'Jujuy' },
+    { value: 'L', label: 'La Pampa' },
+    { value: 'F', label: 'La Rioja' },
+    { value: 'M', label: 'Mendoza' },
+    { value: 'N', label: 'Misiones' },
+    { value: 'Q', label: 'Neuquén' },
+    { value: 'R', label: 'Río Negro' },
+    { value: 'A', label: 'Salta' },
+    { value: 'J', label: 'San Juan' },
+    { value: 'D', label: 'San Luis' },
+    { value: 'Z', label: 'Santa Cruz' },
+    { value: 'S', label: 'Santa Fe' },
+    { value: 'G', label: 'Santiago del Estero' },
+    { value: 'V', label: 'Tierra del Fuego' },
+    { value: 'T', label: 'Tucumán' },
+  ];
 
   readonly personalForm = this.fb.group({
     firstName: ['', [Validators.required, Validators.maxLength(100)]],
     lastName: ['', [Validators.required, Validators.maxLength(100)]],
     phone: ['', [Validators.maxLength(30), Validators.pattern(/^$|^\+?[0-9 ()-]{6,30}$/)]],
+    documentNumber: ['', [Validators.maxLength(30), Validators.pattern(/^$|^(?=(?:\D*\d){7,11}\D*$)[0-9.\s-]+$/)]],
   });
   readonly emailForm = this.fb.group({
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
@@ -59,7 +87,7 @@ export class ProfileComponent implements OnInit {
     number: ['', [Validators.required, Validators.maxLength(30)]],
     floorApartment: ['', Validators.maxLength(50)],
     locality: ['', [Validators.required, Validators.maxLength(120)]],
-    provinceCode: ['', [Validators.required, Validators.pattern(/^[A-Za-z]{1,3}$/)]],
+    provinceCode: ['', [Validators.required, Validators.pattern(/^[A-Za-z]{1,4}$/)]],
     postalCode: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9 -]{4,12}$/)]],
     countryCode: ['AR', [Validators.required, Validators.pattern(/^[A-Za-z]{2}$/)]],
     reference: ['', Validators.maxLength(300)],
@@ -84,10 +112,11 @@ export class ProfileComponent implements OnInit {
       firstName: value.firstName.trim(),
       lastName: value.lastName.trim(),
       phone: value.phone.trim(),
+      documentNumber: value.documentNumber.trim(),
     }).pipe(finalize(() => this.pending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (profile) => {
         this.profile.set(profile);
-        this.personalForm.reset({ firstName: profile.firstName, lastName: profile.lastName, phone: profile.phone ?? '' });
+        this.resetPersonalForm(profile);
         this.replaceSessionUser(profile);
         this.notifications.success('Tus datos personales se guardaron.');
       },
@@ -205,7 +234,7 @@ export class ProfileComponent implements OnInit {
 
   private applyLoadedProfile(profile: Profile): void {
     this.profile.set(profile);
-    this.personalForm.reset({ firstName: profile.firstName, lastName: profile.lastName, phone: profile.phone ?? '' });
+    this.resetPersonalForm(profile);
     this.emailForm.reset({ email: '', currentPassword: '' });
     this.patchAddress(profile.address);
     this.editingAddress.set(!profile.address);
@@ -232,11 +261,28 @@ export class ProfileComponent implements OnInit {
       number: address?.number ?? '',
       floorApartment: address?.floorApartment ?? '',
       locality: address?.locality ?? '',
-      provinceCode: address?.provinceCode ?? '',
+      provinceCode: this.provinceCodeForForm(address?.provinceCode),
       postalCode: address?.postalCode ?? '',
       countryCode: address?.countryCode ?? 'AR',
       reference: address?.reference ?? '',
     });
+  }
+
+  private resetPersonalForm(profile: Profile): void {
+    this.personalForm.reset({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      phone: profile.phone ?? '',
+      documentNumber: profile.documentNumber ?? '',
+    });
+  }
+
+  private provinceCodeForForm(code: string | undefined): string {
+    const normalized = code?.trim().toUpperCase() ?? '';
+    if (normalized === 'BA') return 'B';
+    if (normalized === 'CABA') return 'C';
+    if (normalized === 'SF') return 'S';
+    return normalized;
   }
 
   private prepareForm(form: typeof this.personalForm | typeof this.emailForm | typeof this.addressForm, selector: string): boolean {
@@ -254,7 +300,7 @@ export class ProfileComponent implements OnInit {
   }
 
   private focusFirstInvalid(selector: string): void {
-    this.host.nativeElement.querySelector<HTMLElement>(`${selector} .ng-invalid input, ${selector} .ng-invalid textarea`)?.focus();
+    this.host.nativeElement.querySelector<HTMLElement>(`${selector} .ng-invalid input, ${selector} .ng-invalid textarea, ${selector} app-select.ng-invalid`)?.focus();
   }
 
   private start(action: Exclude<PendingAction, null>): void {

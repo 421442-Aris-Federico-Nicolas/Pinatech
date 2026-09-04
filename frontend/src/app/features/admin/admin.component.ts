@@ -3,7 +3,6 @@ import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef,
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
-import { Order } from '../../core/orders/order.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
@@ -16,11 +15,11 @@ import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
-import { AdminService, Brand, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
+import { AdminOrder, AdminService, Brand, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
-type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
-const ORDER_FILTERS = ['ALL', 'PENDING_PAYMENT', 'PAID', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'];
+type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+const ORDER_FILTERS = ['ALL', 'PENDING_PAYMENT', 'PAID', 'PREPARING', 'READY', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 interface ProductForm extends ProductPayload {}
 interface PendingProductImage { file: File; previewUrl: string; altText: string; }
 interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
@@ -50,7 +49,7 @@ export class AdminComponent {
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
   readonly inventories = signal<Inventory[]>([]);
-  readonly orders = signal<Order[]>([]);
+  readonly orders = signal<AdminOrder[]>([]);
   readonly pendingTransferProofs = signal<PendingBankTransferProof[]>([]);
   readonly proofPreviewUrls = signal<Record<string, string[]>>({});
   readonly proofReviewing = signal<string | null>(null);
@@ -61,6 +60,8 @@ export class AdminComponent {
   readonly expandedOrder = signal<number | null>(null);
   readonly orderFilter = signal<string>('ALL');
   readonly orderUpdating = signal<number | null>(null);
+  readonly shipmentUpdating = signal<number | null>(null);
+  readonly shipmentDocumentLoading = signal<string | null>(null);
   readonly error = signal('');
   readonly saving = signal(false);
   readonly taxonomySaving = signal(false);
@@ -129,7 +130,7 @@ export class AdminComponent {
   }
 
   reload(force = false, preserveMessages = false): void {
-    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock() || (!force && !this.confirmDiscardProductChanges())) return;
+    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock() || this.shipmentUpdating() !== null || this.shipmentDocumentLoading() !== null || (!force && !this.confirmDiscardProductChanges())) return;
     if (!preserveMessages) this.clearMessages();
     this.loading.set(true);
     forkJoin({
@@ -233,6 +234,18 @@ export class AdminComponent {
     }
     if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) {
       this.failAndFocus('Seleccioná una marca válida.', '[name="productBrand"]');
+      return;
+    }
+    const shippingFields = [
+      { value: this.form.shippingWeightGrams, min: 10, max: 10000000, label: 'peso', selector: '[name="shippingWeightGrams"]' },
+      { value: this.form.shippingHeightCm, min: 1, max: 5000, label: 'alto', selector: '[name="shippingHeightCm"]' },
+      { value: this.form.shippingWidthCm, min: 1, max: 5000, label: 'ancho', selector: '[name="shippingWidthCm"]' },
+      { value: this.form.shippingLengthCm, min: 1, max: 5000, label: 'largo', selector: '[name="shippingLengthCm"]' },
+      { value: this.form.shippingClassificationId, min: 1, max: 8, label: 'clasificación', selector: '[name="shippingClassificationId"]' },
+    ];
+    const invalidShippingField = shippingFields.find((field) => !Number.isInteger(Number(field.value)) || Number(field.value) < field.min || Number(field.value) > field.max);
+    if (invalidShippingField) {
+      this.failAndFocus(`Indicá un ${invalidShippingField.label} entero entre ${invalidShippingField.min} y ${invalidShippingField.max}.`, invalidShippingField.selector);
       return;
     }
     const incompleteSpecification = this.form.specifications.findIndex((item) => !item.groupName.trim() || !item.name.trim() || !item.value.trim());
@@ -513,7 +526,7 @@ export class AdminComponent {
     });
   }
 
-  changeOrderStatus(order: Order, action: OrderAction): void {
+  changeOrderStatus(order: AdminOrder, action: OrderAction): void {
     if (action.danger && !confirm(`¿Cancelar el pedido #${order.id}? El stock reservado o preparado volverá a estar disponible.`)) return;
     this.clearMessages();
     this.orderUpdating.set(order.id);
@@ -530,16 +543,92 @@ export class AdminComponent {
     });
   }
 
-  orderActions(status: string, paymentStatus?: string): OrderAction[] {
+  orderActions(status: string, paymentStatus?: string, fulfillmentMethod?: string | null): OrderAction[] {
     switch (status as OrderStatus) {
       case 'PENDING_PAYMENT': return paymentStatus === 'UNDER_REVIEW'
         ? []
         : [{ label: 'Cancelar', status: 'CANCELLED', danger: true }];
       case 'PAID': return [{ label: 'Preparar pedido', status: 'PREPARING' }];
       case 'PREPARING': return [{ label: 'Marcar listo', status: 'READY' }];
-      case 'READY': return [{ label: 'Registrar entrega física', status: 'DELIVERED' }];
+      case 'READY': return fulfillmentMethod === 'DELIVERY' ? [] : [{ label: 'Registrar entrega física', status: 'DELIVERED' }];
       default: return [];
     }
+  }
+
+  canRetryShipment(order: AdminOrder): boolean {
+    return order.fulfillmentMethod === 'DELIVERY'
+      && order.paymentStatus === 'APPROVED'
+      && !['DELIVERED', 'CANCELLED'].includes(order.status)
+      && ['RETRY', 'FAILED'].includes(order.shipment?.status ?? '');
+  }
+
+  canCancelShipment(order: AdminOrder): boolean {
+    const providerStatus = order.shipment?.providerStatus?.toLowerCase() ?? '';
+    return order.fulfillmentMethod === 'DELIVERY'
+      && order.shipment?.status === 'ACTIVE'
+      && !['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(order.status)
+      && ['new', 'documentation_ready'].includes(providerStatus);
+  }
+
+  canDownloadShipmentDocuments(order: AdminOrder): boolean {
+    const providerStatus = order.shipment?.providerStatus?.toLowerCase() ?? '';
+    return ['ACTIVE', 'INCIDENT', 'DELIVERED'].includes(order.shipment?.status ?? '')
+      && ['documentation_ready', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'delivered_with_damage'].includes(providerStatus);
+  }
+
+  retryShipment(order: AdminOrder): void {
+    if (!this.canRetryShipment(order) || this.shipmentUpdating() !== null) return;
+    this.clearMessages();
+    this.shipmentUpdating.set(order.id);
+    this.service.retryShipment(order.id).pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
+      next: () => {
+        this.succeed(`Reintento de envío solicitado para el pedido #${order.id}.`);
+        this.refreshOrdersAfterShipmentAction();
+      },
+      error: () => this.fail('No se pudo reintentar la creación del envío.'),
+    });
+  }
+
+  cancelShipment(order: AdminOrder): void {
+    if (!this.canCancelShipment(order) || this.shipmentUpdating() !== null
+      || !confirm(`¿Cancelar el envío de Zipnova para el pedido #${order.id}? Esta acción no cancela el pedido.`)) return;
+    this.clearMessages();
+    this.shipmentUpdating.set(order.id);
+    this.service.cancelShipment(order.id).pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
+      next: () => {
+        this.succeed(`Envío del pedido #${order.id} cancelado en Zipnova.`);
+        this.refreshOrdersAfterShipmentAction();
+      },
+      error: () => this.fail('No se pudo cancelar el envío en Zipnova.'),
+    });
+  }
+
+  downloadShipmentPdf(order: AdminOrder, kind: 'label' | 'document'): void {
+    if (!this.canDownloadShipmentDocuments(order) || this.shipmentDocumentLoading() !== null) return;
+    this.clearMessages();
+    const key = `${order.id}-${kind}`;
+    this.shipmentDocumentLoading.set(key);
+    const request = kind === 'label' ? this.service.shipmentLabel(order.id) : this.service.shipmentDocument(order.id);
+    request.pipe(finalize(() => this.shipmentDocumentLoading.set(null))).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `PIN-${order.id}-${kind === 'label' ? 'label' : 'document'}.pdf`;
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      },
+      error: () => this.fail(`No se pudo descargar ${kind === 'label' ? 'la etiqueta' : 'el documento'} del envío.`),
+    });
+  }
+
+  shipmentStatusLabel(status: string): string {
+    return ({
+      PENDING_CREATE: 'Pendiente de creación', CREATING: 'Creando envío', ACTIVE: 'Activo', RETRY: 'Reintento pendiente',
+      BLOCKED_PAYMENT: 'Bloqueado por pago', CANCELLED: 'Cancelado', DELIVERED: 'Entregado', INCIDENT: 'Con incidencia', FAILED: 'Fallido',
+    } as Record<string, string>)[status] ?? status;
   }
 
   statusLabel(status: string): string {
@@ -563,7 +652,7 @@ export class AdminComponent {
   stockForVariant(variantId: number): Inventory | undefined { return this.inventories().find((item) => item.variantId === variantId); }
   imageLabel(image: ProductImage, index?: number): string { return image.originalFilename || image.altText || (index === undefined ? `Imagen ${image.id}` : `Imagen ${index + 1}`); }
   variantImage(imageId: number | null | undefined): ProductImage | undefined { return this.selected()?.images.find((image) => image.id === imageId); }
-  totalItems(order: Order): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
+  totalItems(order: AdminOrder): number { return order.items.reduce((total, item) => total + item.quantity, 0); }
 
   approveProof(proof: PendingBankTransferProof): void {
     if (!this.proofPreviewsReady(proof)) {
@@ -669,14 +758,20 @@ export class AdminComponent {
     this.proofPreviewUrls.set({});
   }
 
-  private emptyProduct(): ProductForm { return { name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0, specifications: [], variants: [{ colorName: 'Único', colorHex: null, imageId: null }] }; }
+  private emptyProduct(): ProductForm {
+    return {
+      name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0,
+      shippingWeightGrams: 0, shippingHeightCm: 0, shippingWidthCm: 0, shippingLengthCm: 0, shippingClassificationId: 1,
+      mustKeepVertical: false, specifications: [], variants: [{ colorName: 'Único', colorHex: null, imageId: null }],
+    };
+  }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
     this.products.update((products) => products.some((current) => current.id === product.id)
       ? products.map((current) => current.id === product.id ? product : current)
       : [...products, product]);
     if (preservePendingImages) {
       this.selected.set(product);
-      Object.assign(this.form, { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })) });
+      Object.assign(this.form, this.productForm(product));
       this.productSnapshot = this.productState();
       this.selectedVariantId.set(product.variants[0]?.id ?? null);
       this.inventory.set(this.inventories().find((item) => item.variantId === this.selectedVariantId()) ?? null);
@@ -715,12 +810,33 @@ export class AdminComponent {
     return Number.isInteger(value) && value > 0 && items.some((item) => item.id === value);
   }
   private productForm(product: Product): ProductForm {
-    return { ...product, specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })), variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })) };
+    return {
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: product.price,
+      categoryId: product.categoryId,
+      brandId: product.brandId,
+      shippingWeightGrams: product.shippingWeightGrams ?? 0,
+      shippingHeightCm: product.shippingHeightCm ?? 0,
+      shippingWidthCm: product.shippingWidthCm ?? 0,
+      shippingLengthCm: product.shippingLengthCm ?? 0,
+      shippingClassificationId: product.shippingClassificationId ?? 1,
+      mustKeepVertical: product.mustKeepVertical ?? false,
+      specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })),
+      variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })),
+    };
   }
   private productState(): string { return JSON.stringify(this.form); }
   private confirmDiscardProductChanges(): boolean {
     if (this.section() !== 'catalog' || (this.productState() === this.productSnapshot && !this.pendingImages().length)) return true;
     return confirm('Tenés cambios sin guardar en el producto. ¿Querés descartarlos?');
+  }
+  private refreshOrdersAfterShipmentAction(): void {
+    this.service.orders().subscribe({
+      next: (orders) => this.orders.set(orders),
+      error: () => this.notifications.warning('La acción se registró, pero no pudimos actualizar el estado del envío. Usá Actualizar para reintentar.'),
+    });
   }
   private isSection(value: string | null): value is AdminSection { return ['overview', 'sales', 'catalog', 'inventory'].includes(value ?? ''); }
   private syncUrl(queryParams: Record<string, string | number | null | undefined>): void {

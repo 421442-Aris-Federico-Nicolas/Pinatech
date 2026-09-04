@@ -36,6 +36,12 @@ class ProductControllerTest {
         when(product.getId()).thenReturn(1L);
         when(product.getCategory()).thenReturn(category);
         when(product.getBrand()).thenReturn(brand);
+        when(product.getShippingWeightGrams()).thenReturn(500);
+        when(product.getShippingHeightCm()).thenReturn(10);
+        when(product.getShippingWidthCm()).thenReturn(20);
+        when(product.getShippingLengthCm()).thenReturn(30);
+        when(product.getShippingClassificationId()).thenReturn(2);
+        when(product.isMustKeepVertical()).thenReturn(true);
         when(variant.getId()).thenReturn(7L);
         when(variant.getProduct()).thenReturn(product);
         when(variant.getImageId()).thenReturn(9L);
@@ -48,5 +54,8 @@ class ProductControllerTest {
         var response = controller.detail(1L);
 
         assertEquals(9L, response.variants().getFirst().imageId());
+        assertEquals(500, response.shippingWeightGrams());
+        assertEquals(2, response.shippingClassificationId());
+        assertEquals(true, response.mustKeepVertical());
     }
 }

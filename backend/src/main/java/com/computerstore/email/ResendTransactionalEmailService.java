@@ -132,6 +132,23 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
         send(recipient, contentForSellerOrderEvent(eventType, snapshot, adminUrl), idempotencyKey);
     }
 
+    @Override
+    public void sendShipmentTracking(UUID idempotencyKey, String recipient, String customerName, Long orderId,
+                                     ShipmentTrackingSnapshot snapshot) {
+        if (!enabled) { LOGGER.info("Transactional email disabled; completed outbox event={}",
+                OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE); return; }
+        String orderUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl).path("/orders")
+                .queryParam("order", orderId).build().encode().toUriString();
+        String detail = "Transportista: " + display(snapshot.carrier()) + "\nCodigo de seguimiento: "
+                + display(snapshot.code()) + "\nEntrega estimada: " + instant(snapshot.estimatedDeliveryAt());
+        send(recipient, renderBrandedEmail(new EmailTemplate(
+                "Tu envio ya tiene seguimiento", "Ya podes seguir el envio de tu pedido #" + orderId + ".",
+                "Seguimiento disponible", greeting(customerName),
+                List.of("La documentacion de tu envio esta lista.", detail), null,
+                "Ver mi pedido", orderUrl,
+                "El seguimiento seguro y actualizado esta disponible desde tu pedido Pinatech."), emailLogoUrl), idempotencyKey);
+    }
+
     EmailContent contentFor(AccountActionPurpose purpose, String firstName, String actionUrl) {
         return switch (purpose) {
             case EMAIL_VERIFICATION -> renderEmailVerification(firstName, actionUrl, emailLogoUrl);
@@ -213,11 +230,16 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     "Registramos la entrega de tu pedido " + orderNumber + ".",
                     "Pedido entregado",
                     greeting(customerName),
-                    List.of("Registramos la entrega fisica de tu pedido " + orderNumber + ". Gracias por elegir Pinatech."),
+                    List.of("Registramos la entrega de tu pedido " + orderNumber + ". Gracias por comprar en Pinatech."),
                     null,
                     "Ver mi pedido",
                     orderUrl,
                     "Conserva este email como confirmacion de la entrega.");
+            case SHIPMENT_TRACKING_AVAILABLE -> new EmailTemplate(
+                    "Tu envio ya tiene seguimiento", "Ya podes seguir el envio de tu pedido " + orderNumber + ".",
+                    "Seguimiento disponible", greeting(customerName),
+                    List.of("La documentacion de tu envio esta lista. Consulta el codigo de seguimiento desde tu pedido."),
+                    null, "Ver mi pedido", orderUrl, "Segui siempre tu envio desde tu cuenta Pinatech.");
             case SELLER_ORDER_CREATED, SELLER_PAYMENT_APPROVED ->
                     throw new IllegalArgumentException("Seller events require a seller order snapshot.");
         };
@@ -254,9 +276,10 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                 + "\nEstado: " + display(snapshot.paymentStatus()));
         paragraphs.add("Importes\nMoneda: " + display(snapshot.currency())
                 + "\nSubtotal: " + amount(snapshot.subtotal())
-                + "\nDescuento: " + amount(snapshot.discount())
-                + "\nRecargo: " + amount(snapshot.surcharge())
-                + "\nTotal: " + amount(snapshot.total()));
+                 + "\nDescuento: " + amount(snapshot.discount())
+                 + "\nRecargo: " + amount(snapshot.surcharge())
+                 + "\nEnvio: " + amount(snapshot.shipping())
+                 + "\nTotal: " + amount(snapshot.total()));
         paragraphs.add("Cliente\nNombre: " + display(snapshot.customerName())
                 + "\nEmail: " + display(snapshot.customerEmail())
                 + "\nTelefono: " + display(snapshot.customerPhone()));
@@ -274,6 +297,20 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                 .append("\nEstado de fulfillment: ").append(display(snapshot.fulfillmentStatus()))
                 .append("\nMetodo de entrega: ").append(display(snapshot.deliveryMethod()));
         SellerOrderSnapshot.Pickup pickup = snapshot.pickup();
+        SellerOrderSnapshot.Delivery delivery = snapshot.delivery();
+        if (delivery != null) {
+            String address = display(delivery.street()) + " " + display(delivery.streetNumber());
+            if (delivery.floorApartment() != null && !delivery.floorApartment().isBlank()) {
+                address += ", " + delivery.floorApartment();
+            }
+            return details.append("\nDestinatario: ").append(display(delivery.recipientName()))
+                    .append("\nDireccion: ").append(address)
+                    .append("\nLocalidad: ").append(display(delivery.locality()))
+                    .append("\nProvincia: ").append(display(delivery.province()))
+                    .append("\nCodigo postal: ").append(display(delivery.postalCode()))
+                    .append("\nReferencia: ").append(display(delivery.reference()))
+                    .toString();
+        }
         if (pickup == null) return details.append("\nRetiro: No aplica").toString();
         return details.append("\nRetiro - codigo: ").append(display(pickup.code()))
                 .append("\nRetiro - nombre: ").append(display(pickup.name()))

@@ -193,6 +193,21 @@ https://store.example.com/api/payments/webhooks/mercado-pago
 Las URLs de retorno del navegador no prueban un pago. Solo el webhook firmado seguido por
 la consulta autoritativa al proveedor puede aprobarlo.
 
+## 5.1 Zipnova en produccion
+
+Mantener `ZIPNOVA_ENABLED=false` y `ZIPNOVA_PRODUCTION_CONFIRMATION=false` hasta revisar el
+catálogo y completar una prueba controlada con la cuenta productiva:
+
+1. Confirmar `ZIPNOVA_ACCOUNT_ID`, `ZIPNOVA_ORIGIN_ID`, dirección del origen y permisos de las credenciales.
+2. Cargar `ZIPNOVA_TOKEN` y `ZIPNOVA_SECRET` solo en el gestor de secretos o archivo `0600`.
+3. Generar un `ZIPNOVA_WEBHOOK_SECRET` aleatorio y URL-safe de 24 a 200 caracteres. Registrar exactamente `https://store.example.com/api/shipping/webhooks/zipnova/{secreto}` y redactar esa ruta en logs del proxy/APM.
+4. Verificar que todos los productos vendibles tengan peso, dimensiones, clasificación y orientación; validar además DNI/CUIT, teléfono y dirección del comprador de prueba.
+5. Probar cotización, precio con impuestos, expiración, creación idempotente, etiqueta, documento, tracking, entrega normal, entrega con daño y caída temporal del proveedor.
+6. Activar juntos `ZIPNOVA_ENABLED=true` y `ZIPNOVA_PRODUCTION_CONFIRMATION=true` durante una ventana controlada. Confirmar que `GET /api/checkout/capabilities` anuncia `ZIPNOVA` y `DELIVERY`.
+
+Una desactivación impide nuevas cotizaciones y pausa workers. Antes de desactivar con pedidos
+pagados pendientes, coordinar su despacho o cancelación manual para no dejarlos en espera.
+
 ## 6. Backups, PITR y restauracion
 
 Un volumen Docker, un snapshot sin consistencia o un `pg_dump` local no constituyen por si

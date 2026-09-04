@@ -3,6 +3,8 @@ package com.computerstore.profile.service;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 
@@ -11,6 +13,8 @@ import java.util.Optional;
 import com.computerstore.auth.repository.RefreshTokenRepository;
 import com.computerstore.common.exception.AuthenticationFailureException;
 import com.computerstore.email.TransactionalEmailService;
+import com.computerstore.common.exception.InvalidRequestException;
+import com.computerstore.profile.dto.UpdateProfileRequest;
 import com.computerstore.user.domain.AccountActionPurpose;
 import com.computerstore.user.domain.AccountActionToken;
 import com.computerstore.user.domain.UserAccount;
@@ -23,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ProfileServiceTest {
@@ -96,5 +101,34 @@ class ProfileServiceTest {
 
         verify(emails).sendAccountAction(
                 "new@example.com", "Ana", AccountActionPurpose.EMAIL_CHANGE, "raw-token");
+    }
+
+    @Test
+    void normalizesAndClearsTheProfileDocumentNumber() {
+        UserAccount account = new UserAccount("Ana", "Perez", "ana@example.com", "hash", null);
+        ReflectionTestUtils.setField(account, "id", 4L);
+        when(users.findByIdAndActiveTrue(4L)).thenReturn(Optional.of(account));
+        when(addresses.findById(4L)).thenReturn(Optional.empty());
+
+        var updated = service.updateProfile(4L,
+                new UpdateProfileRequest(null, null, null, "20.123-456 78"));
+
+        assertEquals("2012345678", account.getDocumentNumber());
+        assertEquals("2012345678", updated.documentNumber());
+
+        var cleared = service.updateProfile(4L, new UpdateProfileRequest(null, null, null, " - . "));
+
+        assertNull(account.getDocumentNumber());
+        assertNull(cleared.documentNumber());
+    }
+
+    @Test
+    void rejectsAnInvalidDocumentNumberWhenCalledWithoutControllerValidation() {
+        UserAccount account = new UserAccount("Ana", "Perez", "ana@example.com", "hash", null);
+        ReflectionTestUtils.setField(account, "id", 4L);
+        when(users.findByIdAndActiveTrue(4L)).thenReturn(Optional.of(account));
+
+        assertThrows(InvalidRequestException.class,
+                () -> service.updateProfile(4L, new UpdateProfileRequest(null, null, null, "12A34567")));
     }
 }

@@ -213,7 +213,7 @@ describe('CartService', () => {
     const cart = TestBed.inject(CartService);
     cart.add(product, variant, 2);
     let createdOrder: Parameters<typeof cart.completeCheckout>[0] | undefined;
-    cart.checkout('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe((order) => createdOrder = order);
+    cart.checkout('BANK_TRANSFER', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe((order) => createdOrder = order);
 
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/orders`);
     expect(request.request.body).toEqual({
@@ -222,6 +222,7 @@ describe('CartService', () => {
       fulfillmentMethod: 'PICKUP',
       pickupLocationCode: pickupLocation.code,
       pickupLocationVersion: pickupLocation.version,
+      shippingQuoteId: null,
     });
     expect(request.request.headers.get('Idempotency-Key')).toBeTruthy();
     request.flush({
@@ -258,12 +259,12 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe();
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe();
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
     retry.flush({
@@ -290,12 +291,12 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', 'CORDOBA_CENTRO', 'v1').subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: 'CORDOBA_CENTRO', pickupLocationVersion: 'v1', shippingQuoteId: null }).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({ detail: 'Temporary failure' }, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', 'CORDOBA_NORTE', 'v1').subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: 'CORDOBA_NORTE', pickupLocationVersion: 'v1', shippingQuoteId: null }).subscribe({ error: () => undefined });
     const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
     expect(changed.request.body.pickupLocationCode).toBe('CORDOBA_NORTE');
@@ -307,13 +308,13 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const mercadoPago = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const mercadoPagoKey = mercadoPago.request.headers.get('Idempotency-Key');
     expect(mercadoPago.request.body.paymentMethod).toBe('MERCADO_PAGO');
     mercadoPago.flush({}, { status: 503, statusText: 'Unavailable' });
 
-    cart.checkout('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('BANK_TRANSFER', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const transfer = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(transfer.request.body.paymentMethod).toBe('BANK_TRANSFER');
     expect(transfer.request.headers.get('Idempotency-Key')).not.toBe(mercadoPagoKey);
@@ -327,22 +328,44 @@ describe('CartService', () => {
     const http = TestBed.inject(HttpTestingController);
     cart.add(product, variant);
 
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
     const firstKey = first.request.headers.get('Idempotency-Key');
     first.flush({}, { status: 503, statusText: 'Unavailable' });
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const retry = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
     retry.flush({}, { status: 503, statusText: 'Unavailable' });
 
     cart.setQuantity(variant.id, 2);
-    cart.checkout('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version).subscribe({ error: () => undefined });
+    cart.checkout('MERCADO_PAGO', { fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code, pickupLocationVersion: pickupLocation.version, shippingQuoteId: null }).subscribe({ error: () => undefined });
     const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
     expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
     changed.flush({}, { status: 503, statusText: 'Unavailable' });
     getItem.mockRestore();
     setItem.mockRestore();
+  });
+
+  it('sends only the selected delivery quote and includes it in the idempotency attempt hash', () => {
+    const cart = TestBed.inject(CartService);
+    const http = TestBed.inject(HttpTestingController);
+    cart.add(product, variant, 2);
+    const firstQuote = '0b47f21d-a03a-4bc6-a59a-a761a31bd68d';
+    const secondQuote = '223adb84-57c7-4efe-951e-feb7d7d0d750';
+
+    cart.checkout('BANK_TRANSFER', { fulfillmentMethod: 'DELIVERY', pickupLocationCode: null, pickupLocationVersion: null, shippingQuoteId: firstQuote }).subscribe({ error: () => undefined });
+    const first = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    const firstKey = first.request.headers.get('Idempotency-Key');
+    expect(first.request.body).toEqual({
+      items: [{ variantId: 11, quantity: 2 }], paymentMethod: 'BANK_TRANSFER', fulfillmentMethod: 'DELIVERY',
+      pickupLocationCode: null, pickupLocationVersion: null, shippingQuoteId: firstQuote,
+    });
+    first.flush({}, { status: 503, statusText: 'Unavailable' });
+
+    cart.checkout('BANK_TRANSFER', { fulfillmentMethod: 'DELIVERY', pickupLocationCode: null, pickupLocationVersion: null, shippingQuoteId: secondQuote }).subscribe({ error: () => undefined });
+    const changed = http.expectOne(`${environment.apiBaseUrl}/orders`);
+    expect(changed.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
+    changed.flush({}, { status: 503, statusText: 'Unavailable' });
   });
 
   it('does not activate a residual user cart without an authenticated session', () => {

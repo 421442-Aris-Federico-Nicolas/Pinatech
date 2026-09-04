@@ -17,6 +17,7 @@ import com.computerstore.common.exception.ReservationExpiredException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.domain.PaymentStatus;
+import com.computerstore.order.domain.FulfillmentMethod;
 import com.computerstore.order.dto.OrderResponse;
 import com.computerstore.order.dto.OrderResponseMapper;
 import com.computerstore.order.dto.OrderStatusRequest;
@@ -65,6 +66,10 @@ public class AdminOrderController {
         }
         var order = orders.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
+        if (order.getFulfillmentMethod() == FulfillmentMethod.DELIVERY
+                && (request.status() == OrderStatus.SHIPPED || request.status() == OrderStatus.DELIVERED)) {
+            throw new InvalidStateTransitionException("Zipnova is authoritative for delivery shipment states.");
+        }
         if (request.status() == OrderStatus.CANCELLED && order.getPaymentStatus() == PaymentStatus.APPROVED) {
             throw new InvalidStateTransitionException(
                     "A paid order cannot be cancelled until its payment is refunded.");

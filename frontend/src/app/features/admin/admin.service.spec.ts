@@ -35,6 +35,7 @@ describe('AdminService product images', () => {
     const service = TestBed.inject(AdminService);
     const payload = {
       name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 100, categoryId: 2, brandId: 3, specifications: [],
+      shippingWeightGrams: 450, shippingHeightCm: 8, shippingWidthCm: 12, shippingLengthCm: 18, shippingClassificationId: 2, mustKeepVertical: true,
       variants: [{ id: 7, colorName: 'Negro', colorHex: '#000000', imageId: 8 }],
     };
 
@@ -43,7 +44,37 @@ describe('AdminService product images', () => {
     const request = TestBed.inject(HttpTestingController).expectOne(`${environment.apiBaseUrl}/admin/catalog/products/3`);
     expect(request.request.method).toBe('PUT');
     expect(request.request.body.variants[0].imageId).toBe(8);
+    expect(request.request.body).toEqual(payload);
     request.flush({});
+  });
+
+  it('uses the Zipnova admin action and PDF endpoints', () => {
+    const service = TestBed.inject(AdminService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.retryShipment(41).subscribe();
+    const retry = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/retry`);
+    expect(retry.request.method).toBe('POST');
+    expect(retry.request.body).toBeNull();
+    retry.flush(null);
+
+    service.cancelShipment(41).subscribe();
+    const cancellation = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/cancel`);
+    expect(cancellation.request.method).toBe('POST');
+    expect(cancellation.request.body).toBeNull();
+    cancellation.flush({ result: 'cancelled' });
+
+    service.shipmentLabel(41).subscribe();
+    const label = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/label`);
+    expect(label.request.method).toBe('GET');
+    expect(label.request.responseType).toBe('blob');
+    label.flush(new Blob(['label'], { type: 'application/pdf' }));
+
+    service.shipmentDocument(41).subscribe();
+    const document = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/document`);
+    expect(document.request.method).toBe('GET');
+    expect(document.request.responseType).toBe('blob');
+    document.flush(new Blob(['document'], { type: 'application/pdf' }));
   });
 
   it('updates and deletes categories through admin catalog endpoints', () => {

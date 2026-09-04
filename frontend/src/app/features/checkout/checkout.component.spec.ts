@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
@@ -24,7 +24,7 @@ describe('CheckoutComponent', () => {
     deliveryQuotesEnabled: false,
     paymentMethods: ['MERCADO_PAGO'],
     bankTransferDiscountRate: 0.1,
-    deliveryMethods: [],
+    deliveryMethods: ['ZIPNOVA'],
     fulfillmentMethods: ['PICKUP'],
     pickupLocations: [pickupLocation],
   };
@@ -39,11 +39,14 @@ describe('CheckoutComponent', () => {
     fulfillmentMethod: 'PICKUP',
     pickupLocation,
     subtotal: 3000,
+    shippingCost: 0,
     paymentDiscount: 0,
     paymentSurcharge: 0,
     total: 3000,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2026-07-29T20:00:00Z',
+    deliveryAddress: null,
+    shipment: null,
   };
   const payment: MercadoPagoCheckout = {
     attemptId: 'attempt-1',
@@ -58,6 +61,13 @@ describe('CheckoutComponent', () => {
     requestEmailVerification.mockClear();
     TestBed.configureTestingModule({ providers: [{ provide: AuthService, useValue: { user: authenticatedUser, requestEmailVerification } }] });
   });
+
+  function enterPaymentStep(fixture: ComponentFixture<CheckoutComponent>): void {
+    fixture.componentInstance.selectPickup({ target: { value: pickupLocation.code } } as unknown as Event);
+    fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.continueToPayment();
+    fixture.detectChanges();
+  }
 
   it('creates the order, creates the Mercado Pago preference and redirects in that order', async () => {
     const calls: string[] = [];
@@ -88,27 +98,48 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('input[name="paymentMethod"]').length).toBe(0);
+    expect(fixture.nativeElement.textContent).toContain('Pinatech Centro');
+    expect(fixture.nativeElement.textContent).not.toContain('Av. Colón 123');
+    expect(fixture.nativeElement.querySelector('.pickup-consent')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.carrier-brand--pickup iconify-icon')?.getAttribute('icon')).toBe('line-md:map-marker');
+
+    (fixture.nativeElement.querySelector(`input[value="${pickupLocation.code}"]`) as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Av. Colón 123');
+    expect(fixture.nativeElement.textContent).toContain('Lunes a viernes de 9 a 18.');
+    expect(fixture.nativeElement.textContent).toContain('Presentá tu DNI.');
+    expect(fixture.nativeElement.textContent).toContain('Entiendo que debo retirar en Córdoba');
+    expect(fixture.nativeElement.querySelector('.delivery-card--pickup .pickup-consent')).toBeTruthy();
+    (fixture.nativeElement.querySelector('.pickup-consent input') as HTMLInputElement).click();
+    fixture.detectChanges();
+    fixture.componentInstance.continueToPayment();
+    fixture.detectChanges();
     const radios = fixture.nativeElement.querySelectorAll('input[name="paymentMethod"]') as NodeListOf<HTMLInputElement>;
     expect([...radios].every((radio) => !radio.checked)).toBe(true);
     radios[0].click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Pagar con Mercado Pago');
-    expect(fixture.nativeElement.textContent).toContain('Pinatech Centro');
-    expect(fixture.nativeElement.textContent).toContain('Entiendo que debo retirar en Córdoba');
     const paymentButton = [...fixture.nativeElement.querySelectorAll('button')]
       .find((candidate: HTMLButtonElement) => candidate.textContent?.includes('Pagar con Mercado Pago')) as HTMLButtonElement;
     expect(paymentButton.getAttribute('aria-label')).toBe('Pagar con Mercado Pago');
     expect(paymentButton.classList).toContain('app-button');
-    expect(fixture.nativeElement.querySelectorAll('.panel.app-card').length).toBe(3);
+    expect(fixture.nativeElement.querySelectorAll('.panel.app-card').length).toBe(1);
     expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
-    expect(fixture.nativeElement.querySelector('.product-list')?.tagName).toBe('UL');
-    (fixture.nativeElement.querySelector('.pickup-consent input') as HTMLInputElement).click();
+    expect(fixture.nativeElement.querySelector('.product-list')).toBeNull();
+    expect((fixture.nativeElement.querySelector('img[src="/mercadopago-logo.png"]') as HTMLImageElement).src).toContain('mercadopago-logo.png');
+    fixture.componentInstance.returnToShipping();
     fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.product-list')?.tagName).toBe('UL');
+    fixture.componentInstance.continueToPayment();
 
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
-    expect(cart.checkout).toHaveBeenCalledWith('MERCADO_PAGO', 'PICKUP', pickupLocation.code, pickupLocation.version);
+    expect(cart.checkout).toHaveBeenCalledWith('MERCADO_PAGO', {
+      fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code,
+      pickupLocationVersion: pickupLocation.version, shippingQuoteId: null,
+    });
     expect(cart.completeCheckout).toHaveBeenCalledWith(order);
     expect(assign).toHaveBeenCalledWith(payment.checkoutUrl);
     expect(calls).toEqual(['order', 'payment', 'complete', 'redirect']);
@@ -133,6 +164,7 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
+    enterPaymentStep(fixture);
 
     expect(fixture.componentInstance.selectedPaymentMethod()).toBe('BANK_TRANSFER');
     expect((fixture.nativeElement.querySelector('input[value="BANK_TRANSFER"]') as HTMLInputElement).checked).toBe(true);
@@ -165,8 +197,8 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
-    fixture.componentInstance.pickupAccepted.set(true);
     fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -197,11 +229,14 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
-    fixture.componentInstance.pickupAccepted.set(true);
+    enterPaymentStep(fixture);
 
     fixture.componentInstance.submit();
 
-    expect(cart.checkout).toHaveBeenCalledWith('BANK_TRANSFER', 'PICKUP', pickupLocation.code, pickupLocation.version);
+    expect(cart.checkout).toHaveBeenCalledWith('BANK_TRANSFER', {
+      fulfillmentMethod: 'PICKUP', pickupLocationCode: pickupLocation.code,
+      pickupLocationVersion: pickupLocation.version, shippingQuoteId: null,
+    });
     expect(mercadoPago).not.toHaveBeenCalled();
     expect(cart.completeCheckout).toHaveBeenCalledWith(transferOrder);
     expect(navigate).toHaveBeenCalledWith(['/orders'], { queryParams: { order: 42 } });
@@ -223,11 +258,144 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    enterPaymentStep(fixture);
     fixture.detectChanges();
 
     expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 375, total: 2625 });
     expect(fixture.nativeElement.textContent).toContain('Descuento por transferencia');
     expect(fixture.nativeElement.textContent).not.toContain('recargo');
+  });
+
+  it('quotes delivery, excludes shipping from the transfer discount and sends the selected quote', async () => {
+    const quote = {
+      shippingQuoteId: '0b47f21d-a03a-4bc6-a59a-a761a31bd68d', carrier: 'Andreani', serviceCode: 'standard',
+      service: 'Estándar', logisticType: 'carrier_pickup', amount: 850, currency: 'ARS',
+      estimatedDeliveryAt: '2099-08-03T20:00:00Z', expiresAt: '2099-08-01T20:10:00Z', tags: [],
+    };
+    const deliveryOrder: OrderConfirmation = {
+      ...order, paymentMethod: 'BANK_TRANSFER', fulfillmentMethod: 'DELIVERY', pickupLocation: null,
+      shippingCost: 850, paymentDiscount: 300, total: 3550, reservationExpiresAt: null,
+      deliveryAddress: { recipientName: 'Ada Lovelace', street: 'San Martín', streetNumber: '123', floorApartment: null, locality: 'Córdoba', province: 'Córdoba', provinceCode: 'X', postalCode: '5000', countryCode: 'AR', reference: null },
+    };
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of(deliveryOrder)), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    const shippingQuotes = vi.fn(() => of({ options: [quote] }));
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: {
+          capabilities: () => of({ ...capabilities, deliveryQuotesEnabled: true, paymentMethods: ['BANK_TRANSFER'], fulfillmentMethods: ['PICKUP', 'DELIVERY'] }),
+          shippingQuotes,
+        } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectShippingQuote({ target: { value: quote.shippingQuoteId } } as unknown as Event);
+    fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    fixture.detectChanges();
+
+    expect(shippingQuotes).toHaveBeenCalledWith([{ variantId: 11, quantity: 2 }]);
+    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
+    expect(fixture.componentInstance.selectedTotal()).toBe(3550);
+    expect(fixture.nativeElement.textContent).toContain('Andreani');
+    expect(fixture.nativeElement.textContent).toContain('El envío no tiene descuento');
+
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    fixture.componentInstance.continueToPayment();
+    fixture.componentInstance.submit();
+    expect(cart.checkout).toHaveBeenCalledWith('BANK_TRANSFER', {
+      fulfillmentMethod: 'DELIVERY', pickupLocationCode: null, pickupLocationVersion: null,
+      shippingQuoteId: quote.shippingQuoteId,
+    });
+  });
+
+  it('shows every Zipnova carrier beside pickup and applies known carrier logos', async () => {
+    const baseQuote = {
+      serviceCode: 'standard', service: 'Entrega a domicilio', logisticType: 'carrier_dropoff',
+      currency: 'ARS', estimatedDeliveryAt: null, expiresAt: '2099-01-01T00:00:00Z', tags: [],
+    };
+    const quotes = [
+      { ...baseQuote, shippingQuoteId: 'oca', carrier: 'OCA', amount: 1000 },
+      { ...baseQuote, shippingQuoteId: 'correo', carrier: 'Correo Argentino', amount: 1200 },
+      { ...baseQuote, shippingQuoteId: 'lo-bruno', carrier: 'Lo Bruno', amount: 1400 },
+    ];
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null), checkout: vi.fn(),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    const shippingQuotes = vi.fn(() => of({ options: quotes }));
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]), { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: {
+          capabilities: () => of({ ...capabilities, deliveryQuotesEnabled: true, fulfillmentMethods: ['PICKUP', 'DELIVERY'] }),
+          shippingQuotes,
+        } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+
+    expect(shippingQuotes).toHaveBeenCalledOnce();
+    expect(fixture.nativeElement.querySelectorAll('.delivery-card').length).toBe(4);
+    expect(fixture.nativeElement.textContent).toContain('OCA');
+    expect(fixture.nativeElement.textContent).toContain('Correo Argentino');
+    expect(fixture.nativeElement.textContent).toContain('Lo Bruno');
+    expect(fixture.nativeElement.querySelector('img[src="/Logooca.png"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('img[src="/logo-correo.png"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('input[value="lo-bruno"] + .carrier-brand')?.textContent).toContain('LB');
+
+    (fixture.nativeElement.querySelector(`input[value="${pickupLocation.code}"]`) as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Av. Colón 123');
+
+    (fixture.nativeElement.querySelector('input[value="oca"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedFulfillmentMethod()).toBe('DELIVERY');
+    expect(fixture.componentInstance.selectedShippingQuoteId()).toBe('oca');
+    expect(fixture.nativeElement.textContent).not.toContain('Av. Colón 123');
+    expect(fixture.nativeElement.querySelector('.pickup-consent')).toBeNull();
+  });
+
+  it('blocks an expired quote and lets the customer calculate delivery again', async () => {
+    const expired = { shippingQuoteId: 'expired', carrier: 'Correo', serviceCode: 'standard', service: 'Estándar', logisticType: 'home_delivery', amount: 500, currency: 'ARS', estimatedDeliveryAt: null, expiresAt: '2000-01-01T00:00:00Z', tags: [] };
+    const fresh = { ...expired, shippingQuoteId: 'fresh', expiresAt: '2099-01-01T00:00:00Z' };
+    const shippingQuotes = vi.fn().mockReturnValueOnce(of({ options: [expired] })).mockReturnValueOnce(of({ options: [fresh] }));
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null), checkout: vi.fn(),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]), { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: {
+          capabilities: () => of({ ...capabilities, deliveryQuotesEnabled: true, fulfillmentMethods: ['PICKUP', 'DELIVERY'] }),
+          shippingQuotes,
+        } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.canSubmit()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('La cotización venció');
+    const retry = [...fixture.nativeElement.querySelectorAll('.quote-feedback button')]
+      .find((button: HTMLButtonElement) => button.textContent?.includes('Calcular nuevamente')) as HTMLButtonElement;
+    retry.click();
+    fixture.detectChanges();
+
+    expect(shippingQuotes).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.selectedShippingQuote()?.shippingQuoteId).toBe('fresh');
   });
 
   it('does not create an order when Mercado Pago is disabled', async () => {
@@ -267,7 +435,7 @@ describe('CheckoutComponent', () => {
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
     fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
-    fixture.detectChanges();
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
 
     expect(cart.checkout).not.toHaveBeenCalled();
@@ -356,8 +524,8 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
-    fixture.componentInstance.pickupAccepted.set(true);
     fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -417,12 +585,50 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
+    fixture.componentInstance.selectPickup({ target: { value: pickupLocation.code } } as unknown as Event);
     fixture.componentInstance.pickupAccepted.set(true);
 
     fixture.componentInstance.loadCapabilities();
 
     expect(fixture.componentInstance.selectedPickupCode()).toBe(pickupLocation.code);
     expect(fixture.componentInstance.pickupAccepted()).toBe(false);
+  });
+
+  it('renders and selects each configured pickup location as its own option', async () => {
+    const secondPickup = {
+      ...pickupLocation,
+      code: 'CORDOBA_NORTE',
+      name: 'Pinatech Norte',
+      addressLines: ['Av. Rafael Núñez 456'],
+      instructions: 'Ingresá por recepción.',
+    };
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, pickupLocations: [pickupLocation, secondPickup] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.delivery-card--pickup').length).toBe(2);
+    expect(fixture.nativeElement.textContent).not.toContain('Av. Colón 123');
+    expect(fixture.nativeElement.textContent).not.toContain('Av. Rafael Núñez 456');
+    (fixture.nativeElement.querySelector('input[value="CORDOBA_NORTE"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedPickupCode()).toBe('CORDOBA_NORTE');
+    expect(fixture.componentInstance.pickupAccepted()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Av. Rafael Núñez 456');
+    expect(fixture.nativeElement.textContent).not.toContain('Av. Colón 123');
+    expect(fixture.nativeElement.querySelector('.delivery-card--pickup.selected')?.textContent).toContain('Pinatech Norte');
   });
 
   it('shows the profile action when the backend requires email verification', async () => {
@@ -446,8 +652,8 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
-    fixture.componentInstance.pickupAccepted.set(true);
     fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -476,8 +682,8 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
-    fixture.componentInstance.pickupAccepted.set(true);
     fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
@@ -507,8 +713,8 @@ describe('CheckoutComponent', () => {
 
     const fixture = TestBed.createComponent(CheckoutComponent);
     fixture.detectChanges();
-    fixture.componentInstance.pickupAccepted.set(true);
     fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    enterPaymentStep(fixture);
     fixture.componentInstance.submit();
     fixture.detectChanges();
 

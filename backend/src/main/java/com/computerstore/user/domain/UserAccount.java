@@ -40,6 +40,9 @@ public class UserAccount {
     @Column(length = 30)
     private String phone;
 
+    @Column(name = "document_number", length = 11)
+    private String documentNumber;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
@@ -90,7 +93,7 @@ public class UserAccount {
         roles.add(role);
     }
 
-    public void updateProfile(String firstName, String lastName, String phone) {
+    public void updateProfile(String firstName, String lastName, String phone, String documentNumber) {
         if (firstName != null) {
             this.firstName = firstName;
         }
@@ -99,6 +102,9 @@ public class UserAccount {
         }
         if (phone != null) {
             this.phone = phone.isBlank() ? null : phone;
+        }
+        if (documentNumber != null) {
+            this.documentNumber = documentNumber.isBlank() ? null : documentNumber;
         }
     }
 
@@ -124,6 +130,7 @@ public class UserAccount {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public String getPhone() { return phone; }
+    public String getDocumentNumber() { return documentNumber; }
     public boolean isActive() { return active; }
     public boolean isEmailVerified() { return emailVerifiedAt != null; }
     public Instant getEmailVerifiedAt() { return emailVerifiedAt; }

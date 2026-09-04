@@ -21,6 +21,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.computerstore.payment.exception.PaymentProviderException;
+import com.computerstore.shipping.gateway.ShippingProviderException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -120,9 +121,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentProviderException.class)
     ProblemDetail handlePaymentProvider(PaymentProviderException exception, HttpServletRequest request) {
-        LOGGER.error("Payment provider error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
+        LOGGER.error("Payment provider error while processing {} {}", request.getMethod(), safeRequestPath(request), exception);
         return problem(HttpStatus.BAD_GATEWAY, "payment-provider-error", "Payment provider error",
                 "The payment provider could not complete the request.", request);
+    }
+
+    @ExceptionHandler(ShippingProviderException.class)
+    ProblemDetail handleShippingProvider(ShippingProviderException exception, HttpServletRequest request) {
+        LOGGER.error("Shipping provider error while processing {} {}", request.getMethod(), safeRequestPath(request), exception);
+        HttpStatus status = exception.retryAfter() == null ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE;
+        ProblemDetail problem = problem(status, "shipping-provider-error", "Shipping provider error",
+                "The shipping provider could not complete the request.", request);
+        if (exception.retryAfter() != null) problem.setProperty("retryAfterSeconds", exception.retryAfter().toSeconds());
+        return problem;
     }
 
     @ExceptionHandler(RateLimitExceededException.class)
@@ -140,7 +151,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
-        LOGGER.error("Unexpected error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
+        LOGGER.error("Unexpected error while processing {} {}", request.getMethod(), safeRequestPath(request), exception);
         return problem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "internal-error",
@@ -160,8 +171,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setType(URI.create(ERROR_TYPE_BASE + type));
         problem.setTitle(title);
-        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setInstance(URI.create(safeRequestPath(request)));
         problem.setProperty("timestamp", Instant.now());
         return problem;
+    }
+
+    private String safeRequestPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/shipping/webhooks/zipnova/")
+                ? "/api/shipping/webhooks/zipnova" : path;
     }
 }

@@ -38,6 +38,9 @@ http://{$APP_DOMAIN} {
 		}
 	}
 
+	@zipnova_webhook path /api/shipping/webhooks/zipnova/*
+	log_skip @zipnova_webhook
+
 	log {
 		output stdout
 		format json

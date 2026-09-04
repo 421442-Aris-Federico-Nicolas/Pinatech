@@ -598,6 +598,44 @@ main {
   gap: 0.5rem;
   margin-top: 1rem;
 }
+.delivery-detail,
+.shipment-detail {
+  margin-top: 1rem;
+}
+.delivery-detail address {
+  font-style: normal;
+}
+.delivery-provider {
+  display: flex !important;
+  gap: 0.5rem;
+}
+.shipment-detail {
+  border: 1px solid #1c3a4b;
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+.shipment-detail.incident {
+  border-color: #713046;
+}
+.shipment-heading {
+  display: flex;
+  justify-content: space-between;
+}
+.shipment-detail dl div {
+  display: flex;
+  justify-content: space-between;
+}
+.shipment-detail dd {
+  margin: 0;
+}
+.shipment-detail > a {
+  color: var(--color-cyan);
+}
+.shipment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 .danger-action {
   border-color: #713046 !important;
   color: #ff9eb7 !important;
@@ -994,6 +1032,7 @@ main {
     display: none;
   }
 }
+.shipping-editor,
 .variants-editor,
 .specifications-editor,
 .product-images {
@@ -1016,6 +1055,25 @@ main {
   color: var(--color-text-subtle);
   font-size: 0.7rem;
   margin: 0.3rem 0 0;
+}
+.shipping-form {
+  display: grid;
+  gap: 0.45rem 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.vertical-option {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+.vertical-option span {
+  display: grid;
+  gap: 0.15rem;
+}
+.vertical-option small {
+  color: var(--color-text-subtle);
 }
 .section-label > button,
 .section-label .file-button {
@@ -1118,6 +1176,12 @@ main {
   .variants-editor > article,
   .specifications-editor > article {
     grid-template-columns: 1fr;
+  }
+  .shipping-form {
+    grid-template-columns: 1fr;
+  }
+  .vertical-option {
+    margin-top: 0;
   }
   .specification-actions {
     justify-content: flex-end;

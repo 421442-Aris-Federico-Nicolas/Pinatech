@@ -95,6 +95,22 @@ class OrderEmailOutboxServiceTest {
     }
 
     @Test
+    void shipmentTrackingUsesAnImmutablePayloadSnapshot() throws Exception {
+        EmailOutboxRepository entries = mock(EmailOutboxRepository.class);
+        OrderEmailOutboxService service = new OrderEmailOutboxService(entries, mock(TransactionalEmailService.class),
+                mock(EmailOutboxCompletionService.class), Clock.fixed(NOW, ZoneOffset.UTC), JSON, "");
+        var snapshot = new ShipmentTrackingSnapshot("Andreani", "TRACK-1",
+                Instant.parse("2026-09-05T20:00:00Z"), "https://tracking.example/TRACK-1");
+
+        service.enqueueTracking(order(), snapshot);
+
+        ArgumentCaptor<EmailOutboxEntry> saved = ArgumentCaptor.forClass(EmailOutboxEntry.class);
+        verify(entries).save(saved.capture());
+        assertEquals(OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE, saved.getValue().getEventType());
+        assertEquals(snapshot, JSON.readValue(saved.getValue().getEventPayload(), ShipmentTrackingSnapshot.class));
+    }
+
+    @Test
     void paymentApprovalUsesItsOwnSellerEventAndApprovedSnapshot() throws Exception {
         EmailOutboxRepository entries = mock(EmailOutboxRepository.class);
         OrderEmailOutboxService service = new OrderEmailOutboxService(

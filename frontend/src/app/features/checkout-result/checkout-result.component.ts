@@ -1,9 +1,10 @@
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize, switchMap, take, takeWhile, timer } from 'rxjs';
 import { Order, OrderService } from '../../core/orders/order.service';
+import { estadoLabel } from '../../core/utils/estado-label';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
@@ -17,7 +18,7 @@ const POLL_INTERVAL_MS = 2000;
 
 @Component({
   selector: 'app-checkout-result',
-  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, PinatechSaleSuccessComponent, RouterLink],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, CurrencyPipe, DatePipe, PinatechSaleSuccessComponent, RouterLink],
   templateUrl: './checkout-result.component.html',
   styleUrl: './checkout-result.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,6 +66,10 @@ export class CheckoutResultComponent {
     if (order.paymentStatus === 'REFUNDED') return 'refunded';
     if (TERMINAL_PAYMENT_STATUSES.has(order.paymentStatus)) return 'rejected';
     return 'pending';
+  }
+
+  methodLabel(method: string | null): string {
+    return estadoLabel(method, 'metodo');
   }
 
   private parseOrderId(value: string | null): number | null {

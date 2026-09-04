@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { Order, OrderService } from '../../core/orders/order.service';
+import { Order, OrderService, ShipmentSummary, ShipmentTracking } from '../../core/orders/order.service';
 import { BankTransferDetails, BankTransferService } from '../../core/orders/bank-transfer.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
@@ -42,6 +42,9 @@ export class OrdersComponent {
   readonly selectedProofs = signal<Record<number, File>>({});
   readonly proofErrors = signal<Record<number, string>>({});
   readonly uploadingProof = signal<number | null>(null);
+  readonly tracking = signal<Record<number, ShipmentTracking>>({});
+  readonly trackingLoading = signal<number[]>([]);
+  readonly trackingErrors = signal<Record<number, string>>({});
   readonly estadoTono = estadoTono;
 
   constructor() {
@@ -114,6 +117,7 @@ export class OrdersComponent {
       next: (orders) => {
         this.orders.set(orders);
         for (const order of orders.filter((candidate) => candidate.paymentMethod === 'BANK_TRANSFER')) this.loadBankTransfer(order.id);
+        for (const order of orders.filter((candidate) => candidate.fulfillmentMethod === 'DELIVERY')) this.loadTracking(order.id);
         this.error.set('');
         const requestedOrder = Number(this.route.snapshot.queryParamMap.get('order'));
         if (requestedOrder > 0) queueMicrotask(() => {
@@ -141,6 +145,46 @@ export class OrdersComponent {
 
   methodLabel(method: string | null): string {
     return estadoLabel(method, 'metodo');
+  }
+
+  shipmentStatusLabel(status: string): string {
+    return estadoLabel(status, 'envio');
+  }
+
+  shipmentFor(order: Order): ShipmentSummary | null {
+    return this.tracking()[order.id] ?? order.shipment;
+  }
+
+  loadTracking(orderId: number): void {
+    if (this.trackingLoading().includes(orderId)) return;
+    this.trackingLoading.update((ids) => [...ids, orderId]);
+    this.service.tracking(orderId).pipe(
+      finalize(() => this.trackingLoading.update((ids) => ids.filter((id) => id !== orderId))),
+    ).subscribe({
+      next: (tracking) => {
+        this.tracking.update((current) => ({ ...current, [orderId]: tracking }));
+        this.trackingErrors.update((current) => ({ ...current, [orderId]: '' }));
+      },
+      error: (error: unknown) => {
+        const unavailable = error instanceof HttpErrorResponse && error.status === 404;
+        this.trackingErrors.update((current) => ({
+          ...current,
+          [orderId]: unavailable
+            ? 'El seguimiento estará disponible cuando el correo reciba el envío.'
+            : 'No pudimos actualizar el seguimiento del envío.',
+        }));
+      },
+    });
+  }
+
+  safeTrackingUrl(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' ? url.toString() : null;
+    } catch {
+      return null;
+    }
   }
 
   loadBankTransfer(orderId: number): void {
@@ -212,7 +256,8 @@ export class OrdersComponent {
       && order.paymentStatus === 'PENDING'
       && transfer.proof === null
       && !!transfer.paymentDueAt
-      && Number.isFinite(Date.parse(transfer.paymentDueAt));
+      && Number.isFinite(Date.parse(transfer.paymentDueAt))
+      && Date.parse(transfer.paymentDueAt) > Date.now();
   }
 
   proofStatusLabel(status: string): string {

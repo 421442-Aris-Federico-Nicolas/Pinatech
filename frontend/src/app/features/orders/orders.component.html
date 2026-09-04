@@ -122,6 +122,47 @@
             </section>
           }
 
+          @if (order.deliveryAddress; as address) {
+            <section class="delivery" [attr.aria-labelledby]="'delivery-title-' + order.id">
+              <div class="delivery-heading"><div><p>Entrega a domicilio</p><h3 [id]="'delivery-title-' + order.id">{{ address.recipientName }}</h3></div><strong>{{ methodLabel(order.fulfillmentMethod) }}</strong></div>
+              <address>
+                <span>{{ address.street }} {{ address.streetNumber }}@if (address.floorApartment) {, {{ address.floorApartment }}}</span>
+                <span>{{ address.locality }}, {{ address.province }} · CP {{ address.postalCode }}</span>
+                @if (address.reference) { <span>Referencia: {{ address.reference }}</span> }
+              </address>
+            </section>
+          }
+
+          @if (order.fulfillmentMethod === 'DELIVERY') {
+            <section class="tracking" [attr.aria-labelledby]="'tracking-title-' + order.id" [attr.aria-busy]="trackingLoading().includes(order.id)">
+              <div class="tracking-heading">
+                <div><p>Seguimiento</p><h3 [id]="'tracking-title-' + order.id">Estado del envío</h3></div>
+                <button appButton="text" type="button" (click)="loadTracking(order.id)" [disabled]="trackingLoading().includes(order.id)">{{ trackingLoading().includes(order.id) ? 'Actualizando…' : 'Actualizar seguimiento' }}</button>
+              </div>
+              @if (trackingLoading().includes(order.id) && !shipmentFor(order)) { <p class="tracking-loading" role="status">Consultando el seguimiento con el correo…</p> }
+              @if (trackingErrors()[order.id]) { <app-feedback class="tracking-error" [tone]="shipmentFor(order) ? 'warning' : 'info'">{{ trackingErrors()[order.id] }}</app-feedback> }
+              @if (shipmentFor(order); as shipment) {
+                @if (shipment.incident) { <app-feedback class="incident" tone="warning" announce="polite"><strong>El envío registra una incidencia.</strong> Actualizá el seguimiento para consultar el último estado y contactanos si necesitás ayuda.</app-feedback> }
+                <dl class="tracking-summary">
+                  <div><dt>Estado</dt><dd>{{ shipmentStatusLabel(shipment.status) }}</dd></div>
+                  @if (shipment.carrier) { <div><dt>Correo</dt><dd>{{ shipment.carrier }}</dd></div> }
+                  @if (shipment.trackingCode) { <div><dt>Código</dt><dd>{{ shipment.trackingCode }}</dd></div> }
+                  @if (shipment.estimatedDeliveryAt) { <div><dt>Entrega estimada</dt><dd>{{ shipment.estimatedDeliveryAt | date:'mediumDate' }}</dd></div> }
+                </dl>
+                @if (safeTrackingUrl(shipment.trackingUrl); as trackingUrl) { <a class="tracking-link" [href]="trackingUrl" target="_blank" rel="noopener noreferrer">Seguir en el sitio del correo <span class="visually-hidden">(abre en una pestaña nueva)</span></a> }
+              }
+              @if (tracking()[order.id]; as detail) {
+                @if (detail.history.length) {
+                  <ol class="timeline" aria-label="Historial del envío">
+                    @for (event of detail.history; track event.occurredAt + event.status + (event.substatus ?? '')) {
+                      <li><span aria-hidden="true"></span><div><strong>{{ shipmentStatusLabel(event.status) }}</strong>@if (event.substatus) { <small>{{ shipmentStatusLabel(event.substatus) }}</small> }<time [attr.datetime]="event.occurredAt">{{ event.occurredAt | date:'medium' }}</time></div></li>
+                    }
+                  </ol>
+                }
+              }
+            </section>
+          }
+
           <ul class="items" aria-label="Productos del pedido">
             @for (item of order.items; track item.variantId) {
               <li><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></li>
@@ -133,7 +174,7 @@
               <div><dt>Pago</dt><dd [attr.translate]="order.paymentMethod === 'MERCADO_PAGO' ? 'no' : null">{{ methodLabel(order.paymentMethod) }}</dd></div>
               <div><dt>Modalidad</dt><dd>{{ methodLabel(order.fulfillmentMethod) }}</dd></div>
             </dl>
-            <div class="total"><span>Precio de lista</span><strong>{{ order.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong>@if (order.paymentDiscount > 0) { <span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }@if (order.paymentSurcharge > 0) { <span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }<span>Total · retiro sin costo</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
+            <div class="total"><span>Precio de lista</span><strong>{{ order.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong>@if (order.paymentDiscount > 0) { <span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }@if (order.paymentSurcharge > 0) { <span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }@if (order.shippingCost > 0) { <span>Envío</span><strong>{{ order.shippingCost | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong> }<span>Total</span><strong>{{ order.total | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></div>
           </footer>
         </article></li>
       }

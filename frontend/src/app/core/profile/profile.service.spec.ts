@@ -17,4 +17,15 @@ describe('ProfileService', () => {
     expect(email.request.body).toEqual({ email: 'new@example.com', currentPassword: 'Password1' });
     email.flush(null);
   });
+
+  it('includes the document number in profile updates', () => {
+    const service = TestBed.inject(ProfileService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.update({ firstName: 'Ada', lastName: 'Lovelace', phone: '', documentNumber: '20.123.456-7' }).subscribe();
+    const update = http.expectOne(`${environment.apiBaseUrl}/profile`);
+    expect(update.request.method).toBe('PATCH');
+    expect(update.request.body).toEqual({ firstName: 'Ada', lastName: 'Lovelace', phone: '', documentNumber: '20.123.456-7' });
+    update.flush({});
+  });
 });

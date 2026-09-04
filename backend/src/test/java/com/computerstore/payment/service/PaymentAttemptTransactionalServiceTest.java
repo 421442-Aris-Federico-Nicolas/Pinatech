@@ -36,6 +36,10 @@ import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.domain.PaymentStatus;
 import com.computerstore.order.domain.PickupLocationSnapshot;
+import com.computerstore.order.domain.DeliveryAddressSnapshot;
+import com.computerstore.shipping.domain.ShippingQuote;
+import com.computerstore.shipping.config.ZipnovaProperties;
+import com.computerstore.shipping.gateway.ZipnovaGateway;
 import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
 import com.computerstore.order.service.FulfillmentPolicy;
@@ -65,10 +69,20 @@ class PaymentAttemptTransactionalServiceTest {
     private final OrderStockService stock = Mockito.mock(OrderStockService.class);
     private final OrderEmailOutboxService outbox = Mockito.mock(OrderEmailOutboxService.class);
     private final Map<String, ProviderPaymentRecord> records = new HashMap<>();
-    private final FulfillmentPolicy fulfillment = new FulfillmentPolicy(fulfillmentProperties());
+    private final FulfillmentPolicy fulfillment = deliveryFulfillmentPolicy();
     private final PaymentAttemptTransactionalService service = new PaymentAttemptTransactionalService(
             attempts, providerPayments, events, orders, stock, properties(), fulfillment,
             Clock.fixed(NOW, ZoneOffset.UTC), outbox);
+
+    private FulfillmentPolicy deliveryFulfillmentPolicy() {
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<ZipnovaProperties> provider =
+                Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(new ZipnovaProperties(true, true, "token", "secret", 7L, 12L,
+                "pinatech-test", "dynamic", Duration.ofMinutes(15), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                "012345678901234567890123", Duration.ofMinutes(10)));
+        return new FulfillmentPolicy(fulfillmentProperties(), provider);
+    }
 
     @BeforeEach
     void setUp() {
@@ -184,6 +198,37 @@ class PaymentAttemptTransactionalServiceTest {
         assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().amount());
         assertEquals(1, preparation.preferenceRequest().items().size());
         assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().items().getFirst().unitPrice());
+    }
+
+    @Test
+    void deliveryPreferenceAddsZipnovaItemSoItemsMatchOrderTotal() {
+        Product product = Mockito.mock(Product.class);
+        when(product.getName()).thenReturn("Keyboard"); when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
+        when(product.hasCompleteShippingData()).thenReturn(true); when(product.getShippingWeightGrams()).thenReturn(500);
+        when(product.getShippingHeightCm()).thenReturn(10); when(product.getShippingWidthCm()).thenReturn(20);
+        when(product.getShippingLengthCm()).thenReturn(30); when(product.getShippingClassificationId()).thenReturn(1);
+        ProductVariant variant = Mockito.mock(ProductVariant.class); when(variant.getId()).thenReturn(1L);
+        when(variant.getProduct()).thenReturn(product); when(variant.getColorName()).thenReturn("Black");
+        UserAccount user = Mockito.mock(UserAccount.class); when(user.isEmailVerified()).thenReturn(true);
+        var option = new ZipnovaGateway.QuoteOption(3, "Andreani", "standard", "Estandar", "carrier_pickup",
+                new BigDecimal("21.00"), null, List.of());
+        var quote = new ShippingQuote(user, "a".repeat(64), "b".repeat(64), option, "[]", NOW, NOW.plusSeconds(900));
+        var address = new DeliveryAddressSnapshot("Ada", "12345678", "a@b.com", "3515550000", "A", "1", null,
+                "Cordoba", "Cordoba", "X", "5000", "AR", null);
+        CustomerOrder order = new CustomerOrder(user, List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"),
+                BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("21.00"), PaymentMethod.MERCADO_PAGO,
+                NOW.plusSeconds(300), null, null, null, null, FulfillmentMethod.DELIVERY, null, quote, address);
+        when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+        when(attempts.findActiveByOrderId(any(), any())).thenReturn(List.of());
+        when(attempts.save(any(PaymentAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentPreparation preparation = service.prepare(42L, 7L, "payment-key");
+
+        assertEquals(new BigDecimal("121.00"), preparation.preferenceRequest().amount());
+        assertEquals("ENVIO_ZIPNOVA", preparation.preferenceRequest().items().get(1).id());
+        assertEquals(preparation.preferenceRequest().amount(), preparation.preferenceRequest().items().stream()
+                .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
     @Test

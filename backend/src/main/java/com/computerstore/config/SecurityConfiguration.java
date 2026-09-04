@@ -60,6 +60,7 @@ public class SecurityConfiguration {
                                 "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/checkout/capabilities").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/mercado-pago").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/shipping/webhooks/zipnova/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",

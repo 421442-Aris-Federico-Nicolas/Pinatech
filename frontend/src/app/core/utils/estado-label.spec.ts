@@ -18,4 +18,10 @@ describe('estadoLabel', () => {
     expect(estadoLabel('NEW_BACKEND_STATE', 'pedido')).toBe('New backend state');
     expect(estadoTono('NEW_BACKEND_STATE', 'pedido')).toBe('neutral');
   });
+
+  it('labels customer shipment states without leaking provider codes', () => {
+    expect(estadoLabel('PENDING_CREATE', 'envio')).toBe('Preparando el envío');
+    expect(estadoLabel('in_transit', 'envio')).toBe('En tránsito');
+    expect(estadoTono('INCIDENT', 'envio')).toBe('warning');
+  });
 });

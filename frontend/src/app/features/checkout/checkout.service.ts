@@ -1,8 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { PickupLocation } from '../../core/orders/order.service';
-import { PaymentMethod } from '../../core/orders/order.service';
+import { FulfillmentMethod, PaymentMethod, PickupLocation } from '../../core/orders/order.service';
 
 export const CHECKOUT_WINDOW = new InjectionToken<Pick<Window, 'location'>>('Checkout window', {
   providedIn: 'root',
@@ -17,8 +16,30 @@ export interface CheckoutCapabilities {
   paymentMethods: PaymentMethod[];
   bankTransferDiscountRate: number;
   deliveryMethods: string[];
-  fulfillmentMethods: string[];
+  fulfillmentMethods: FulfillmentMethod[];
   pickupLocations: PickupLocation[];
+}
+
+export interface ShippingQuoteItem {
+  variantId: number;
+  quantity: number;
+}
+
+export interface ShippingQuoteOption {
+  shippingQuoteId: string;
+  carrier: string;
+  serviceCode: string;
+  service: string;
+  logisticType: string;
+  amount: number;
+  currency: string;
+  estimatedDeliveryAt: string | null;
+  expiresAt: string;
+  tags: string[];
+}
+
+export interface ShippingQuoteResponse {
+  options: ShippingQuoteOption[];
 }
 
 export interface MercadoPagoCheckout {
@@ -40,6 +61,10 @@ export class CheckoutService {
 
   capabilities() {
     return this.http.get<CheckoutCapabilities>(`${environment.apiBaseUrl}/checkout/capabilities`);
+  }
+
+  shippingQuotes(items: ShippingQuoteItem[]) {
+    return this.http.post<ShippingQuoteResponse>(`${environment.apiBaseUrl}/shipping/quotes`, { items });
   }
 
   mercadoPago(orderId: number, paymentStatus: string) {
