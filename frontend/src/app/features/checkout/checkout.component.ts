@@ -55,8 +55,9 @@ export class CheckoutComponent {
   readonly loadingQuotes = signal(false);
   readonly submitError = signal('');
   readonly verificationNotice = signal('');
-  readonly submitErrorKind = signal<'verification' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' | null>(null);
+  readonly submitErrorKind = signal<'verification' | 'profile' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' | null>(null);
   readonly emailVerified = computed(() => this.auth.user()?.emailVerified === true);
+  readonly documentNumberPresent = computed(() => /^\d{7,11}$/.test(this.auth.user()?.documentNumber ?? ''));
   readonly selectedPickup = computed(() => this.capabilities()?.pickupLocations
     .find((location) => location.code === this.selectedPickupCode()) ?? null);
   readonly selectedShippingQuote = computed(() => this.shippingQuotes()
@@ -128,7 +129,7 @@ export class CheckoutComponent {
           : null;
         this.selectedFulfillmentMethod.set(selectedFulfillment);
         this.capabilitiesError.set('');
-        if (this.deliveryEnabled(capabilities)) this.loadShippingQuotes();
+        if (this.deliveryEnabled(capabilities) && this.documentNumberPresent()) this.loadShippingQuotes();
       },
       error: () => {
         this.capabilities.set(null);
@@ -185,7 +186,7 @@ export class CheckoutComponent {
   }
 
   loadShippingQuotes(): void {
-    if (this.loadingQuotes() || !this.deliveryEnabled()) return;
+    if (this.loadingQuotes() || !this.deliveryEnabled() || !this.documentNumberPresent()) return;
     this.loadingQuotes.set(true);
     this.quoteNeedsProfile.set(false);
     const items = this.cart.items().map((item) => ({ variantId: item.variant.id, quantity: item.quantity }));
@@ -297,16 +298,17 @@ export class CheckoutComponent {
   }
 
   fulfillmentEnabled(capabilities = this.capabilities()): boolean {
-    return this.selectedFulfillmentMethod() === 'PICKUP'
+    return this.documentNumberPresent() && (this.selectedFulfillmentMethod() === 'PICKUP'
       ? this.pickupEnabled(capabilities) && this.pickupAccepted()
       : this.selectedFulfillmentMethod() === 'DELIVERY'
         ? this.deliveryEnabled(capabilities) && !!this.selectedShippingQuote() && !this.quoteExpired()
-        : false;
+        : false);
   }
 
   canSubmit(capabilities = this.capabilities()): boolean {
     return this.selectedPaymentEnabled(capabilities)
       && this.fulfillmentEnabled(capabilities)
+      && this.documentNumberPresent()
       && this.emailVerified();
   }
 
@@ -361,7 +363,7 @@ export class CheckoutComponent {
   }
 
   private handleSubmitError(error: unknown): void {
-    let kind: 'verification' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' = 'generic';
+    let kind: 'verification' | 'profile' | 'pending-transfer' | 'shipping' | 'conflict' | 'network' | 'generic' = 'generic';
     let message = 'No pudimos completar la compra. Conservamos tu carrito para que puedas reintentarlo sin duplicar el pedido.';
 
     if (error instanceof HttpErrorResponse) {
@@ -374,6 +376,9 @@ export class CheckoutComponent {
       if (error.status === 403 && typeof problemType === 'string' && problemType.endsWith('email-verification-required')) {
         kind = 'verification';
         message = 'Necesitás verificar tu email antes de comprar. Revisá tu perfil y volvé a intentarlo; conservamos tu carrito.';
+      } else if (error.status === 400 && typeof problemDetail === 'string' && /document number/i.test(problemDetail)) {
+        kind = 'profile';
+        message = 'Necesitás completar tu DNI o CUIT en Mi perfil antes de crear un pedido. Conservamos tu carrito.';
       } else if (error.status === 409 && this.selectedPaymentMethod() === 'BANK_TRANSFER'
           && typeof problemDetail === 'string' && problemDetail.includes('pending bank transfer order')) {
         kind = 'pending-transfer';

@@ -76,7 +76,7 @@ export class ProfileComponent implements OnInit {
     firstName: ['', [Validators.required, Validators.maxLength(100)]],
     lastName: ['', [Validators.required, Validators.maxLength(100)]],
     phone: ['', [Validators.maxLength(30), Validators.pattern(/^$|^\+?[0-9 ()-]{6,30}$/)]],
-    documentNumber: ['', [Validators.maxLength(30), Validators.pattern(/^$|^(?=(?:\D*\d){7,11}\D*$)[0-9.\s-]+$/)]],
+    documentNumber: ['', [Validators.required, Validators.maxLength(30), Validators.pattern(/^(?=(?:\D*\d){7,11}\D*$)[0-9.\s-]+$/)]],
   });
   readonly emailForm = this.fb.group({
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
@@ -250,6 +250,7 @@ export class ProfileComponent implements OnInit {
       lastName: profile.lastName,
       email: profile.email,
       phone: profile.phone,
+      documentNumber: profile.documentNumber,
       emailVerified: profile.emailVerified,
       roles: [...profile.roles],
     });

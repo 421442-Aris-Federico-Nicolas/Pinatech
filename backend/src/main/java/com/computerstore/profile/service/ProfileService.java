@@ -173,7 +173,7 @@ public class ProfileService {
             return null;
         }
         String normalized = value.replaceAll("[.\\s-]", "");
-        if (!normalized.isEmpty() && !normalized.matches("[0-9]{7,11}")) {
+        if (!normalized.matches("[0-9]{7,11}")) {
             throw new InvalidRequestException("Document number format is invalid.");
         }
         return normalized;

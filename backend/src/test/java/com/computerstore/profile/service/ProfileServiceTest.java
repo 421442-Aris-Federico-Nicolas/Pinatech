@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 
@@ -104,7 +103,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void normalizesAndClearsTheProfileDocumentNumber() {
+    void normalizesTheProfileDocumentNumberAndRejectsClearingIt() {
         UserAccount account = new UserAccount("Ana", "Perez", "ana@example.com", "hash", null);
         ReflectionTestUtils.setField(account, "id", 4L);
         when(users.findByIdAndActiveTrue(4L)).thenReturn(Optional.of(account));
@@ -116,10 +115,9 @@ class ProfileServiceTest {
         assertEquals("2012345678", account.getDocumentNumber());
         assertEquals("2012345678", updated.documentNumber());
 
-        var cleared = service.updateProfile(4L, new UpdateProfileRequest(null, null, null, " - . "));
-
-        assertNull(account.getDocumentNumber());
-        assertNull(cleared.documentNumber());
+        assertThrows(InvalidRequestException.class,
+                () -> service.updateProfile(4L, new UpdateProfileRequest(null, null, null, " - . ")));
+        assertEquals("2012345678", account.getDocumentNumber());
     }
 
     @Test

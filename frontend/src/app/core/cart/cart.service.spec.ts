@@ -58,7 +58,7 @@ describe('CartService', () => {
     localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 3 }]));
     const cart = TestBed.inject(CartService);
 
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: '12345678', emailVerified: true, roles: ['CUSTOMER'] });
     isAuthenticated.set(true);
     TestBed.tick();
 
@@ -111,7 +111,7 @@ describe('CartService', () => {
   });
 
   it('does not restore an expired confirmation and removes it from storage', () => {
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: '12345678', emailVerified: true, roles: ['CUSTOMER'] });
     isAuthenticated.set(true);
     localStorage.setItem('pinatech-order-user-7', JSON.stringify({
       id: 42,
@@ -138,7 +138,7 @@ describe('CartService', () => {
   });
 
   it('rejects an invalid confirmation expiration date', () => {
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: '12345678', emailVerified: true, roles: ['CUSTOMER'] });
     isAuthenticated.set(true);
     localStorage.setItem('pinatech-order-user-7', JSON.stringify({
       id: 42,
@@ -371,7 +371,7 @@ describe('CartService', () => {
   it('does not activate a residual user cart without an authenticated session', () => {
     localStorage.setItem('pinatech-cart-guest', JSON.stringify([{ product, variant, quantity: 1 }]));
     localStorage.setItem('pinatech-cart-user-7', JSON.stringify([{ product, variant, quantity: 4 }]));
-    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+    user.set({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: '12345678', emailVerified: true, roles: ['CUSTOMER'] });
 
     const cart = TestBed.inject(CartService);
     TestBed.tick();

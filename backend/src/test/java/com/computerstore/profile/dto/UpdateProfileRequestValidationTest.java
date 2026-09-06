@@ -11,15 +11,17 @@ class UpdateProfileRequestValidationTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
-    void acceptsArgentineDocumentFormatsAndBlankValues() {
+    void acceptsArgentineDocumentFormatsAndAnOmittedValue() {
         assertTrue(validator.validate(new UpdateProfileRequest(null, null, null, "20.123-456 78")).isEmpty());
-        assertTrue(validator.validate(new UpdateProfileRequest(null, null, null, " - . ")).isEmpty());
+        assertTrue(validator.validate(new UpdateProfileRequest("Ada", null, null, null)).isEmpty());
     }
 
     @Test
-    void rejectsInvalidCharactersAndDigitCounts() {
+    void rejectsBlankValuesInvalidCharactersAndDigitCounts() {
+        assertFalse(validator.validate(new UpdateProfileRequest(null, null, null, " - . ")).isEmpty());
         assertFalse(validator.validate(new UpdateProfileRequest(null, null, null, "12A34567")).isEmpty());
         assertFalse(validator.validate(new UpdateProfileRequest(null, null, null, "123456")).isEmpty());
         assertFalse(validator.validate(new UpdateProfileRequest(null, null, null, "123456789012")).isEmpty());
+        assertFalse(validator.validate(new UpdateProfileRequest(null, null, null, ".".repeat(31))).isEmpty());
     }
 }

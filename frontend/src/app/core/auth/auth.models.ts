@@ -4,6 +4,7 @@ export interface AuthenticatedUser {
   lastName: string;
   email: string;
   phone: string | null;
+  documentNumber: string | null;
   emailVerified: boolean;
   roles: string[];
 }
