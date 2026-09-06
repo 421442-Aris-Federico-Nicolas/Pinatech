@@ -24,7 +24,7 @@
         @case ('refund-pending') {
           <app-feedback class="state pending" tone="info" announce="polite">
             <h1>Reintegro en proceso</h1>
-            <p>El pago llegó después del vencimiento del pedido. Iniciamos la devolución automáticamente.</p>
+            <p>{{ currentOrder.cancellationReason ? 'El pedido fue cancelado. El reintegro total está en proceso.' : 'El pago llegó después del vencimiento del pedido. Iniciamos la devolución automáticamente.' }}</p>
           </app-feedback>
         }
         @case ('rejected') {

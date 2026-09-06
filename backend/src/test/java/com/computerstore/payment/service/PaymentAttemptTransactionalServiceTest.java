@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.domain.ProductVariant;
@@ -32,6 +33,7 @@ import com.computerstore.order.config.FulfillmentProperties;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.order.domain.FulfillmentMethod;
 import com.computerstore.order.domain.OrderItem;
+import com.computerstore.order.domain.OrderCancellationReason;
 import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.domain.PaymentStatus;
@@ -167,9 +169,48 @@ class PaymentAttemptTransactionalServiceTest {
         assertEquals(PaymentStatus.REFUND_PENDING, order.getPaymentStatus());
         service.applyRefundResult(refund, new RefundResult("refund-1", "approved", new BigDecimal("90.00")));
         assertEquals(PaymentStatus.REFUND_PENDING, order.getPaymentStatus());
-        assertEquals("PENDING", records.get("123").getRefundStatus());
+        assertEquals("AMOUNT_MISMATCH", records.get("123").getRefundStatus());
         service.applyRefundResult(refund, new RefundResult("refund-1", "approved", new BigDecimal("100.00")));
         assertEquals(PaymentStatus.REFUNDED, order.getPaymentStatus());
+    }
+
+    @Test
+    void completedRefundForAnAdministrativelyCancelledOrderSendsConfirmation() {
+        CustomerOrder order = order(NOW.plusSeconds(300));
+        PaymentAttempt attempt = readyAttempt(order, "pref-1");
+        lock(attempt, order);
+        service.processWebhook(payment(attempt, "pref-1", "123", "approved", NOW, false),
+                "123", "request-1", "{}");
+        ProviderPaymentRecord payment = records.get("123");
+        order.cancelForRefund(OrderCancellationReason.CUSTOMER_REQUEST, null, 7L, NOW);
+        UUID refundKey = payment.requestRefund(NOW);
+        RefundInstruction instruction = new RefundInstruction(
+                attempt.getPublicId(), "123", refundKey, null, null);
+
+        service.applyRefundResult(instruction,
+                new RefundResult("refund-1", "approved", new BigDecimal("100.00")));
+
+        assertEquals(PaymentStatus.REFUNDED, order.getPaymentStatus());
+        verify(outbox).enqueueOnce(order, OrderEmailEventType.PAYMENT_REFUNDED);
+    }
+
+    @Test
+    void rejectedRefundIsRetriedAsANewIdempotentRequest() {
+        CustomerOrder order = order(NOW.plusSeconds(300));
+        PaymentAttempt attempt = readyAttempt(order, "pref-1");
+        lock(attempt, order);
+        service.processWebhook(payment(attempt, "pref-1", "123", "approved", NOW, false),
+                "123", "request-1", "{}");
+        ProviderPaymentRecord payment = records.get("123");
+        UUID firstKey = payment.requestRefund(NOW);
+        RefundInstruction first = new RefundInstruction(attempt.getPublicId(), "123", firstKey, null, null);
+        service.applyRefundResult(first, new RefundResult("refund-1", "rejected", new BigDecimal("100.00")));
+        when(providerPayments.lockRefundsDue(NOW)).thenReturn(List.of(payment));
+
+        RefundInstruction retry = service.claimPendingRefunds().getFirst();
+
+        assertFalse(firstKey.equals(retry.idempotencyKey()));
+        assertEquals(null, retry.refundId());
     }
 
     @Test

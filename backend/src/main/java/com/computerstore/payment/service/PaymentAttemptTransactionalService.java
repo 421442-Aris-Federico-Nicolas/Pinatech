@@ -174,14 +174,14 @@ public class PaymentAttemptTransactionalService {
             ProviderPayment payment, String requestId, String notificationPayload) {
         UUID publicId = parsePublicId(payment.externalReference());
         PaymentAttempt attempt = attemptForUpdate(publicId);
-        var order = orders.findByIdForUpdate(attempt.getOrder().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         validateAuthoritativePayment(attempt, payment);
 
         Optional<ProviderPaymentRecord> existingPayment = providerPayments
                 .findByProviderPaymentIdForUpdate(payment.id());
         ProviderPaymentRecord providerPayment = existingPayment
                 .orElseGet(() -> providerPayments.save(new ProviderPaymentRecord(attempt, payment)));
+        var order = orders.findByIdForUpdate(attempt.getOrder().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         if (!providerPayment.getAttempt().getPublicId().equals(attempt.getPublicId())) {
             throw new InvalidRequestException("Mercado Pago payment is already linked to another preference.");
         }
@@ -230,6 +230,10 @@ public class PaymentAttemptTransactionalService {
                     order.markPaymentRefunded();
                     shippingPaymentRevoked(order);
                     attempt.summaryStatus(status, PaymentAttemptStatus.REFUNDED);
+                    if (outbox != null && order.getStatus() == OrderStatus.CANCELLED
+                            && order.getCancellationReason() != null) {
+                        outbox.enqueueOnce(order, OrderEmailEventType.PAYMENT_REFUNDED);
+                    }
                 }
                 event.processed("REFUNDED_BY_PROVIDER");
             }
@@ -298,20 +302,27 @@ public class PaymentAttemptTransactionalService {
 
     @Transactional
     public void applyRefundResult(RefundInstruction instruction, RefundResult result) {
+        PaymentAttempt attempt = attemptForUpdate(instruction.attemptId());
         ProviderPaymentRecord payment = providerPayments
                 .findByProviderPaymentIdForUpdate(instruction.paymentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Provider payment not found."));
-        if (!instruction.idempotencyKey().equals(payment.getRefundIdempotencyKey())) {
+        if (!attempt.getPublicId().equals(payment.getAttempt().getPublicId())
+                || !instruction.idempotencyKey().equals(payment.getRefundIdempotencyKey())) {
             throw new IllegalStateException("Refund result does not match the pending refund.");
         }
-        var order = orders.findByIdForUpdate(payment.getAttempt().getOrder().getId())
+        var order = orders.findByIdForUpdate(attempt.getOrder().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         payment.refundResult(result, Instant.now(clock));
         if (payment.refundTerminalAndComplete()) {
-            if (!providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
+            boolean cancelledFundsOrder = payment.isFundsOrder() && order.getStatus() == OrderStatus.CANCELLED
+                    && order.getPaymentStatus() == com.computerstore.order.domain.PaymentStatus.REFUND_PENDING;
+            if (cancelledFundsOrder || !providerPayments.existsByAttemptOrderIdAndFundsOrderTrue(order.getId())) {
                 order.markPaymentRefunded();
                 shippingPaymentRevoked(order);
-                payment.getAttempt().summaryStatus("refunded", PaymentAttemptStatus.REFUNDED);
+                attempt.summaryStatus("refunded", PaymentAttemptStatus.REFUNDED);
+                if (outbox != null && order.getCancellationReason() != null) {
+                    outbox.enqueueOnce(order, OrderEmailEventType.PAYMENT_REFUNDED);
+                }
             }
             event(instruction.eventId()).ifPresent(value -> value.processed("REFUNDED"));
         } else {
@@ -332,6 +343,7 @@ public class PaymentAttemptTransactionalService {
     public List<RefundInstruction> claimPendingRefunds() {
         Instant now = Instant.now(clock);
         return providerPayments.lockRefundsDue(now).stream().map(payment -> {
+            payment.prepareRefundRetry(now);
             payment.lease(now.plusSeconds(60));
             return new RefundInstruction(
                     payment.getAttempt().getPublicId(), payment.getProviderPaymentId(),

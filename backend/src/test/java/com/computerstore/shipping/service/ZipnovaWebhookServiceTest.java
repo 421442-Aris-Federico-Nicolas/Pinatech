@@ -46,7 +46,7 @@ class ZipnovaWebhookServiceTest {
 
         service.process(instruction);
 
-        verify(shipments).applyWebhook(99L, provider, List.of());
+        verify(shipments).applyWebhook(99L, provider, List.of(), false);
         verify(completion).complete(instruction, true, null);
     }
     private ZipnovaWebhookService service(ShippingWebhookInboxRepository inbox) {

@@ -1,4 +1,4 @@
-<div class="admin-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
+<div class="admin-shell" [class.sidebar-collapsed]="sidebarCollapsed()" [attr.inert]="cancellationOrder() || refundOrder() ? '' : null" [attr.aria-hidden]="cancellationOrder() || refundOrder() ? 'true' : null">
   <aside class="admin-sidebar">
     <div class="sidebar-head">
       <div class="admin-mark">P</div>
@@ -19,7 +19,7 @@
   <main [attr.aria-busy]="loading()">
     <header class="page-heading">
       <div><p class="eyebrow">Operación interna</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
-      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock() || shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
+      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock() || orderUpdating() !== null || shipmentUpdating() !== null || refundConfirming() !== null || ordersRefreshing() || shipmentDocumentLoading() !== null" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
     </header>
 
     @if (error()) { <app-feedback class="page-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
@@ -120,7 +120,7 @@
                     @if (order.shipment; as shipment) {
                       <section class="shipment-detail" [class.incident]="shipment.incident" [attr.aria-busy]="shipmentUpdating() === order.id || shipmentDocumentLoading()?.startsWith(order.id + '-')">
                         <div class="shipment-heading"><h3>Envío Zipnova</h3><i class="status-badge" [appBadge]="shipment.incident ? 'danger' : 'info'">{{ shipmentStatusLabel(shipment.status) }}</i></div>
-                        @if(shipment.status === 'CANCELLED'){<app-feedback class="shipment-cancelled" tone="warning"><strong>Zipnova canceló este envío.</strong> El pedido y el pago siguen vigentes. Creá un envío de reemplazo.</app-feedback>}
+                        @if(shipment.status === 'CANCELLED' && order.status !== 'CANCELLED'){<app-feedback class="shipment-cancelled" tone="warning"><strong>Este envío está cancelado.</strong> El pedido y el pago siguen vigentes. Creá un envío de reemplazo o cancelá el pedido.</app-feedback>}
                         <dl>
                           <div><dt>Estado del operador</dt><dd>{{ shipment.providerStatus || 'Sin informar' }}@if(shipment.providerSubstatus){ · {{ shipment.providerSubstatus }}}</dd></div>
                           @if(shipment.carrier){<div><dt>Transportista</dt><dd>{{ shipment.carrier }}</dd></div>}
@@ -128,18 +128,19 @@
                           @if(shipment.estimatedDeliveryAt){<div><dt>Entrega estimada</dt><dd>{{ shipment.estimatedDeliveryAt | date:'dd/MM/yyyy' }}</dd></div>}
                         </dl>
                         @if(shipment.trackingUrl){<a [href]="shipment.trackingUrl" target="_blank" rel="noopener noreferrer">Abrir seguimiento del transportista</a>}
-                        @if(canDownloadShipmentDocuments(order) || canRetryShipment(order) || canCancelShipment(order)) {
-                          <div class="shipment-actions" aria-label="Acciones del envío">
+                        @if(canDownloadShipmentDocuments(order) || canRetryShipment(order) || canCancelShipment(order) || canCancelOrderAfterShipmentCancellation(order)) {
+                          <div class="shipment-actions" [attr.aria-label]="canCancelOrderAfterShipmentCancellation(order) ? 'Acciones del envío y el pedido' : 'Acciones del envío'">
                             @if(canDownloadShipmentDocuments(order)){<button appButton="outlined" type="button" [disabled]="shipmentDocumentLoading() !== null || shipmentUpdating() !== null" (click)="downloadShipmentPdf(order, 'label')">{{ shipmentDocumentLoading() === order.id + '-label' ? 'Descargando…' : 'Etiqueta PDF' }}</button><button appButton="outlined" type="button" [disabled]="shipmentDocumentLoading() !== null || shipmentUpdating() !== null" (click)="downloadShipmentPdf(order, 'document')">{{ shipmentDocumentLoading() === order.id + '-document' ? 'Descargando…' : 'Documento PDF' }}</button>}
-                            @if(canRetryShipment(order)){<button appButton="outlined" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="retryShipment(order)">{{ shipmentUpdating() === order.id ? 'Solicitando…' : shipment.status === 'CANCELLED' ? 'Crear envío de reemplazo' : 'Reintentar envío' }}</button>}
-                            @if(canCancelShipment(order)){<button appButton="outlined" tone="danger" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null" (click)="cancelShipment(order)">{{ shipmentUpdating() === order.id ? 'Cancelando…' : 'Cancelar envío' }}</button>}
+                            @if(canRetryShipment(order)){<button appButton="outlined" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null || orderUpdating() !== null || refundConfirming() !== null || ordersRefreshing()" (click)="retryShipment(order)">{{ shipmentUpdating() === order.id ? 'Solicitando…' : shipment.status === 'CANCELLED' ? 'Crear envío de reemplazo' : 'Reintentar envío' }}</button>}
+                            @if(canCancelShipment(order)){<button appButton="outlined" tone="danger" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null || orderUpdating() !== null || refundConfirming() !== null || ordersRefreshing()" (click)="openCancellationDialog(order, false, $event)">Cancelar envío</button>}
+                            @if(canCancelOrderAfterShipmentCancellation(order)){<button appButton="outlined" tone="danger" type="button" [disabled]="shipmentUpdating() !== null || shipmentDocumentLoading() !== null || orderUpdating() !== null || refundConfirming() !== null || ordersRefreshing()" (click)="openCancellationDialog(order, true, $event)">Cancelar pedido</button>}
                           </div>
                         }
                       </section>
                     } @else { <p class="shipment-empty">Zipnova todavía no generó un envío para este pedido.</p> }
                   }
                 </div>
-                <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.fulfillmentMethod === 'DELIVERY'){<p><span>Envío</span><strong>{{ (order.shippingCost ?? 0) | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus, order.fulfillmentMethod, order.fulfillmentStatus, order.shipment?.status);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() === order.id" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}</div></div>
+                <div class="order-actions"><p><span>Precio de lista</span><strong>{{ order.subtotal | number:'1.0-2' }} ARS</strong></p>@if(order.fulfillmentMethod === 'DELIVERY'){<p><span>Envío</span><strong>{{ (order.shippingCost ?? 0) | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentDiscount > 0){<p><span>Descuento por transferencia</span><strong>− {{ order.paymentDiscount | number:'1.0-2' }} ARS</strong></p>}@if(order.paymentSurcharge > 0){<p><span>Ajuste histórico de pago</span><strong>{{ order.paymentSurcharge | number:'1.0-2' }} ARS</strong></p>}<p><span>Total</span><strong>{{ order.total | number:'1.0-2' }} ARS</strong></p>@if(order.status === 'PENDING_PAYMENT' && order.reservationExpiresAt){<small>La reserva vence {{ order.reservationExpiresAt | date:'dd/MM, HH:mm' }}.</small>}<div>@for(action of orderActions(order.status, order.paymentStatus, order.fulfillmentMethod, order.fulfillmentStatus, order.shipment?.status);track action.status){<button appButton="outlined" [tone]="action.danger ? 'danger' : 'default'" type="button" [disabled]="orderUpdating() !== null || shipmentUpdating() !== null || refundConfirming() !== null || ordersRefreshing()" (click)="changeOrderStatus(order, action)">{{ action.label }}</button>}@if(canConfirmBankTransferRefund(order)){<button appButton="outlined" type="button" [disabled]="refundConfirming() !== null || shipmentUpdating() !== null || orderUpdating() !== null || ordersRefreshing()" (click)="openRefundDialog(order, $event)">Confirmar reintegro</button>}</div></div>
               </div>
             }
           </article>
@@ -229,3 +230,48 @@
     }
   </main>
 </div>
+
+@if (cancellationOrder(); as order) {
+  <div class="admin-modal-backdrop" (click)="closeCancellationDialog()">
+    <section class="admin-modal cancellation-dialog" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="cancellation-title" aria-describedby="cancellation-description" [attr.aria-busy]="shipmentUpdating() === order.id" (click)="$event.stopPropagation()" (keydown)="handleDialogKeydown($event, 'cancellation')">
+      <header>
+        <div><p class="panel-kicker">Pedido #{{ order.id }}</p><h2 id="cancellation-title">{{ order.shipment?.status === 'CANCELLED' ? 'Cancelar pedido' : 'Cancelar envío' }}</h2></div>
+        <button class="modal-close" type="button" aria-label="Cerrar" [disabled]="shipmentUpdating() === order.id" (click)="closeCancellationDialog()">×</button>
+      </header>
+      <form (ngSubmit)="submitCancellation()" novalidate>
+        <fieldset [disabled]="shipmentUpdating() === order.id">
+          @if (order.shipment?.status === 'CANCELLED') {
+            <p id="cancellation-description" class="modal-description">El transportista ya canceló el envío. Esta acción cancelará solamente el pedido y liberará su stock; no solicitará otra cancelación al transportista. {{ order.paymentMethod === 'MERCADO_PAGO' ? 'También solicitará el reintegro total en Mercado Pago.' : 'El reintegro de la transferencia quedará pendiente de confirmación manual.' }}</p>
+          } @else {
+            <p id="cancellation-description" class="modal-description">Elegí si el pedido debe continuar vigente o si también necesitás cancelarlo.</p>
+            <fieldset class="cancellation-scope">
+              <legend>Alcance de la cancelación</legend>
+              <label><input type="radio" name="cancellationScope" value="SHIPMENT_ONLY" [(ngModel)]="cancellationScope"><span><strong>Cancelar solo el envío</strong><small>El pedido y el pago siguen vigentes.</small></span></label>
+              <label><input type="radio" name="cancellationScope" value="ORDER" [(ngModel)]="cancellationScope"><span><strong>Cancelar envío y pedido</strong><small>Libera el stock y {{ order.paymentMethod === 'MERCADO_PAGO' ? 'solicita el reintegro total en Mercado Pago' : 'deja pendiente el reintegro manual de la transferencia' }}.</small></span></label>
+            </fieldset>
+          }
+          @if (cancellationScope === 'ORDER') {
+            <app-select class="cancellation-reason" label="Motivo de cancelación" placeholder="Seleccioná un motivo" [options]="cancellationReasonOptions" [(ngModel)]="cancellationReason" name="cancellationReason" [disabled]="shipmentUpdating() === order.id" required />
+            <app-textarea class="cancellation-detail" label="Detalle interno (opcional)" [rows]="4" [maxLength]="500" [(ngModel)]="cancellationDetail" name="cancellationDetail" autocomplete="off" spellcheck="true" hint="Máximo 500 caracteres. No se comparte con el cliente." [disabled]="shipmentUpdating() === order.id" />
+          }
+        </fieldset>
+        @if (cancellationError()) { <p class="modal-error" role="alert">{{ cancellationError() }}</p> }
+        <footer><button appButton="text" type="button" [disabled]="shipmentUpdating() === order.id" (click)="closeCancellationDialog()">Volver</button><button appButton="filled" tone="danger" type="submit" [disabled]="shipmentUpdating() === order.id">{{ shipmentUpdating() === order.id ? 'Cancelando…' : order.shipment?.status === 'CANCELLED' ? 'Cancelar pedido' : cancellationScope === 'ORDER' ? 'Cancelar envío y pedido' : 'Cancelar solo el envío' }}</button></footer>
+      </form>
+    </section>
+  </div>
+}
+
+@if (refundOrder(); as order) {
+  <div class="admin-modal-backdrop" (click)="closeRefundDialog()">
+    <section class="admin-modal refund-dialog" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="refund-title" aria-describedby="refund-description" [attr.aria-busy]="refundConfirming() === order.id" (click)="$event.stopPropagation()" (keydown)="handleDialogKeydown($event, 'refund')">
+      <header><div><p class="panel-kicker">Pedido #{{ order.id }}</p><h2 id="refund-title">Confirmar reintegro</h2></div><button class="modal-close" type="button" aria-label="Cerrar" [disabled]="refundConfirming() === order.id" (click)="closeRefundDialog()">×</button></header>
+      <form (ngSubmit)="confirmBankTransferRefund()" novalidate>
+        <p id="refund-description" class="modal-description">Registrá que el reintegro de la transferencia bancaria ya fue realizado.</p>
+        <app-input class="refund-reference" label="Referencia bancaria (opcional)" [maxLength]="200" [(ngModel)]="refundReference" name="refundReference" autocomplete="off" hint="Máximo 200 caracteres." [disabled]="refundConfirming() === order.id" />
+        @if (refundError()) { <p class="modal-error" role="alert">{{ refundError() }}</p> }
+        <footer><button appButton="text" type="button" [disabled]="refundConfirming() === order.id" (click)="closeRefundDialog()">Volver</button><button appButton="filled" type="submit" [disabled]="refundConfirming() === order.id">{{ refundConfirming() === order.id ? 'Confirmando…' : 'Confirmar reintegro' }}</button></footer>
+      </form>
+    </section>
+  </div>
+}

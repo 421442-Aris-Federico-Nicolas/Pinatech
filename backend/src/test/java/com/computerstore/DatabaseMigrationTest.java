@@ -3,6 +3,7 @@ package com.computerstore;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -216,7 +217,27 @@ class DatabaseMigrationTest {
                 WHERE conrelid = 'email_outbox'::regclass
                   AND conname = 'chk_email_outbox_seller_payload'
                 """, Integer.class));
-        assertEquals("28", jdbc.queryForObject(
+        assertEquals("YES", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'shipment_events'
+                  AND column_name = 'provider_shipment_id'
+                """, String.class));
+        assertEquals("NO", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'email_outbox'
+                  AND column_name = 'deduplication_key'
+                """, String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conrelid = 'email_outbox'::regclass
+                  AND conname = 'uq_email_outbox_order_event_key'
+                """, Integer.class));
+        assertTrue(jdbc.queryForObject("""
+                SELECT pg_get_constraintdef(oid) FROM pg_constraint
+                WHERE conrelid = 'provider_payments'::regclass
+                  AND conname = 'chk_provider_payments_refund_status'
+                """, String.class).contains("AMOUNT_MISMATCH"));
+        assertEquals("29", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }

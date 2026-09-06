@@ -58,11 +58,16 @@ describe('AdminService product images', () => {
     expect(retry.request.body).toBeNull();
     retry.flush(null);
 
-    service.cancelShipment(41).subscribe();
+    service.cancelShipment(41, { scope: 'ORDER', reasonCode: 'LOGISTICS_PROBLEM', internalDetail: 'Sin cobertura alternativa' }).subscribe();
     const cancellation = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/cancel`);
     expect(cancellation.request.method).toBe('POST');
-    expect(cancellation.request.body).toBeNull();
-    cancellation.flush({ result: 'cancelled' });
+    expect(cancellation.request.body).toEqual({ scope: 'ORDER', reasonCode: 'LOGISTICS_PROBLEM', internalDetail: 'Sin cobertura alternativa' });
+    cancellation.flush({ id: 41, status: 'CANCELLED' });
+
+    service.cancelShipment(42, { scope: 'SHIPMENT_ONLY' }).subscribe();
+    const shipmentOnlyCancellation = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/42/cancel`);
+    expect(shipmentOnlyCancellation.request.body).toEqual({ scope: 'SHIPMENT_ONLY' });
+    shipmentOnlyCancellation.flush({ id: 42, status: 'PAID' });
 
     service.shipmentLabel(41).subscribe();
     const label = http.expectOne(`${environment.apiBaseUrl}/admin/shipping/orders/41/label`);
@@ -75,6 +80,22 @@ describe('AdminService product images', () => {
     expect(document.request.method).toBe('GET');
     expect(document.request.responseType).toBe('blob');
     document.flush(new Blob(['document'], { type: 'application/pdf' }));
+  });
+
+  it('confirms bank-transfer refunds with an optional reference', () => {
+    const service = TestBed.inject(AdminService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.confirmBankTransferRefund(41, 'TRX-9001').subscribe();
+    const withReference = http.expectOne(`${environment.apiBaseUrl}/admin/orders/41/bank-transfer-refund/confirm`);
+    expect(withReference.request.method).toBe('POST');
+    expect(withReference.request.body).toEqual({ reference: 'TRX-9001' });
+    withReference.flush({ id: 41, status: 'CANCELLED', paymentStatus: 'REFUNDED' });
+
+    service.confirmBankTransferRefund(42).subscribe();
+    const withoutReference = http.expectOne(`${environment.apiBaseUrl}/admin/orders/42/bank-transfer-refund/confirm`);
+    expect(withoutReference.request.body).toEqual({});
+    withoutReference.flush({ id: 42, status: 'CANCELLED', paymentStatus: 'REFUNDED' });
   });
 
   it('updates and deletes categories through admin catalog endpoints', () => {

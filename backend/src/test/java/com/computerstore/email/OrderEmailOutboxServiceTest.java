@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -102,12 +103,27 @@ class OrderEmailOutboxServiceTest {
         var snapshot = new ShipmentTrackingSnapshot("Andreani", "TRACK-1",
                 Instant.parse("2026-09-05T20:00:00Z"), "https://tracking.example/TRACK-1");
 
-        service.enqueueTracking(order(), snapshot);
+        service.enqueueTracking(order(), snapshot, "shipment-1");
 
         ArgumentCaptor<EmailOutboxEntry> saved = ArgumentCaptor.forClass(EmailOutboxEntry.class);
         verify(entries).save(saved.capture());
         assertEquals(OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE, saved.getValue().getEventType());
+        assertEquals("shipment-1", saved.getValue().getDeduplicationKey());
         assertEquals(snapshot, JSON.readValue(saved.getValue().getEventPayload(), ShipmentTrackingSnapshot.class));
+    }
+
+    @Test
+    void repeatedTrackingForTheSameProviderShipmentIsNotQueuedAgain() {
+        EmailOutboxRepository entries = mock(EmailOutboxRepository.class);
+        when(entries.existsByOrderIdAndEventTypeAndDeduplicationKey(
+                41L, OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE, "shipment-1")).thenReturn(true);
+        OrderEmailOutboxService service = new OrderEmailOutboxService(entries, mock(TransactionalEmailService.class),
+                mock(EmailOutboxCompletionService.class), Clock.fixed(NOW, ZoneOffset.UTC), JSON, "");
+
+        service.enqueueTracking(order(), new ShipmentTrackingSnapshot("Andreani", "TRACK-1", NOW, null),
+                "shipment-1");
+
+        verify(entries, never()).save(any());
     }
 
     @Test

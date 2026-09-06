@@ -59,11 +59,12 @@ public class OrderEmailOutboxService {
         if (!entries.existsByOrderIdAndEventType(order.getId(), event)) enqueue(order, event);
     }
 
-    public void enqueueTracking(CustomerOrder order, ShipmentTrackingSnapshot snapshot) {
-        if (entries.existsByOrderIdAndEventType(order.getId(), OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE)) return;
+    public void enqueueTracking(CustomerOrder order, ShipmentTrackingSnapshot snapshot, String shipmentKey) {
+        if (entries.existsByOrderIdAndEventTypeAndDeduplicationKey(
+                order.getId(), OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE, shipmentKey)) return;
         Instant now = Instant.now(clock);
         entries.save(new EmailOutboxEntry(order, OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE,
-                order.getUser().getEmail(), serializeTracking(snapshot), now));
+                order.getUser().getEmail(), serializeTracking(snapshot), shipmentKey, now));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

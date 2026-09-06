@@ -21,6 +21,8 @@ public record OrderResponse(
         BigDecimal total,
         Instant createdAt,
         Instant reservationExpiresAt,
+        String cancellationReason,
+        Instant cancelledAt,
         String customerName,
         String customerEmail,
         List<Item> items,

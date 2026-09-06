@@ -83,3 +83,85 @@ app-admin .proof-review-error { color: var(--color-danger-text); font-weight: 70
   app-admin .proof-summary { align-items: stretch; flex-direction: column; }
   app-admin .proof-summary > strong { text-align: left; }
 }
+
+app-admin {
+  .admin-modal-backdrop {
+    align-items: center;
+    background: rgba(2, 8, 13, 0.82);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    overscroll-behavior: contain;
+    padding: 1rem;
+    position: fixed;
+    z-index: 1100;
+  }
+  .admin-modal {
+    background: #0d1822;
+    border: 1px solid #294656;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+    max-height: calc(100dvh - 2rem);
+    max-width: 580px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 1.35rem;
+    width: 100%;
+  }
+  .admin-modal > header {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+  .admin-modal h2 { font-size: 1.35rem; margin: .3rem 0 0; }
+  .modal-close {
+    align-items: center;
+    background: transparent;
+    border: 1px solid #294656;
+    border-radius: 8px;
+    color: #b7c8d2;
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 36px;
+    font-size: 1.3rem;
+    height: 36px;
+    justify-content: center;
+  }
+  .admin-modal form > fieldset,
+  .cancellation-scope { border: 0; margin: 0; min-width: 0; padding: 0; }
+  .modal-description { color: #9db0bd; font-size: .85rem; line-height: 1.55; margin: 1rem 0; }
+  .cancellation-scope { display: grid; gap: .55rem; }
+  .cancellation-scope legend { color: #b9c9d2; font-size: .72rem; font-weight: 800; margin-bottom: .55rem; }
+  .cancellation-scope label {
+    align-items: flex-start;
+    background: #101f2b;
+    border: 1px solid #244153;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    gap: .7rem;
+    padding: .8rem;
+  }
+  .cancellation-scope label:has(input:checked) { background: #112b39; border-color: #3a8197; }
+  .cancellation-scope input { accent-color: var(--color-cyan); margin-top: .2rem; }
+  .cancellation-scope span { display: grid; gap: .2rem; }
+  .cancellation-scope small { color: #8097a6; font-size: .7rem; }
+  .admin-modal :is(app-select, app-input, app-textarea) { display: block; margin-top: .75rem; }
+  .modal-error { color: #ff9eb7; font-size: .78rem; margin: .8rem 0 0; }
+  .admin-modal footer {
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    gap: .55rem;
+    justify-content: flex-end;
+    margin-top: 1.15rem;
+    padding-top: 1rem;
+  }
+  .admin-modal :disabled { cursor: not-allowed; }
+}
+
+@media (max-width: 480px) {
+  app-admin .admin-modal-backdrop { align-items: flex-end; padding: 0; }
+  app-admin .admin-modal { border-bottom: 0; border-radius: 16px 16px 0 0; max-height: calc(100dvh - 1rem); padding: 1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom)); }
+  app-admin .admin-modal footer { align-items: stretch; flex-direction: column; }
+}

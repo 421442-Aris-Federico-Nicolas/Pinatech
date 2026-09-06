@@ -42,8 +42,107 @@ class ShipmentWorkerTest {
 
         new ShipmentWorker(transactions, gateway, properties()).reconcileDue();
 
-        verify(transactions).reconciled(id, token, cancelled, List.of());
+        verify(transactions).reconciled(id, token, cancelled, List.of(), false);
         verify(transactions, never()).reconciliationFailed(any(), any());
+    }
+
+    @Test
+    void pendingCancellationIsRetriedAfterTheRequestProcessStops() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, true);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verify(gateway).cancel(99L);
+        verify(transactions).cancellationSucceeded(id, token, 42L, 99L);
+    }
+
+    @Test
+    void failedCancellationRemainsScheduledForRecovery() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, true);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+        when(gateway.cancel(99L)).thenThrow(
+                new ShippingProviderException("cancellation unavailable", null, false, true, null));
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verify(transactions).cancellationFailed(id, token, "cancellation unavailable");
+        verify(transactions, never()).cancellationSucceeded(any(), anyLong());
+    }
+
+    @Test
+    void permanentCancellationFailureReleasesTheOrderForOperationalHandling() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, true);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+        when(gateway.cancel(99L)).thenThrow(
+                new ShippingProviderException("shipment already dispatched", null, false, false, null));
+        when(gateway.getShipment(99L)).thenReturn(new ZipnovaGateway.ProviderShipment(
+                99L, "PIN-42", "shipped", null, null, null, null, Instant.now(), "Andreani"));
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verify(transactions).cancellationRejected(id, token, "shipment already dispatched");
+        verify(transactions, never()).cancellationFailed(any(), any(), any());
+    }
+
+    @Test
+    void permanentCancellationErrorCompletesWhenProviderAlreadyCancelled() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, true);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+        when(gateway.cancel(99L)).thenThrow(
+                new ShippingProviderException("shipment already cancelled", null, false, false, null));
+        when(gateway.getShipment(99L)).thenReturn(new ZipnovaGateway.ProviderShipment(
+                99L, "PIN-42", "cancelled", null, null, null, null, Instant.now(), "Andreani"));
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verify(transactions).cancellationSucceeded(id, token, 42L, 99L);
+        verify(transactions, never()).cancellationRejected(any(), any(), any());
+    }
+
+    @Test
+    void unconfirmedPermanentCancellationErrorRemainsScheduled() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, true);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+        when(gateway.cancel(99L)).thenThrow(
+                new ShippingProviderException("shipment already cancelled", null, false, false, null));
+        when(gateway.getShipment(99L)).thenThrow(
+                new ShippingProviderException("lookup unavailable", null, false, true, null));
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verify(transactions).cancellationFailed(id, token,
+                "Cancellation result could not be confirmed: lookup unavailable");
+        verify(transactions, never()).cancellationRejected(any(), any(), any());
+    }
+
+    @Test
+    void locallyFinalizesAnAlreadyCancelledProviderShipment() {
+        ShipmentDispatchService transactions = mock(ShipmentDispatchService.class);
+        ZipnovaGateway gateway = mock(ZipnovaGateway.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        var instruction = new ShipmentDispatchService.CancellationRetryInstruction(id, token, 42L, 99L, false);
+        when(transactions.claimCancellation()).thenReturn(Optional.of(instruction), Optional.empty());
+
+        new ShipmentWorker(transactions, gateway, properties()).cancelDue();
+
+        verifyNoInteractions(gateway);
+        verify(transactions).cancellationSucceeded(id, token, 42L, 99L);
     }
     private ZipnovaProperties properties() { return new ZipnovaProperties(true, true, "token", "secret", 7L, 12L,
             "pinatech", "dynamic", Duration.ofMinutes(15), Duration.ofSeconds(1), Duration.ofSeconds(2),

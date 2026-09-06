@@ -9,7 +9,7 @@ describe('AdminComponent payments', () => {
   const renderedOrder: Order = {
     id: 41, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
     paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 240, paymentDiscount: 0, paymentSurcharge: 24, total: 264,
-    createdAt: '2026-08-17T10:00:00Z', reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada Lovelace',
+    createdAt: '2026-08-17T10:00:00Z', reservationExpiresAt: '2026-08-18T10:00:00Z', cancellationReason: null, cancelledAt: null, customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com', shippingCost: 0, deliveryAddress: null, shipment: null,
     items: [{ productId: 4, variantId: 9, productName: 'Mouse', colorName: 'Negro', colorHex: '#000000', unitPrice: 120, quantity: 2, subtotal: 240 }],
   };
@@ -48,7 +48,7 @@ describe('AdminComponent payments', () => {
     const base: Order = {
       id: 1, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentStatus: 'PENDING', currency: 'ARS',
       paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: null, subtotal: 100, paymentDiscount: 0, paymentSurcharge: 10, total: 110, createdAt: '2026-08-17T10:00:00Z',
-      reservationExpiresAt: '2026-08-18T10:00:00Z', customerName: 'Ada', customerEmail: 'ada@example.com', shippingCost: 0,
+      reservationExpiresAt: '2026-08-18T10:00:00Z', cancellationReason: null, cancelledAt: null, customerName: 'Ada', customerEmail: 'ada@example.com', shippingCost: 0,
       deliveryAddress: null, shipment: null, items: [],
     };
 
@@ -293,6 +293,82 @@ describe('AdminComponent payments', () => {
     expect(component.canDownloadShipmentDocuments({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'new' } })).toBe(false);
   });
 
+  it('cancels through the in-component dialog, requires an order reason and refreshes stock', async () => {
+    const deliveryOrder: AdminOrder = {
+      ...renderedOrder,
+      fulfillmentMethod: 'DELIVERY', deliveryMethod: 'ZIPNOVA',
+      shipment: {
+        status: 'ACTIVE', providerStatus: 'documentation_ready', providerSubstatus: null, carrier: 'Andreani',
+        trackingCode: 'TRACK-41', trackingUrl: null, estimatedDeliveryAt: null, incident: false,
+      },
+    };
+    const cancelledOrder: AdminOrder = {
+      ...deliveryOrder, status: 'CANCELLED', fulfillmentStatus: 'CANCELLED', cancellationReason: 'LOGISTICS_PROBLEM', cancelledAt: '2026-08-18T12:00:00Z',
+      shipment: { ...deliveryOrder.shipment!, status: 'CANCELLED', providerStatus: 'cancelled' },
+    };
+    const cancelShipment = vi.fn(() => of(cancelledOrder));
+    const inventories = vi.fn(() => of([]));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories,
+          orders: () => of([deliveryOrder]), pendingBankTransferProofs: () => of([]), cancelShipment,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('sales');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const cancellationButton = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.shipment-actions button'))
+      .find((button) => button.textContent?.includes('Cancelar envío'))!;
+    const browserConfirmation = vi.spyOn(globalThis, 'confirm');
+    browserConfirmation.mockClear();
+
+    cancellationButton.click();
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    const dialog = fixture.nativeElement.querySelector('.cancellation-dialog') as HTMLElement;
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.textContent).toContain('Cancelar solo el envío');
+    expect(dialog.textContent).toContain('Cancelar envío y pedido');
+    expect(browserConfirmation).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(dialog.querySelector('input[type="radio"]'));
+
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    await Promise.resolve();
+    expect(fixture.nativeElement.querySelector('.cancellation-dialog')).toBeNull();
+    expect(document.activeElement).toBe(cancellationButton);
+
+    cancellationButton.click();
+    fixture.detectChanges();
+    component.cancellationScope = 'ORDER';
+    fixture.detectChanges();
+    expect(dialog.textContent).toContain('reintegro total en Mercado Pago');
+    component.submitCancellation();
+    fixture.detectChanges();
+    expect(cancelShipment).not.toHaveBeenCalled();
+    expect(component.cancellationError()).toContain('motivo');
+
+    component.cancellationReason = 'LOGISTICS_PROBLEM';
+    component.cancellationDetail = '  Sin cobertura alternativa  ';
+    component.submitCancellation();
+    fixture.detectChanges();
+
+    expect(cancelShipment).toHaveBeenCalledWith(41, { scope: 'ORDER', reasonCode: 'LOGISTICS_PROBLEM', internalDetail: 'Sin cobertura alternativa' });
+    expect(component.orders()[0]).toEqual(cancelledOrder);
+    expect(inventories).toHaveBeenCalledTimes(2);
+    expect(component.cancellationOrder()).toBeNull();
+    browserConfirmation.mockRestore();
+  });
+
   it('warns about a cancelled shipment and explicitly confirms its replacement', async () => {
     const cancelledOrder: AdminOrder = {
       ...renderedOrder,
@@ -322,10 +398,25 @@ describe('AdminComponent payments', () => {
     const detail = fixture.nativeElement.querySelector('.order-detail') as HTMLElement;
     const replacementButton = Array.from(detail.querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.includes('Crear envío de reemplazo'));
-    expect(detail.textContent).toContain('Zipnova canceló este envío.');
+    const cancelOrderButton = Array.from(detail.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Cancelar pedido'));
+    expect(detail.textContent).toContain('Este envío está cancelado.');
     expect(detail.textContent).toContain('El pedido y el pago siguen vigentes.');
     expect(detail.textContent).not.toContain('Preparar pedido');
     expect(replacementButton).toBeTruthy();
+    expect(cancelOrderButton).toBeTruthy();
+    expect(fixture.componentInstance.canCancelOrderAfterShipmentCancellation({ ...cancelledOrder, status: 'SHIPPED' })).toBe(false);
+    expect(fixture.componentInstance.canCancelOrderAfterShipmentCancellation({ ...cancelledOrder, paymentStatus: 'REFUND_PENDING' })).toBe(false);
+
+    cancelOrderButton?.click();
+    fixture.detectChanges();
+    const cancellationDialog = fixture.nativeElement.querySelector('.cancellation-dialog') as HTMLElement;
+    expect(fixture.componentInstance.cancellationScope).toBe('ORDER');
+    expect(cancellationDialog.textContent).toContain('El transportista ya canceló el envío.');
+    expect(cancellationDialog.textContent).toContain('no solicitará otra cancelación al transportista');
+    expect(cancellationDialog.textContent).not.toContain('Cancelar envío y pedido');
+    fixture.componentInstance.closeCancellationDialog();
+    fixture.detectChanges();
 
     const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
     replacementButton?.click();
@@ -336,6 +427,57 @@ describe('AdminComponent payments', () => {
     replacementButton?.click();
     expect(retryShipment).toHaveBeenCalledWith(41);
     confirmation.mockRestore();
+
+    fixture.componentInstance.orders.set([{
+      ...cancelledOrder, status: 'CANCELLED', paymentStatus: 'REFUND_PENDING', fulfillmentStatus: 'CANCELLED',
+    }]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement.querySelector('.order-detail') as HTMLElement).textContent).not.toContain('El pedido y el pago siguen vigentes.');
+  });
+
+  it('confirms a pending bank-transfer refund and updates the local order', async () => {
+    const pendingRefund: AdminOrder = {
+      ...renderedOrder,
+      status: 'CANCELLED', fulfillmentStatus: 'CANCELLED', paymentMethod: 'BANK_TRANSFER', paymentStatus: 'REFUND_PENDING',
+      cancellationReason: 'CUSTOMER_REQUEST', cancelledAt: '2026-08-18T10:00:00Z',
+    };
+    const refunded: AdminOrder = { ...pendingRefund, paymentStatus: 'REFUNDED' };
+    const confirmBankTransferRefund = vi.fn(() => of(refunded));
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
+          orders: () => of([pendingRefund]), pendingBankTransferProofs: () => of([]), confirmBankTransferRefund,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('sales');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const refundButton = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.order-actions button'))
+      .find((button) => button.textContent?.includes('Confirmar reintegro'))!;
+
+    refundButton.click();
+    fixture.detectChanges();
+    const reference = fixture.nativeElement.querySelector('.refund-reference input') as HTMLInputElement;
+    expect(reference.maxLength).toBe(200);
+    component.refundReference = 'x'.repeat(201);
+    component.confirmBankTransferRefund();
+    expect(confirmBankTransferRefund).not.toHaveBeenCalled();
+    expect(component.refundError()).toContain('200');
+
+    component.refundReference = '  TRX-9001  ';
+    component.confirmBankTransferRefund();
+    fixture.detectChanges();
+
+    expect(confirmBankTransferRefund).toHaveBeenCalledWith(41, 'TRX-9001');
+    expect(component.orders()[0].paymentStatus).toBe('REFUNDED');
+    expect(component.refundOrder()).toBeNull();
   });
 
   it('refreshes orders after requesting an eligible shipment retry', async () => {

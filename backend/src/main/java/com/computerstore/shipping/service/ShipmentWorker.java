@@ -36,6 +36,15 @@ public class ShipmentWorker {
             reconcile(instruction.get());
         }
     }
+    @Scheduled(fixedDelay = 10000)
+    public void cancelDue() {
+        if (!properties.available()) return;
+        for (int processed = 0; processed < BATCH_SIZE; processed++) {
+            var instruction = transactions.claimCancellation();
+            if (instruction.isEmpty()) return;
+            cancel(instruction.get());
+        }
+    }
     private void create(ShipmentDispatchService.CreateInstruction instruction) {
         try {
             var existing = gateway.findByExternalId(instruction.externalId());
@@ -47,13 +56,48 @@ public class ShipmentWorker {
         try {
             var shipment = gateway.getShipment(instruction.providerId());
             List<ZipnovaGateway.TrackingEvent> history = List.of();
+            boolean trackingComplete = true;
             try {
                 history = gateway.tracking(instruction.providerId());
             } catch (ShippingProviderException error) {
+                trackingComplete = false;
                 LOGGER.warn("Zipnova tracking lookup failed for shipment {}; applying provider state without history.",
                         instruction.providerId());
             }
-            transactions.reconciled(instruction.id(), instruction.token(), shipment, history);
+            transactions.reconciled(instruction.id(), instruction.token(), shipment, history, trackingComplete);
         } catch (ShippingProviderException error) { transactions.reconciliationFailed(instruction.id(), instruction.token()); }
+    }
+    private void cancel(ShipmentDispatchService.CancellationRetryInstruction instruction) {
+        try {
+            if (!instruction.providerCancellationRequired()) {
+                transactions.cancellationSucceeded(instruction.id(), instruction.token(),
+                        instruction.orderId(), instruction.providerId());
+                return;
+            }
+            gateway.cancel(instruction.providerId());
+            transactions.cancellationSucceeded(instruction.id(), instruction.token(),
+                    instruction.orderId(), instruction.providerId());
+        } catch (ShippingProviderException error) {
+            if (error.retryable()) {
+                transactions.cancellationFailed(instruction.id(), instruction.token(), error.getMessage());
+                return;
+            }
+            resolveRejectedCancellation(instruction, error);
+        }
+    }
+    private void resolveRejectedCancellation(ShipmentDispatchService.CancellationRetryInstruction instruction,
+                                             ShippingProviderException cancellationError) {
+        try {
+            var provider = gateway.getShipment(instruction.providerId());
+            if ("cancelled".equalsIgnoreCase(provider.status()) || "canceled".equalsIgnoreCase(provider.status())) {
+                transactions.cancellationSucceeded(instruction.id(), instruction.token(),
+                        instruction.orderId(), instruction.providerId());
+            } else {
+                transactions.cancellationRejected(instruction.id(), instruction.token(), cancellationError.getMessage());
+            }
+        } catch (ShippingProviderException lookupError) {
+            transactions.cancellationFailed(instruction.id(), instruction.token(),
+                    "Cancellation result could not be confirmed: " + lookupError.getMessage());
+        }
     }
 }

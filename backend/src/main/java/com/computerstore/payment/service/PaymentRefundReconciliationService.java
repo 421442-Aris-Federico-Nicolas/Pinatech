@@ -36,7 +36,7 @@ public class PaymentRefundReconciliationService {
             try {
                 for (String paymentId : gateway.findPaymentIdsByPreference(instruction.preferenceId())) {
                     var refund = transactions.processReconciledPayment(gateway.getPayment(paymentId));
-                    refund.ifPresent(this::reconcileRefund);
+                    refund.ifPresent(this::executeRefund);
                 }
                 transactions.reconciliationSucceeded(instruction.attemptId());
             } catch (RuntimeException exception) {
@@ -46,11 +46,11 @@ public class PaymentRefundReconciliationService {
         }
 
         for (RefundInstruction instruction : transactions.claimPendingRefunds()) {
-            reconcileRefund(instruction);
+            executeRefund(instruction);
         }
     }
 
-    private void reconcileRefund(RefundInstruction instruction) {
+    public void executeRefund(RefundInstruction instruction) {
         try {
             RefundResult result = instruction.refundId() == null
                     ? gateway.refund(instruction.paymentId(), instruction.idempotencyKey())
