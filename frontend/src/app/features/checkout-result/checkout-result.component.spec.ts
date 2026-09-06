@@ -22,6 +22,8 @@ describe('CheckoutResultComponent', () => {
     total: 3300,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
+    cancellationReason: null,
+    cancelledAt: null,
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
     items: [],
@@ -195,6 +197,29 @@ describe('CheckoutResultComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('$850.00');
     expect(fixture.nativeElement.textContent).toContain('San Martín 123');
     expect(fixture.nativeElement.textContent).toContain('Entrega estimada');
+    fixture.destroy();
+  });
+
+  it('explains an administrative cancellation without claiming the payment arrived late', async () => {
+    const cancelled: Order = {
+      ...order, status: 'CANCELLED', paymentStatus: 'REFUND_PENDING', fulfillmentStatus: 'CANCELLED',
+      cancellationReason: 'CUSTOMER_REQUEST', cancelledAt: '2026-08-02T10:00:00Z',
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutResultComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ orderId: '42' }) } } },
+        { provide: OrderService, useValue: { get: () => of(cancelled) } },
+      ],
+    }).compileComponents();
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(CheckoutResultComponent);
+    vi.advanceTimersByTime(0);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('El pedido fue cancelado.');
+    expect(fixture.nativeElement.textContent).not.toContain('después del vencimiento');
     fixture.destroy();
   });
 });

@@ -185,7 +185,8 @@ class ResendTransactionalEmailServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = OrderEmailEventType.class, names = {"SELLER_ORDER_CREATED", "SELLER_PAYMENT_APPROVED"},
+    @EnumSource(value = OrderEmailEventType.class,
+            names = {"SHIPMENT_TRACKING_AVAILABLE", "SELLER_ORDER_CREATED", "SELLER_PAYMENT_APPROVED"},
             mode = EnumSource.Mode.EXCLUDE)
     void orderEventsUseTheBrandedTemplate(OrderEmailEventType eventType) {
         ResendTransactionalEmailService service = new ResendTransactionalEmailService(
@@ -210,6 +211,26 @@ class ResendTransactionalEmailServiceTest {
             assertFalse(content.html().contains(reason));
             assertTrue(content.text().contains("Motivo: " + reason));
         }
+    }
+
+    @Test
+    void cancellationEmailsExplainTheReasonAndSeparateTheRefundConfirmation() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                true, "key", "Pinatech <ventas@example.com>", "https://store.example.com",
+                "https://cdn.example.com/logo.png", new ObjectMapper());
+
+        ResendTransactionalEmailService.EmailContent cancellation = service.contentForOrderEvent(
+                "Ana", OrderEmailEventType.ORDER_CANCELLED, 42L, "Problema logistico",
+                "https://store.example.com/orders/42");
+        ResendTransactionalEmailService.EmailContent refunded = service.contentForOrderEvent(
+                "Ana", OrderEmailEventType.PAYMENT_REFUNDED, 42L, null,
+                "https://store.example.com/orders/42");
+
+        assertEquals("Pedido cancelado", cancellation.subject());
+        assertTrue(cancellation.html().contains("Motivo"));
+        assertTrue(cancellation.text().contains("Problema logistico"));
+        assertEquals("Reintegro completado", refunded.subject());
+        assertTrue(refunded.text().contains("devolucion total"));
     }
 
     @Test

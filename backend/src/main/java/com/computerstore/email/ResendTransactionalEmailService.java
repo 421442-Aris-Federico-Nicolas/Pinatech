@@ -219,6 +219,26 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
                     "Ver mi pedido",
                     orderUrl,
                     "El pedido fue cancelado y el stock reservado quedo liberado. No realices otra transferencia para este pedido.");
+            case ORDER_CANCELLED -> new EmailTemplate(
+                    "Pedido cancelado",
+                    "Cancelamos tu pedido " + orderNumber + " y comenzamos a procesar el reintegro.",
+                    "Tu pedido fue cancelado",
+                    greeting(customerName),
+                    List.of("Cancelamos el pedido " + orderNumber + ". El stock ya fue liberado y el reintegro total esta en proceso."),
+                    new EmailCallout("Motivo", rejectionReason == null ? "No informado" : rejectionReason),
+                    "Ver mi pedido",
+                    orderUrl,
+                    "Te enviaremos otra confirmacion cuando el dinero haya sido devuelto.");
+            case PAYMENT_REFUNDED -> new EmailTemplate(
+                    "Reintegro completado",
+                    "El reintegro de tu pedido " + orderNumber + " fue completado.",
+                    "Reintegro completado",
+                    greeting(customerName),
+                    List.of("Confirmamos la devolucion total del pago correspondiente al pedido " + orderNumber + "."),
+                    null,
+                    "Ver mi pedido",
+                    orderUrl,
+                    "La acreditacion final puede depender de los plazos de tu banco o medio de pago.");
             case ORDER_DELIVERED -> new EmailTemplate(
                     "Pedido entregado",
                     "Registramos la entrega de tu pedido " + orderNumber + ".",

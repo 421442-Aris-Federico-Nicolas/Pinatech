@@ -25,6 +25,8 @@ describe('OrdersComponent', () => {
     total: 3300,
     createdAt: '2026-07-28T20:00:00Z',
     reservationExpiresAt: '2099-07-29T20:00:00Z',
+    cancellationReason: null,
+    cancelledAt: null,
     customerName: 'Ada Lovelace',
     customerEmail: 'ada@example.com',
     items: [{ productId: 1, variantId: 11, productName: 'Teclado', colorName: 'Negro', colorHex: '#000000', unitPrice: 1500, quantity: 2, subtotal: 3000 }],
@@ -298,5 +300,48 @@ describe('OrdersComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('El envío registra una incidencia.');
     expect(fixture.componentInstance.shipmentStatusLabel('canceled')).toBe('Cancelado');
     expect(fixture.componentInstance.estadoTono('canceled', 'envio')).toBe('danger');
+
+    fixture.componentInstance.orders.set([{
+      ...cancelled, status: 'CANCELLED', paymentStatus: 'REFUND_PENDING', fulfillmentStatus: 'CANCELLED',
+      cancellationReason: 'LOGISTICS_PROBLEM', cancelledAt: '2026-08-02T10:05:00Z',
+    }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Motivo: Problema logístico.');
+    expect(fixture.nativeElement.textContent).toContain('El reintegro total está en proceso.');
+    expect(fixture.nativeElement.textContent).not.toContain('Tu pedido sigue vigente.');
+  });
+
+  it('drops cached active tracking when only the refreshed shipment is cancelled', async () => {
+    const active: Order = {
+      ...order, status: 'PAID', paymentStatus: 'APPROVED', fulfillmentMethod: 'DELIVERY', pickupLocation: null,
+      shipment: {
+        status: 'ACTIVE', providerStatus: 'new', providerSubstatus: null, carrier: 'Andreani',
+        trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null, incident: false,
+      },
+    };
+    const cancelled: Order = {
+      ...active, fulfillmentStatus: 'CANCELLED',
+      shipment: { ...active.shipment!, status: 'CANCELLED', providerStatus: 'cancelled', incident: true },
+    };
+    const mine = vi.fn().mockReturnValueOnce(of([active])).mockReturnValueOnce(of([cancelled]));
+    const tracking = vi.fn(() => of({ ...active.shipment!, history: [] }));
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine, tracking } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.shipmentFor(active)?.status).toBe('ACTIVE');
+
+    fixture.componentInstance.load();
+    fixture.detectChanges();
+
+    expect(tracking).toHaveBeenCalledTimes(1);
+    expect(fixture.componentInstance.shipmentFor(cancelled)?.status).toBe('CANCELLED');
   });
 });

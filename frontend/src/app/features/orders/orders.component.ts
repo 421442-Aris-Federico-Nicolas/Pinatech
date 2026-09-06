@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { Order, OrderService, ShipmentSummary, ShipmentTracking } from '../../core/orders/order.service';
+import { CancellationReasonCode, Order, OrderService, ShipmentSummary, ShipmentTracking } from '../../core/orders/order.service';
 import { BankTransferDetails, BankTransferService } from '../../core/orders/bank-transfer.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
@@ -116,8 +116,12 @@ export class OrdersComponent {
     this.service.mine().pipe(finalize(() => this.loading.set(false))).subscribe({
       next: (orders) => {
         this.orders.set(orders);
+        this.tracking.update((current) => Object.fromEntries(Object.entries(current)
+          .filter(([orderId]) => !orders.some((order) => order.id === Number(orderId)
+            && (order.status === 'CANCELLED' || order.shipment?.status === 'CANCELLED')))));
         for (const order of orders.filter((candidate) => candidate.paymentMethod === 'BANK_TRANSFER')) this.loadBankTransfer(order.id);
-        for (const order of orders.filter((candidate) => candidate.fulfillmentMethod === 'DELIVERY')) this.loadTracking(order.id);
+        for (const order of orders.filter((candidate) => candidate.fulfillmentMethod === 'DELIVERY'
+          && candidate.status !== 'CANCELLED' && candidate.shipment?.status !== 'CANCELLED')) this.loadTracking(order.id);
         this.error.set('');
         const requestedOrder = Number(this.route.snapshot.queryParamMap.get('order'));
         if (requestedOrder > 0) queueMicrotask(() => {
@@ -143,6 +147,17 @@ export class OrdersComponent {
     return estadoLabel(status, 'entrega');
   }
 
+  cancellationReasonLabel(reason: CancellationReasonCode): string {
+    return {
+      CUSTOMER_REQUEST: 'Solicitud del cliente',
+      INVALID_DELIVERY_DATA: 'Datos de entrega incorrectos',
+      PRODUCT_UNAVAILABLE: 'Producto sin disponibilidad',
+      LOGISTICS_PROBLEM: 'Problema logístico',
+      DUPLICATE_OR_ERROR: 'Pedido duplicado o generado por error',
+      OTHER: 'Otro motivo',
+    }[reason];
+  }
+
   methodLabel(method: string | null): string {
     return estadoLabel(method, 'metodo');
   }
@@ -162,6 +177,8 @@ export class OrdersComponent {
       finalize(() => this.trackingLoading.update((ids) => ids.filter((id) => id !== orderId))),
     ).subscribe({
       next: (tracking) => {
+        if (this.orders().some((order) => order.id === orderId
+          && (order.status === 'CANCELLED' || order.shipment?.status === 'CANCELLED'))) return;
         this.tracking.update((current) => ({ ...current, [orderId]: tracking }));
         this.trackingErrors.update((current) => ({ ...current, [orderId]: '' }));
       },

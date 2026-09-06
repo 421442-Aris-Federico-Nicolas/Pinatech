@@ -2,9 +2,11 @@ package com.computerstore.shipping.domain;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import com.computerstore.order.domain.CustomerOrder;
+import com.computerstore.order.domain.OrderCancellationReason;
 import com.computerstore.shipping.gateway.ZipnovaGateway;
 import jakarta.persistence.*;
 
@@ -29,6 +31,12 @@ public class OrderShipment {
     @Column(name = "last_error", length = 500) private String lastError;
     @Column(name = "provider_updated_at") private Instant providerUpdatedAt;
     @Column(name = "estimated_delivery_at") private Instant estimatedDeliveryAt;
+    @Column(name = "tracking_sync_pending", nullable = false) private boolean trackingSyncPending;
+    @Enumerated(EnumType.STRING) @Column(name = "cancellation_scope", length = 20) private ShipmentCancellationScope cancellationScope;
+    @Enumerated(EnumType.STRING) @Column(name = "cancellation_reason", length = 40) private OrderCancellationReason cancellationReason;
+    @Column(name = "cancellation_internal_detail", length = 500) private String cancellationInternalDetail;
+    @Column(name = "cancellation_requested_by_user_id") private Long cancellationRequestedByUserId;
+    @Column(name = "cancellation_requested_at") private Instant cancellationRequestedAt;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
@@ -75,11 +83,14 @@ public class OrderShipment {
     }
     public void reconciliationDue(UUID token, Instant next) { requireLease(token); this.nextAttemptAt = next;
         this.leaseUntil = null; this.leaseToken = null; }
+    public void trackingSyncResult(boolean complete) { trackingSyncPending = !complete; }
     public void retryNow(Instant now) { if (providerShipmentId == null) { status = OrderShipmentStatus.RETRY; attemptCount = 0; } nextAttemptAt = now;
         leaseUntil = null; leaseToken = null; lastError = null; }
     public void blockForPayment(Instant now) { status = OrderShipmentStatus.BLOCKED_PAYMENT; nextAttemptAt = now;
         leaseUntil = null; leaseToken = null; lastError = "Shipment paused because payment is not approved."; updatedAt = now; }
     public void paymentNotApproved(Instant now) {
+        if (status == OrderShipmentStatus.CANCELLED) return;
+        if (status == OrderShipmentStatus.CREATING) return;
         if (providerShipmentId == null) blockForPayment(now);
         else {
             incident = true; status = OrderShipmentStatus.INCIDENT;
@@ -89,6 +100,40 @@ public class OrderShipment {
     public void cancelled(Instant now) { status = OrderShipmentStatus.CANCELLED; incident = true; rawStatus = "cancelled";
         leaseUntil = null; leaseToken = null; nextAttemptAt = now;
         lastError = "Provider shipment cancelled; the order requires operational resolution."; updatedAt = now; }
+    public void requestCancellation(ShipmentCancellationScope scope, OrderCancellationReason reason,
+                                    String internalDetail, Long adminId, Instant now) {
+        if (scope == ShipmentCancellationScope.ORDER && reason == null) {
+            throw new IllegalArgumentException("Order cancellation requires a reason.");
+        }
+        cancellationScope = scope; cancellationReason = reason;
+        cancellationInternalDetail = truncate(internalDetail, 500);
+        cancellationRequestedByUserId = adminId; cancellationRequestedAt = now;
+        nextAttemptAt = now.plusSeconds(60); lastError = null; updatedAt = now;
+    }
+    public void cancellationPending(Instant now, String error) {
+        incident = true; status = OrderShipmentStatus.INCIDENT;
+        nextAttemptAt = now.plusSeconds(120);
+        lastError = truncate(error == null ? "Provider shipment cancellation is pending." : error); updatedAt = now;
+    }
+    public void cancellationFailed(UUID token, Instant now, String error) {
+        requireLease(token); leaseUntil = null; leaseToken = null; cancellationPending(now, error);
+    }
+    public void cancellationCompleted(UUID token, Instant now) {
+        requireLease(token);
+        cancelled(now);
+    }
+    public void cancellationRejected(UUID token, Instant now, String error) {
+        requireLease(token);
+        cancellationScope = null; cancellationReason = null; cancellationInternalDetail = null;
+        cancellationRequestedByUserId = null; cancellationRequestedAt = null;
+        leaseUntil = null; leaseToken = null; nextAttemptAt = now; lastError = truncate(error);
+        incident = isDamage(rawStatus, rawSubstatus);
+        if (isCancellation(rawStatus)) status = OrderShipmentStatus.CANCELLED;
+        else if (incident) status = OrderShipmentStatus.INCIDENT;
+        else if ("delivered".equalsIgnoreCase(rawStatus)) status = OrderShipmentStatus.DELIVERED;
+        else status = OrderShipmentStatus.ACTIVE;
+        updatedAt = now;
+    }
     public void replaceCancelled(String source, Instant now) {
         if (status != OrderShipmentStatus.CANCELLED || providerShipmentId == null) {
             throw new IllegalStateException("Only a cancelled provider shipment can be replaced.");
@@ -96,7 +141,9 @@ public class OrderShipment {
         externalId = externalId(source + "|replacement|" + providerShipmentId, order.getId());
         status = OrderShipmentStatus.PENDING_CREATE; providerShipmentId = null; rawStatus = null; rawSubstatus = null;
         carrierTrackingId = null; trackingUrl = null; estimatedDeliveryAt = null; providerUpdatedAt = null;
-        incident = false; attemptCount = 0; nextAttemptAt = now; leaseUntil = null; leaseToken = null;
+        incident = false; trackingSyncPending = false; attemptCount = 0; nextAttemptAt = now; leaseUntil = null; leaseToken = null;
+        cancellationScope = null; cancellationReason = null; cancellationInternalDetail = null;
+        cancellationRequestedByUserId = null; cancellationRequestedAt = null;
         lastError = null; updatedAt = now;
     }
     private void requireLease(UUID token) { if (token == null || !token.equals(leaseToken)) throw new IllegalStateException("Stale shipping lease."); }
@@ -119,6 +166,18 @@ public class OrderShipment {
     public Long getProviderShipmentId() { return providerShipmentId; } public String getRawStatus() { return rawStatus; }
     public String getRawSubstatus() { return rawSubstatus; } public String getCarrierTrackingId() { return carrierTrackingId; }
     public String getTrackingUrl() { return trackingUrl; } public boolean isIncident() { return incident; }
+    public boolean isTrackingSyncPending() { return trackingSyncPending; }
+    public ShipmentCancellationScope getCancellationScope() { return cancellationScope; }
+    public OrderCancellationReason getCancellationReason() { return cancellationReason; }
+    public String getCancellationInternalDetail() { return cancellationInternalDetail; }
+    public Long getCancellationRequestedByUserId() { return cancellationRequestedByUserId; }
+    public Instant getCancellationRequestedAt() { return cancellationRequestedAt; }
+    public boolean isCancellationRequested() { return cancellationScope != null; }
+    public boolean matchesCancellation(ShipmentCancellationScope scope, OrderCancellationReason reason,
+                                       String internalDetail) {
+        return cancellationScope == scope && cancellationReason == reason
+                && Objects.equals(cancellationInternalDetail, truncate(internalDetail, 500));
+    }
     public Instant getProviderUpdatedAt() { return providerUpdatedAt; }
     public Instant getEstimatedDeliveryAt() { return estimatedDeliveryAt; }
 }

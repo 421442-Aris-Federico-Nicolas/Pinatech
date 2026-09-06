@@ -27,6 +27,7 @@ export interface PickupLocation {
 
 export type PaymentMethod = 'BANK_TRANSFER' | 'MERCADO_PAGO';
 export type FulfillmentMethod = 'PICKUP' | 'DELIVERY';
+export type CancellationReasonCode = 'CUSTOMER_REQUEST' | 'INVALID_DELIVERY_DATA' | 'PRODUCT_UNAVAILABLE' | 'LOGISTICS_PROBLEM' | 'DUPLICATE_OR_ERROR' | 'OTHER';
 
 export interface DeliveryAddress {
   recipientName: string;
@@ -79,6 +80,8 @@ export interface Order {
   total: number;
   createdAt: string;
   reservationExpiresAt: string | null;
+  cancellationReason: CancellationReasonCode | null;
+  cancelledAt: string | null;
   customerName: string;
   customerEmail: string;
   items: OrderItem[];

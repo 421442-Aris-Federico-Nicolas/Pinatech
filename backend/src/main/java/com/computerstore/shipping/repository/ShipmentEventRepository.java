@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ShipmentEventRepository extends JpaRepository<ShipmentEvent, Long> {
     boolean existsByEventKey(String eventKey);
-    List<ShipmentEvent> findByShipmentIdOrderByOccurredAtAscIdAsc(UUID shipmentId);
+    List<ShipmentEvent> findByShipmentIdAndProviderShipmentIdOrderByOccurredAtAscIdAsc(
+            UUID shipmentId, Long providerShipmentId);
 }

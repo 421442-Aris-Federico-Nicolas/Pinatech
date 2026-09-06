@@ -4,6 +4,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
 import { NotificationService } from '../../core/notifications/notification.service';
+import { CancellationReasonCode } from '../../core/orders/order.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
@@ -15,7 +16,7 @@ import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
-import { AdminOrder, AdminService, Brand, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
+import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
@@ -41,6 +42,8 @@ export class AdminComponent {
   private readonly notifications = inject(NotificationService);
   private productSnapshot = '';
   private proofPreviewGeneration = 0;
+  private cancellationTrigger: HTMLElement | null = null;
+  private refundTrigger: HTMLElement | null = null;
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
   readonly sidebarCollapsed = signal(false);
@@ -61,7 +64,13 @@ export class AdminComponent {
   readonly orderFilter = signal<string>('ALL');
   readonly orderUpdating = signal<number | null>(null);
   readonly shipmentUpdating = signal<number | null>(null);
+  readonly ordersRefreshing = signal(false);
   readonly shipmentDocumentLoading = signal<string | null>(null);
+  readonly cancellationOrder = signal<AdminOrder | null>(null);
+  readonly cancellationError = signal('');
+  readonly refundOrder = signal<AdminOrder | null>(null);
+  readonly refundConfirming = signal<number | null>(null);
+  readonly refundError = signal('');
   readonly error = signal('');
   readonly saving = signal(false);
   readonly taxonomySaving = signal(false);
@@ -81,6 +90,10 @@ export class AdminComponent {
   proofAmounts: Record<string, number | null> = {};
   proofReferences: Record<string, string> = {};
   proofRejectionReasons: Record<string, string> = {};
+  cancellationScope: CancellationScope = 'SHIPMENT_ONLY';
+  cancellationReason: CancellationReasonCode | null = null;
+  cancellationDetail = '';
+  refundReference = '';
 
   readonly soldOrders = computed(() => this.orders().filter((order) => order.paymentStatus === 'APPROVED'));
   readonly revenue = computed(() => this.soldOrders().reduce((total, order) => total + order.total, 0));
@@ -111,6 +124,14 @@ export class AdminComponent {
     { value: null, label: 'Sin imagen específica' },
     ...(this.selected()?.images ?? []).map((image, index) => ({ value: image.id, label: this.imageLabel(image, index) })),
   ]);
+  readonly cancellationReasonOptions: readonly AppSelectOption[] = [
+    { value: 'CUSTOMER_REQUEST', label: 'Solicitud del cliente' },
+    { value: 'INVALID_DELIVERY_DATA', label: 'Datos de entrega inválidos' },
+    { value: 'PRODUCT_UNAVAILABLE', label: 'Producto no disponible' },
+    { value: 'LOGISTICS_PROBLEM', label: 'Problema logístico' },
+    { value: 'DUPLICATE_OR_ERROR', label: 'Pedido duplicado o error' },
+    { value: 'OTHER', label: 'Otro motivo' },
+  ];
   readonly estadoTono = estadoTono;
 
   constructor() {
@@ -130,7 +151,10 @@ export class AdminComponent {
   }
 
   reload(force = false, preserveMessages = false): void {
-    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock() || this.shipmentUpdating() !== null || this.shipmentDocumentLoading() !== null || (!force && !this.confirmDiscardProductChanges())) return;
+    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock()
+      || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null
+      || this.ordersRefreshing() || this.shipmentDocumentLoading() !== null
+      || (!force && !this.confirmDiscardProductChanges())) return;
     if (!preserveMessages) this.clearMessages();
     this.loading.set(true);
     forkJoin({
@@ -527,6 +551,8 @@ export class AdminComponent {
   }
 
   changeOrderStatus(order: AdminOrder, action: OrderAction): void {
+    if (this.orderUpdating() !== null || this.shipmentUpdating() !== null
+      || this.refundConfirming() !== null || this.ordersRefreshing()) return;
     if (action.danger && !confirm(`¿Cancelar el pedido #${order.id}? El stock reservado o preparado volverá a estar disponible.`)) return;
     this.clearMessages();
     this.orderUpdating.set(order.id);
@@ -567,8 +593,22 @@ export class AdminComponent {
     const providerStatus = order.shipment?.providerStatus?.toLowerCase() ?? '';
     return order.fulfillmentMethod === 'DELIVERY'
       && order.shipment?.status === 'ACTIVE'
+      && order.paymentStatus === 'APPROVED'
       && !['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(order.status)
       && ['new', 'documentation_ready'].includes(providerStatus);
+  }
+
+  canCancelOrderAfterShipmentCancellation(order: AdminOrder): boolean {
+    return order.fulfillmentMethod === 'DELIVERY'
+      && order.shipment?.status === 'CANCELLED'
+      && order.paymentStatus === 'APPROVED'
+      && ['PAID', 'PREPARING', 'READY'].includes(order.status);
+  }
+
+  canConfirmBankTransferRefund(order: AdminOrder): boolean {
+    return order.status === 'CANCELLED'
+      && order.paymentMethod === 'BANK_TRANSFER'
+      && order.paymentStatus === 'REFUND_PENDING';
   }
 
   canDownloadShipmentDocuments(order: AdminOrder): boolean {
@@ -578,7 +618,8 @@ export class AdminComponent {
   }
 
   retryShipment(order: AdminOrder): void {
-    if (!this.canRetryShipment(order) || this.shipmentUpdating() !== null) return;
+    if (!this.canRetryShipment(order) || this.shipmentUpdating() !== null
+      || this.orderUpdating() !== null || this.refundConfirming() !== null || this.ordersRefreshing()) return;
     const replacement = order.shipment?.status === 'CANCELLED';
     if (replacement && !confirm(`¿Crear un envío de reemplazo para el pedido #${order.id}? El pedido y el pago actuales seguirán vigentes.`)) return;
     this.clearMessages();
@@ -596,18 +637,132 @@ export class AdminComponent {
     });
   }
 
-  cancelShipment(order: AdminOrder): void {
-    if (!this.canCancelShipment(order) || this.shipmentUpdating() !== null
-      || !confirm(`¿Cancelar el envío de Zipnova para el pedido #${order.id}? Esta acción no cancela el pedido.`)) return;
-    this.clearMessages();
+  openCancellationDialog(order: AdminOrder, orderOnly = false, event?: Event): void {
+    if (this.shipmentUpdating() !== null || this.orderUpdating() !== null
+      || this.refundConfirming() !== null || this.ordersRefreshing()
+      || (orderOnly ? !this.canCancelOrderAfterShipmentCancellation(order) : !this.canCancelShipment(order))) return;
+    this.cancellationTrigger = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    this.cancellationScope = orderOnly ? 'ORDER' : 'SHIPMENT_ONLY';
+    this.cancellationReason = null;
+    this.cancellationDetail = '';
+    this.cancellationError.set('');
+    this.cancellationOrder.set(order);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(orderOnly ? '.cancellation-reason' : '.cancellation-scope input')?.focus());
+  }
+
+  closeCancellationDialog(): void {
+    if (this.shipmentUpdating() !== null) return;
+    this.dismissCancellationDialog();
+  }
+
+  submitCancellation(): void {
+    const order = this.cancellationOrder();
+    if (!order || this.shipmentUpdating() !== null || !this.canRetryCancellation(order, this.cancellationScope)) return;
+    const detail = this.cancellationDetail.trim();
+    const hasStandardReason = this.cancellationReasonOptions.some((option) => option.value === this.cancellationReason);
+    if (this.cancellationScope === 'ORDER' && !hasStandardReason) {
+      this.cancellationError.set('Seleccioná un motivo para cancelar el pedido.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.cancellation-reason')?.focus());
+      return;
+    }
+    if (this.cancellationScope === 'ORDER' && detail.length > 500) {
+      this.cancellationError.set('El detalle interno no puede superar los 500 caracteres.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.cancellation-detail')?.focus());
+      return;
+    }
+    const scope = this.cancellationScope;
+    const payload = scope === 'ORDER'
+      ? { scope, reasonCode: this.cancellationReason!, ...(detail ? { internalDetail: detail } : {}) }
+      : { scope };
+    this.cancellationError.set('');
     this.shipmentUpdating.set(order.id);
-    this.service.cancelShipment(order.id).pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
-      next: () => {
-        this.succeed(`Envío del pedido #${order.id} cancelado en Zipnova.`);
-        this.refreshOrdersAfterShipmentAction();
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.cancellation-dialog')?.focus());
+    this.service.cancelShipment(order.id, payload).subscribe({
+      next: (updated) => {
+        this.shipmentUpdating.set(null);
+        this.updateLocalOrder(updated);
+        if (!this.cancellationCompleted(updated, scope)) {
+          this.dismissCancellationDialog();
+          this.notifications.warning('La cancelación ya está en proceso. Actualizá los pedidos en unos segundos para ver el resultado.');
+          return;
+        }
+        this.dismissCancellationDialog();
+        this.succeed(this.cancellationSuccessMessage(updated, scope));
+        if (scope === 'ORDER') this.refreshInventoriesAfterCancellation();
       },
-      error: () => this.fail('No se pudo cancelar el envío en Zipnova.'),
+      error: () => {
+        this.cancellationError.set('No pudimos confirmar el resultado. Estamos actualizando el estado antes de que vuelvas a intentar.');
+        this.refreshCancellationAfterError(order.id, scope);
+      },
     });
+  }
+
+  openRefundDialog(order: AdminOrder, event?: Event): void {
+    if (!this.canConfirmBankTransferRefund(order) || this.refundConfirming() !== null
+      || this.shipmentUpdating() !== null || this.orderUpdating() !== null || this.ordersRefreshing()) return;
+    this.refundTrigger = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    this.refundReference = '';
+    this.refundError.set('');
+    this.refundOrder.set(order);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-reference')?.focus());
+  }
+
+  closeRefundDialog(): void {
+    if (this.refundConfirming() !== null) return;
+    this.dismissRefundDialog();
+  }
+
+  confirmBankTransferRefund(): void {
+    const order = this.refundOrder();
+    if (!order || this.refundConfirming() !== null || this.shipmentUpdating() !== null
+      || this.orderUpdating() !== null || this.ordersRefreshing() || !this.canConfirmBankTransferRefund(order)) return;
+    const reference = this.refundReference.trim();
+    if (reference.length > 200) {
+      this.refundError.set('La referencia no puede superar los 200 caracteres.');
+      queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-reference')?.focus());
+      return;
+    }
+    this.refundError.set('');
+    this.refundConfirming.set(order.id);
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-dialog')?.focus());
+    this.service.confirmBankTransferRefund(order.id, reference || undefined).subscribe({
+      next: (updated) => {
+        this.refundConfirming.set(null);
+        this.updateLocalOrder(updated);
+        this.dismissRefundDialog();
+        this.succeed(`Reintegro del pedido #${order.id} confirmado.`);
+      },
+      error: () => {
+        this.refundError.set('No pudimos confirmar el resultado. Estamos actualizando el pedido antes de que vuelvas a intentar.');
+        this.refreshRefundAfterError(order.id);
+      },
+    });
+  }
+
+  handleDialogKeydown(event: KeyboardEvent, dialog: 'cancellation' | 'refund'): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (dialog === 'cancellation') this.closeCancellationDialog();
+      else this.closeRefundDialog();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const container = event.currentTarget as HTMLElement;
+    const controls = Array.from(container.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'));
+    if (!controls.length) {
+      event.preventDefault();
+      container.focus();
+      return;
+    }
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === container || document.activeElement === first || !container.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === container || document.activeElement === last || !container.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   downloadShipmentPdf(order: AdminOrder, kind: 'label' | 'document'): void {
@@ -840,9 +995,113 @@ export class AdminComponent {
     return confirm('Tenés cambios sin guardar en el producto. ¿Querés descartarlos?');
   }
   private refreshOrdersAfterShipmentAction(): void {
-    this.service.orders().subscribe({
+    this.ordersRefreshing.set(true);
+    this.service.orders().pipe(finalize(() => this.ordersRefreshing.set(false))).subscribe({
       next: (orders) => this.orders.set(orders),
       error: () => this.notifications.warning('La acción se registró, pero no pudimos actualizar el estado del envío. Usá Actualizar para reintentar.'),
+    });
+  }
+  private updateLocalOrder(updated: AdminOrder): void {
+    this.orders.update((orders) => orders.map((order) => order.id === updated.id ? updated : order));
+  }
+  private refreshInventoriesAfterCancellation(): void {
+    this.service.inventories().subscribe({
+      next: (inventories) => this.inventories.set(inventories),
+      error: () => this.notifications.warning('El pedido se canceló, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
+    });
+  }
+  private refreshCancellationAfterError(orderId: number, scope: CancellationScope): void {
+    this.service.orders().pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
+      next: (orders) => {
+        this.orders.set(orders);
+        const updated = orders.find((order) => order.id === orderId);
+        if (!updated || this.cancellationOrder()?.id !== orderId) return;
+        const completed = this.cancellationCompleted(updated, scope);
+        if (completed) {
+          this.dismissCancellationDialog();
+          this.succeed(this.cancellationSuccessMessage(updated, scope));
+          if (scope === 'ORDER') this.refreshInventoriesAfterCancellation();
+        } else if (!this.canRetryCancellation(updated, scope)) {
+          this.dismissCancellationDialog();
+          this.notifications.warning('El pedido o el envío cambió de estado y ya no admite esta cancelación.');
+        } else {
+          this.cancellationOrder.set(updated);
+          this.cancellationError.set('La cancelación no quedó confirmada. Revisá el estado actualizado antes de volver a intentar.');
+          queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>(
+            scope === 'ORDER' ? '.cancellation-reason' : '.cancellation-scope input')?.focus());
+        }
+      },
+      error: () => {
+        this.cancellationError.set('No pudimos actualizar el estado. Esperá unos segundos antes de volver a intentar.');
+        queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.cancellation-dialog')?.focus());
+      },
+    });
+  }
+  private refreshRefundAfterError(orderId: number): void {
+    this.service.orders().pipe(finalize(() => this.refundConfirming.set(null))).subscribe({
+      next: (orders) => {
+        this.orders.set(orders);
+        const updated = orders.find((order) => order.id === orderId);
+        if (!updated || this.refundOrder()?.id !== orderId) return;
+        if (updated.paymentStatus === 'REFUNDED') {
+          this.dismissRefundDialog();
+          this.succeed(`Reintegro del pedido #${orderId} confirmado.`);
+        } else if (!this.canConfirmBankTransferRefund(updated)) {
+          this.dismissRefundDialog();
+          this.notifications.warning('El pedido cambió de estado y ya no admite confirmar este reintegro.');
+        } else {
+          this.refundOrder.set(updated);
+          this.refundError.set('El reintegro no quedó confirmado. Revisá el pedido actualizado antes de volver a intentar.');
+          queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-reference')?.focus());
+        }
+      },
+      error: () => {
+        this.refundError.set('No pudimos actualizar el pedido. Esperá unos segundos antes de volver a intentar.');
+        queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-dialog')?.focus());
+      },
+    });
+  }
+  private canRetryCancellation(order: AdminOrder, scope: CancellationScope): boolean {
+    if (scope === 'SHIPMENT_ONLY') return this.canCancelShipment(order);
+    return order.shipment?.status === 'CANCELLED'
+      ? this.canCancelOrderAfterShipmentCancellation(order)
+      : this.canCancelShipment(order);
+  }
+  private cancellationCompleted(order: AdminOrder, scope: CancellationScope): boolean {
+    return scope === 'ORDER' ? order.status === 'CANCELLED' : order.shipment?.status === 'CANCELLED';
+  }
+  private cancellationSuccessMessage(order: AdminOrder, scope: CancellationScope): string {
+    if (scope === 'SHIPMENT_ONLY') return `Envío del pedido #${order.id} cancelado en Zipnova.`;
+    if (order.paymentMethod === 'MERCADO_PAGO') {
+      return order.paymentStatus === 'REFUNDED'
+        ? `Pedido #${order.id} cancelado y reintegro de Mercado Pago confirmado.`
+        : `Pedido #${order.id} cancelado. El reintegro de Mercado Pago quedó pendiente.`;
+    }
+    return `Pedido #${order.id} cancelado. El reintegro por transferencia quedó pendiente de confirmación.`;
+  }
+  private dismissCancellationDialog(): void {
+    const orderId = this.cancellationOrder()?.id;
+    const trigger = this.cancellationTrigger;
+    this.cancellationOrder.set(null);
+    this.cancellationError.set('');
+    this.cancellationTrigger = null;
+    this.restoreDialogFocus(trigger, orderId);
+  }
+  private dismissRefundDialog(): void {
+    const orderId = this.refundOrder()?.id;
+    const trigger = this.refundTrigger;
+    this.refundOrder.set(null);
+    this.refundError.set('');
+    this.refundTrigger = null;
+    this.restoreDialogFocus(trigger, orderId);
+  }
+  private restoreDialogFocus(trigger: HTMLElement | null, orderId?: number): void {
+    queueMicrotask(() => {
+      if (trigger?.isConnected) trigger.focus();
+      else if (orderId) this.host.nativeElement.querySelector<HTMLElement>(`[aria-controls="order-detail-${orderId}"]`)?.focus();
+      if (!this.host.nativeElement.contains(document.activeElement)) {
+        this.host.nativeElement.querySelector<HTMLElement>('nav button[aria-current="page"]')?.focus();
+      }
     });
   }
   private isSection(value: string | null): value is AdminSection { return ['overview', 'sales', 'catalog', 'inventory'].includes(value ?? ''); }

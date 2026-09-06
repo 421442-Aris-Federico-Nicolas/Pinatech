@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import com.computerstore.common.exception.InvalidStateTransitionException;
 import com.computerstore.order.domain.*;
 import com.computerstore.shipping.gateway.ZipnovaGateway;
@@ -93,6 +94,38 @@ class ShippingOrderDomainTest {
         assertEquals(FulfillmentStatus.PENDING, order.getFulfillmentStatus());
         order.transitionTo(OrderStatus.PREPARING);
         assertEquals(FulfillmentStatus.PREPARING, order.getFulfillmentStatus());
+    }
+
+    @Test
+    void shipmentEventsKeepTheProviderIdAfterAReplacementIsQueued() {
+        CustomerOrder order = mock(CustomerOrder.class);
+        when(order.getId()).thenReturn(42L);
+        Instant now = Instant.parse("2026-09-04T12:00:00Z");
+        OrderShipment shipment = new OrderShipment(order, "pinatech", now);
+        UUID token = shipment.lease(now);
+        shipment.created(provider("new", now), token, now);
+        ShipmentEvent event = new ShipmentEvent(shipment, "a".repeat(64), "new", null, now, now);
+
+        shipment.cancelled(now.plusSeconds(1));
+        shipment.replaceCancelled("pinatech", now.plusSeconds(2));
+
+        assertEquals(99L, event.getProviderShipmentId());
+        assertNull(shipment.getProviderShipmentId());
+    }
+
+    @Test
+    void paymentRevocationDuringCreationDoesNotOrphanTheProviderShipment() {
+        CustomerOrder order = mock(CustomerOrder.class);
+        when(order.getId()).thenReturn(42L);
+        Instant now = Instant.parse("2026-09-04T12:00:00Z");
+        OrderShipment shipment = new OrderShipment(order, "pinatech", now);
+        UUID token = shipment.lease(now);
+
+        shipment.paymentNotApproved(now.plusSeconds(1));
+        shipment.created(provider("new", now.plusSeconds(2)), token, now.plusSeconds(2));
+
+        assertEquals(99L, shipment.getProviderShipmentId());
+        assertEquals(OrderShipmentStatus.ACTIVE, shipment.getStatus());
     }
 
     private ZipnovaGateway.ProviderShipment provider(String status, Instant updatedAt) {

@@ -55,13 +55,15 @@ public class ZipnovaWebhookService {
         try {
             var provider = gateway.getShipment(item.providerId());
             List<ZipnovaGateway.TrackingEvent> history = List.of();
+            boolean trackingComplete = true;
             try {
                 history = gateway.tracking(item.providerId());
             } catch (ShippingProviderException error) {
+                trackingComplete = false;
                 LOGGER.warn("Zipnova tracking lookup failed for webhook shipment {}; applying provider state without history.",
                         item.providerId());
             }
-            shipments.applyWebhook(item.providerId(), provider, history);
+            shipments.applyWebhook(item.providerId(), provider, history, trackingComplete);
             completion.complete(item, true, null);
         } catch (ShippingProviderException error) { completion.complete(item, false, error.getMessage()); }
     }

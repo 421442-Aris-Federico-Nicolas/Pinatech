@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { Page, Product, ProductImage } from '../catalog/catalog.service';
-import { Order } from '../../core/orders/order.service';
+import { CancellationReasonCode, Order } from '../../core/orders/order.service';
 
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
@@ -26,6 +26,12 @@ export interface ProductPayload {
   variants: ProductVariantPayload[];
 }
 export type AdminOrder = Order;
+export type CancellationScope = 'SHIPMENT_ONLY' | 'ORDER';
+export interface CancelShipmentPayload {
+  scope: CancellationScope;
+  reasonCode?: CancellationReasonCode;
+  internalDetail?: string;
+}
 export interface PendingBankTransferProof {
   id: string;
   status: 'PENDING_REVIEW';
@@ -80,7 +86,9 @@ export class AdminService {
   orders() { return this.http.get<AdminOrder[]>(`${environment.apiBaseUrl}/admin/orders`); }
   updateOrderStatus(id: number, status: string) { return this.http.patch<AdminOrder>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }
   retryShipment(orderId: number) { return this.http.post<void>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/retry`, null); }
-  cancelShipment(orderId: number) { return this.http.post<{ result: string }>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/cancel`, null); }
+  cancelShipment(orderId: number, payload: CancelShipmentPayload) {
+    return this.http.post<AdminOrder>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/cancel`, payload);
+  }
   shipmentLabel(orderId: number) { return this.http.get(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/label`, { responseType: 'blob' }); }
   shipmentDocument(orderId: number) { return this.http.get(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/document`, { responseType: 'blob' }); }
   pendingBankTransferProofs() {
@@ -96,5 +104,8 @@ export class AdminService {
   }
   rejectBankTransferProof(proofId: string, reason: string) {
     return this.http.post<void>(`${environment.apiBaseUrl}/admin/bank-transfer-proofs/${proofId}/reject`, { reason });
+  }
+  confirmBankTransferRefund(orderId: number, reference?: string) {
+    return this.http.post<AdminOrder>(`${environment.apiBaseUrl}/admin/orders/${orderId}/bank-transfer-refund/confirm`, reference ? { reference } : {});
   }
 }

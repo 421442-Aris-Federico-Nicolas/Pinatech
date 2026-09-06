@@ -27,6 +27,8 @@ public class EmailOutboxEntry {
     private String rejectionReason;
     @Column(name = "seller_payload", columnDefinition = "text")
     private String eventPayload;
+    @Column(name = "deduplication_key", nullable = false, length = 100)
+    private String deduplicationKey;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EmailOutboxStatus status;
@@ -54,6 +56,7 @@ public class EmailOutboxEntry {
         this.recipient = order.getUser().getEmail();
         this.customerName = order.getUser().getFirstName();
         this.rejectionReason = reason;
+        this.deduplicationKey = "single";
         this.status = EmailOutboxStatus.PENDING;
         this.nextAttemptAt = now;
         this.createdAt = now;
@@ -67,9 +70,16 @@ public class EmailOutboxEntry {
         this.recipient = recipient;
         this.customerName = order.getUser().getFirstName();
         this.eventPayload = sellerPayload;
+        this.deduplicationKey = "single";
         this.status = EmailOutboxStatus.PENDING;
         this.nextAttemptAt = now;
         this.createdAt = now;
+    }
+
+    public EmailOutboxEntry(CustomerOrder order, OrderEmailEventType eventType, String recipient,
+                            String eventPayload, String deduplicationKey, Instant now) {
+        this(order, eventType, recipient, eventPayload, now);
+        this.deduplicationKey = deduplicationKey;
     }
 
     public UUID lease(Instant until) {
@@ -108,6 +118,7 @@ public class EmailOutboxEntry {
     public String getRejectionReason() { return rejectionReason; }
     public String getSellerPayload() { return eventPayload; }
     public String getEventPayload() { return eventPayload; }
+    public String getDeduplicationKey() { return deduplicationKey; }
     public EmailOutboxStatus getStatus() { return status; }
     public int getAttemptCount() { return attemptCount; }
     public boolean hasLease(UUID token) { return token != null && token.equals(leaseToken); }

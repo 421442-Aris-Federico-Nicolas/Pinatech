@@ -19,6 +19,10 @@ public interface ProviderPaymentRepository extends JpaRepository<ProviderPayment
 
     boolean existsByAttemptOrderIdAndFundsOrderTrue(Long orderId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select payment from ProviderPaymentRecord payment where payment.attempt.order.id = :orderId and payment.fundsOrder = true")
+    Optional<ProviderPaymentRecord> findFundsPaymentByOrderIdForUpdate(@Param("orderId") Long orderId);
+
     @Query(value = """
             SELECT * FROM provider_payments
             WHERE refund_status IN ('PENDING', 'REJECTED')

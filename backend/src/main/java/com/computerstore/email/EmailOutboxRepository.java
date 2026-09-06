@@ -12,6 +12,8 @@ import java.util.UUID;
 
 public interface EmailOutboxRepository extends JpaRepository<EmailOutboxEntry, UUID> {
     boolean existsByOrderIdAndEventType(Long orderId, OrderEmailEventType eventType);
+    boolean existsByOrderIdAndEventTypeAndDeduplicationKey(Long orderId, OrderEmailEventType eventType,
+                                                           String deduplicationKey);
     @Query(value = """
             SELECT * FROM email_outbox
             WHERE status IN ('PENDING', 'SENDING') AND next_attempt_at <= :now

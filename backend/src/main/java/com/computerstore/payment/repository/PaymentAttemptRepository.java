@@ -27,6 +27,13 @@ public interface PaymentAttemptRepository extends JpaRepository<PaymentAttempt, 
     @Query("select attempt from PaymentAttempt attempt where attempt.publicId = :publicId")
     Optional<PaymentAttempt> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select payment.attempt from ProviderPaymentRecord payment
+            where payment.attempt.order.id = :orderId and payment.fundsOrder = true
+            """)
+    Optional<PaymentAttempt> findFundingAttemptByOrderIdForUpdate(@Param("orderId") Long orderId);
+
     @Query(value = """
             SELECT * FROM payment_attempts
             WHERE preference_id IS NOT NULL

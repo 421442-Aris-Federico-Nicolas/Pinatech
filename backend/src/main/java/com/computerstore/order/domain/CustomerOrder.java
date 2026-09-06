@@ -121,6 +121,28 @@ public class CustomerOrder {
     @Column(name = "request_hash", length = 64)
     private String requestHash;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason", length = 40)
+    private OrderCancellationReason cancellationReason;
+
+    @Column(name = "cancellation_internal_detail", length = 500)
+    private String cancellationInternalDetail;
+
+    @Column(name = "cancelled_by_user_id")
+    private Long cancelledByUserId;
+
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt;
+
+    @Column(name = "refund_reference", length = 200)
+    private String refundReference;
+
+    @Column(name = "refund_confirmed_by_user_id")
+    private Long refundConfirmedByUserId;
+
+    @Column(name = "refund_confirmed_at")
+    private Instant refundConfirmedAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -347,6 +369,41 @@ public class CustomerOrder {
         paymentStatus = PaymentStatus.REFUNDED;
     }
 
+    public boolean cancelForRefund(OrderCancellationReason reason, String internalDetail, Long adminId, Instant now) {
+        Objects.requireNonNull(reason);
+        Objects.requireNonNull(adminId);
+        Objects.requireNonNull(now);
+        if (status == OrderStatus.CANCELLED) return false;
+        if (paymentStatus != PaymentStatus.APPROVED
+                || (status != OrderStatus.PAID && status != OrderStatus.PREPARING && status != OrderStatus.READY)) {
+            throw new InvalidStateTransitionException("Only a paid order that has not shipped can be cancelled with a refund.");
+        }
+        status = OrderStatus.CANCELLED;
+        fulfillmentStatus = FulfillmentStatus.CANCELLED;
+        paymentStatus = PaymentStatus.REFUND_PENDING;
+        cancellationReason = reason;
+        cancellationInternalDetail = truncate(internalDetail, 500);
+        cancelledByUserId = adminId;
+        cancelledAt = now;
+        return true;
+    }
+
+    public boolean confirmBankTransferRefund(String reference, Long adminId, Instant now) {
+        if (paymentMethod == PaymentMethod.BANK_TRANSFER && status == OrderStatus.CANCELLED
+                && paymentStatus == PaymentStatus.REFUNDED && refundConfirmedAt != null) {
+            return false;
+        }
+        if (paymentMethod != PaymentMethod.BANK_TRANSFER || status != OrderStatus.CANCELLED
+                || paymentStatus != PaymentStatus.REFUND_PENDING || cancellationReason == null) {
+            throw new InvalidStateTransitionException("This order is not awaiting a manual bank transfer refund.");
+        }
+        paymentStatus = PaymentStatus.REFUNDED;
+        refundReference = truncate(reference, 200);
+        refundConfirmedByUserId = Objects.requireNonNull(adminId);
+        refundConfirmedAt = Objects.requireNonNull(now);
+        return true;
+    }
+
     public void markPaymentInMediation() {
         paymentStatus = PaymentStatus.IN_MEDIATION;
     }
@@ -424,6 +481,19 @@ public class CustomerOrder {
     public Instant getPaymentDueAt() { return paymentDueAt; }
     public BankAccountSnapshot getBankAccount() { return bankAccount; }
     public String getRequestHash() { return requestHash; }
+    public OrderCancellationReason getCancellationReason() { return cancellationReason; }
+    public String getCancellationInternalDetail() { return cancellationInternalDetail; }
+    public Long getCancelledByUserId() { return cancelledByUserId; }
+    public Instant getCancelledAt() { return cancelledAt; }
+    public String getRefundReference() { return refundReference; }
+    public Long getRefundConfirmedByUserId() { return refundConfirmedByUserId; }
+    public Instant getRefundConfirmedAt() { return refundConfirmedAt; }
     public List<OrderItem> getItems() { return List.copyOf(items); }
     public UserAccount getUser() { return user; }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.isBlank()) return null;
+        String trimmed = value.trim();
+        return trimmed.substring(0, Math.min(trimmed.length(), maxLength));
+    }
 }

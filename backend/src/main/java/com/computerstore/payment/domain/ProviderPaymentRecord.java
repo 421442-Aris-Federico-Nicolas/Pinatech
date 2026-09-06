@@ -149,6 +149,15 @@ public class ProviderPaymentRecord {
         return refundIdempotencyKey;
     }
 
+    public void prepareRefundRetry(Instant now) {
+        if (!"REJECTED".equals(refundStatus)) return;
+        refundId = null;
+        refundIdempotencyKey = UUID.randomUUID();
+        refundStatus = "PENDING";
+        refundLastError = null;
+        nextRetryAt = now;
+    }
+
     public void refundResult(RefundResult result, Instant now) {
         refundId = result.id();
         String resultStatus = normalizeRefundStatus(result.status());
@@ -159,11 +168,11 @@ public class ProviderPaymentRecord {
         if ("APPROVED".equals(resultStatus) && amount.compareTo(result.amount()) == 0) {
             amountRefunded = result.amount();
             nextRetryAt = null;
+        } else if ("APPROVED".equals(resultStatus)) {
+            refundStatus = "AMOUNT_MISMATCH";
+            refundLastError = "Approved refund amount does not match the expected amount.";
+            nextRetryAt = null;
         } else {
-            if ("APPROVED".equals(resultStatus)) {
-                refundStatus = "PENDING";
-                refundLastError = "Approved refund amount does not match the expected amount.";
-            }
             nextRetryAt = retryAt(now);
         }
     }

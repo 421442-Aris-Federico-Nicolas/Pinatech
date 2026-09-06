@@ -1,7 +1,9 @@
 package com.computerstore.order.domain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -110,6 +112,56 @@ class CustomerOrderTest {
         transfer.approveBankTransfer();
         assertEquals(OrderStatus.PAID, transfer.getStatus());
         assertEquals(PaymentStatus.APPROVED, transfer.getPaymentStatus());
+    }
+
+    @Test
+    void paidCancellationRecordsAuditAndLeavesTheRefundPending() {
+        CustomerOrder order = order();
+        Instant cancelledAt = Instant.parse("2026-09-04T12:00:00Z");
+        order.transitionTo(OrderStatus.PAID);
+
+        order.cancelForRefund(OrderCancellationReason.DUPLICATE_OR_ERROR, "  Internal duplicate  ", 7L, cancelledAt);
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        assertEquals(FulfillmentStatus.CANCELLED, order.getFulfillmentStatus());
+        assertEquals(PaymentStatus.REFUND_PENDING, order.getPaymentStatus());
+        assertEquals(OrderCancellationReason.DUPLICATE_OR_ERROR, order.getCancellationReason());
+        assertEquals("Internal duplicate", order.getCancellationInternalDetail());
+        assertEquals(7L, order.getCancelledByUserId());
+        assertEquals(cancelledAt, order.getCancelledAt());
+    }
+
+    @Test
+    void bankTransferRefundRequiresACancelledApprovedOrderAndRecordsConfirmation() {
+        Instant due = Instant.parse("2026-09-04T12:00:00Z");
+        CustomerOrder transfer = bankTransferOrder(due);
+        transfer.submitBankTransferProof();
+        transfer.approveBankTransfer();
+        transfer.cancelForRefund(OrderCancellationReason.CUSTOMER_REQUEST, null, 7L, due);
+
+        assertTrue(transfer.confirmBankTransferRefund("  receipt-123  ", 8L, due.plusSeconds(60)));
+
+        assertEquals(PaymentStatus.REFUNDED, transfer.getPaymentStatus());
+        assertEquals("receipt-123", transfer.getRefundReference());
+        assertEquals(8L, transfer.getRefundConfirmedByUserId());
+        assertEquals(due.plusSeconds(60), transfer.getRefundConfirmedAt());
+        assertFalse(transfer.confirmBankTransferRefund("receipt-123", 8L, due.plusSeconds(120)));
+        assertEquals(due.plusSeconds(60), transfer.getRefundConfirmedAt());
+    }
+
+    private CustomerOrder bankTransferOrder(Instant due) {
+        Product product = Mockito.mock(Product.class);
+        Mockito.when(product.getName()).thenReturn("Keyboard");
+        Mockito.when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
+        ProductVariant variant = Mockito.mock(ProductVariant.class);
+        Mockito.when(variant.getProduct()).thenReturn(product);
+        Mockito.when(variant.getColorName()).thenReturn("Black");
+        return new CustomerOrder(
+                new UserAccount("Customer", "Example", "customer@example.com", "hash", null),
+                List.of(new OrderItem(variant, 1)), new BigDecimal("100.00"), new BigDecimal("0.00"),
+                new BigDecimal("0.00"), PaymentMethod.BANK_TRANSFER, due, due,
+                new BankAccountSnapshot("Pinatech", "30-12345678-9", "Bank", "alias", "1234567890123456789012", "ARS"),
+                null, null, FulfillmentMethod.PICKUP, null);
     }
 
     private CustomerOrder order() {
