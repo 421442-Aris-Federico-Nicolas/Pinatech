@@ -189,7 +189,7 @@ public class AuthService {
         Set<String> roles = user.getRoles().stream().map(role -> role.getName().name()).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return new AuthenticatedUserResponse(
                 user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(), user.getPhone(),
-                user.isEmailVerified(), roles
+                user.getDocumentNumber(), user.isEmailVerified(), roles
         );
     }
 

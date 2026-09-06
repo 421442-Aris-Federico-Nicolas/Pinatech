@@ -9,7 +9,7 @@ import { CheckoutComponent } from './checkout.component';
 import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService, MercadoPagoCheckout } from './checkout.service';
 
 describe('CheckoutComponent', () => {
-  const authenticatedUser = signal({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: true, roles: ['CUSTOMER'] });
+  const authenticatedUser = signal({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: '12345678' as string | null, emailVerified: true, roles: ['CUSTOMER'] });
   const requestEmailVerification = vi.fn(() => of({ message: 'accepted' }));
   const pickupLocation = { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes de 9 a 18.' };
   const item: CartItem = {
@@ -57,7 +57,7 @@ describe('CheckoutComponent', () => {
   };
 
   beforeEach(() => {
-    authenticatedUser.set({ ...authenticatedUser(), emailVerified: true });
+    authenticatedUser.set({ ...authenticatedUser(), documentNumber: '12345678', emailVerified: true });
     requestEmailVerification.mockClear();
     TestBed.configureTestingModule({ providers: [{ provide: AuthService, useValue: { user: authenticatedUser, requestEmailVerification } }] });
   });
@@ -594,6 +594,46 @@ describe('CheckoutComponent', () => {
     expect(fixture.componentInstance.pickupAccepted()).toBe(false);
   });
 
+  it('blocks pickup and delivery until the customer completes their document number', async () => {
+    authenticatedUser.set({ ...authenticatedUser(), documentNumber: null });
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    const shippingQuotes = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: {
+          capabilities: () => of({
+            ...capabilities,
+            deliveryQuotesEnabled: true,
+            fulfillmentMethods: ['PICKUP', 'DELIVERY'],
+          }),
+          shippingQuotes,
+        } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.selectPickup({ target: { value: pickupLocation.code } } as unknown as Event);
+    fixture.componentInstance.pickupAccepted.set(true);
+    fixture.componentInstance.continueToPayment();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.checkoutStep()).toBe('SHIPPING');
+    expect(fixture.componentInstance.fulfillmentEnabled()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Completá tu DNI o CUIT en Mi perfil');
+    expect(fixture.nativeElement.querySelector('.notice a')?.getAttribute('href')).toBe('/profile');
+    expect((fixture.nativeElement.querySelector('.delivery-options') as HTMLFieldSetElement).disabled).toBe(true);
+    expect(shippingQuotes).not.toHaveBeenCalled();
+    expect(cart.checkout).not.toHaveBeenCalled();
+  });
+
   it('renders and selects each configured pickup location as its own option', async () => {
     const secondPickup = {
       ...pickupLocation,
@@ -658,6 +698,37 @@ describe('CheckoutComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Necesitás verificar tu email');
+    expect(fixture.nativeElement.querySelector('.submit-error a')?.getAttribute('href')).toBe('/profile');
+    expect(cart.items()).toEqual([item]);
+  });
+
+  it('keeps the cart and links to the profile when the backend rejects a missing document', async () => {
+    const error = new HttpErrorResponse({
+      status: 400,
+      error: { detail: 'A valid document number is required to create an order.' },
+    });
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => throwError(() => error)), completeCheckout: vi.fn(),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of(capabilities) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.selectedPaymentMethod.set('MERCADO_PAGO');
+    enterPaymentStep(fixture);
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('completar tu DNI o CUIT');
     expect(fixture.nativeElement.querySelector('.submit-error a')?.getAttribute('href')).toBe('/profile');
     expect(cart.items()).toEqual([item]);
   });

@@ -91,10 +91,16 @@
               @if (!pickupEnabled(options) && !deliveryEnabled(options)) {
                 <app-feedback class="notice" tone="warning">No hay un punto de retiro disponible ni opciones de envío. No es posible completar la compra en este momento.</app-feedback>
               } @else {
+                @if (!documentNumberPresent()) {
+                  <app-feedback class="notice" tone="warning" announce="polite">
+                    Completá tu DNI o CUIT en Mi perfil antes de elegir retiro o envío.
+                    <a feedback-actions appButton="text" routerLink="/profile">Completar perfil</a>
+                  </app-feedback>
+                }
                 @if (deliveryEnabled(options)) {
                   <div class="delivery-heading"><p>Tarifas calculadas para la dirección guardada en tu perfil.</p><a routerLink="/profile">Revisar dirección</a></div>
                 }
-                <fieldset class="delivery-options" [disabled]="submitting()">
+                <fieldset class="delivery-options" [disabled]="submitting() || !documentNumberPresent()">
                   <legend>Opciones disponibles</legend>
                   @if (pickupEnabled(options)) {
                     @for (location of options.pickupLocations; track location.code) {
@@ -228,7 +234,7 @@
         @if (capabilities()) {
           @if (checkoutStep() === 'SHIPPING') {
             <button appButton="filled" type="button" (click)="continueToPayment()" [disabled]="reconciling() || loadingCapabilities() || !fulfillmentEnabled()">Continuar al pago</button>
-            <small>{{ selectedFulfillmentMethod() === 'PICKUP' && !pickupAccepted() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : selectedFulfillmentMethod() === 'DELIVERY' && (!selectedShippingQuote() || quoteExpired()) ? 'Elegí una opción de envío vigente para continuar.' : 'En el próximo paso vas a elegir cómo pagar.' }}</small>
+            <small>{{ !documentNumberPresent() ? 'Completá tu DNI o CUIT en Mi perfil para continuar.' : selectedFulfillmentMethod() === 'PICKUP' && !pickupAccepted() ? 'Confirmá que entendés la modalidad de retiro para continuar.' : selectedFulfillmentMethod() === 'DELIVERY' && (!selectedShippingQuote() || quoteExpired()) ? 'Elegí una opción de envío vigente para continuar.' : 'En el próximo paso vas a elegir cómo pagar.' }}</small>
           } @else {
             <button appButton="filled" type="button" (click)="submit()" [disabled]="reconciling() || loadingCapabilities() || submitting() || !canSubmit()" [attr.aria-busy]="submitting()" [attr.aria-label]="submitting() ? 'Registrando pedido, esperá' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Crear pedido por transferencia' : 'Elegí un método de pago para continuar'">
               @if (submitting()) { <span class="button-spinner" aria-hidden="true"></span> }
@@ -241,7 +247,7 @@
         @if (checkoutStep() === 'PAYMENT' && submitError()) {
           <app-feedback class="submit-error" tone="error" announce="assertive">
             <p>{{ submitError() }}</p>
-             <span feedback-actions>@if (submitErrorKind() === 'verification') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'pending-transfer') { <a routerLink="/orders">Ver pedido pendiente</a> } @if (submitErrorKind() === 'shipping') { <button appButton="text" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes()">Calcular envío nuevamente</button> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
+             <span feedback-actions>@if (submitErrorKind() === 'verification' || submitErrorKind() === 'profile') { <a routerLink="/profile">Ir a Mi perfil</a> } @if (submitErrorKind() === 'pending-transfer') { <a routerLink="/orders">Ver pedido pendiente</a> } @if (submitErrorKind() === 'shipping') { <button appButton="text" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes()">Calcular envío nuevamente</button> } @if (submitErrorKind() === 'conflict') { <a routerLink="/cart">Revisar carrito</a> } @if (submitErrorKind() === 'network' || submitErrorKind() === 'generic') { <button appButton="text" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()">Reintentar</button> }</span>
           </app-feedback>
         }
       </aside>

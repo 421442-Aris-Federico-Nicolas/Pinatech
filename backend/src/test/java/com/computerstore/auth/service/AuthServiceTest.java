@@ -64,6 +64,7 @@ class AuthServiceTest {
     void loginCreatesHashedRefreshTokenForValidCredentials() throws Exception {
         stubJwt();
         UserAccount user = customer();
+        user.updateProfile(null, null, null, "12345678");
         when(users.findByEmailIgnoreCase("customer@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", user.getPasswordHash())).thenReturn(true);
 
@@ -72,6 +73,7 @@ class AuthServiceTest {
         ArgumentCaptor<RefreshToken> token = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokens).save(token.capture());
         assertEquals("access-token", session.response().accessToken());
+        assertEquals("12345678", session.response().user().documentNumber());
         assertNotEquals(session.refreshToken(), token.getValue().getTokenHash());
         assertEquals(sha256(session.refreshToken()), token.getValue().getTokenHash());
         assertNotNull(token.getValue().getFamilyId());

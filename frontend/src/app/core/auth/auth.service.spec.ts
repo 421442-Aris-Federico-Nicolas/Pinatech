@@ -20,7 +20,7 @@ describe('AuthService', () => {
     };
     const response: AuthResponse = {
       accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900,
-      user: { id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: false, roles: ['CUSTOMER'] },
+      user: { id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: null, emailVerified: false, roles: ['CUSTOMER'] },
     };
 
     auth.register(account).subscribe();

@@ -130,6 +130,9 @@ public class OrderController {
         if (!user.isEmailVerified()) {
             throw new EmailVerificationRequiredException();
         }
+        if (user.getDocumentNumber() == null || user.getDocumentNumber().isBlank()) {
+            throw new InvalidRequestException("A valid document number is required to create an order.");
+        }
         PaymentMethod paymentMethod = request.paymentMethod();
         String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
         String requestHash = idempotencyKey == null ? null : requestHash(request, paymentMethod);

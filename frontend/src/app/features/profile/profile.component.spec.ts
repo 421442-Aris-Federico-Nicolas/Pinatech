@@ -46,12 +46,14 @@ describe('ProfileComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Verificación pendiente');
     expect(fixture.nativeElement.querySelectorAll('#personal-form app-input').length).toBe(4);
     expect(fixture.nativeElement.textContent).toContain('DNI o CUIT de 7 a 11 dígitos');
+    expect(fixture.nativeElement.textContent).not.toContain('Documento (opcional)');
     expect(fixture.nativeElement.querySelector('#address-form')).toBeTruthy();
     expect(fixture.nativeElement.querySelectorAll('#address-form app-select option').length).toBe(25);
     expect(fixture.nativeElement.textContent).toContain('código oficial de una letra');
     expect(fixture.nativeElement.textContent).toContain('Ver mis pedidos');
 
     const documentNumber = fixture.componentInstance.personalForm.controls.documentNumber;
+    expect(documentNumber.hasError('required')).toBe(true);
     documentNumber.setValue('1.234-56');
     expect(documentNumber.hasError('pattern')).toBe(true);
     documentNumber.setValue('12.345.678.901-2');
@@ -67,13 +69,13 @@ describe('ProfileComponent', () => {
     expect(documentNumber.value).toBe('2012345678');
     expect(replaceUser).toHaveBeenLastCalledWith({
       id: 7, firstName: 'Augusta', lastName: 'Lovelace', email: 'ada@example.com', phone: null,
-      emailVerified: false, roles: ['CUSTOMER'],
+      documentNumber: '2012345678', emailVerified: false, roles: ['CUSTOMER'],
     });
   });
 
   it('does not submit an invalid address', async () => {
     const profiles = { get: vi.fn(() => of(profile)), putAddress: vi.fn() };
-    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: false, roles: ['CUSTOMER'] });
+    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: null, emailVerified: false, roles: ['CUSTOMER'] });
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
       providers: [
@@ -99,7 +101,7 @@ describe('ProfileComponent', () => {
 
   it('always requires the current password for email changes and associates a 409 with the email field', async () => {
     const requestEmailChange = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 409 })));
-    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: false, roles: ['CUSTOMER'] });
+    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: null, emailVerified: false, roles: ['CUSTOMER'] });
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
       providers: [
@@ -127,7 +129,7 @@ describe('ProfileComponent', () => {
 
   it('does not replace a session that changed before the profile response arrives', async () => {
     const response = new Subject<Profile>();
-    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, emailVerified: false, roles: ['CUSTOMER'] });
+    const user = signal<AuthenticatedUser | null>({ id: 7, firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', phone: null, documentNumber: null, emailVerified: false, roles: ['CUSTOMER'] });
     const isAuthenticated = signal(true);
     const replaceUser = vi.fn();
     await TestBed.configureTestingModule({

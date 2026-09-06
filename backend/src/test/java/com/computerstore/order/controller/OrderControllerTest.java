@@ -24,6 +24,7 @@ import com.computerstore.catalog.domain.ProductVariant;
 import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.common.exception.DuplicateResourceException;
 import com.computerstore.common.exception.EmailVerificationRequiredException;
+import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.email.OrderEmailOutboxService;
 import com.computerstore.email.OrderEmailEventType;
 import com.computerstore.order.config.FulfillmentProperties;
@@ -66,7 +67,20 @@ class OrderControllerTest {
         when(user.getFirstName()).thenReturn("Customer");
         when(user.getLastName()).thenReturn("Example");
         when(user.getEmail()).thenReturn("customer@example.com");
+        when(user.getDocumentNumber()).thenReturn("12345678");
         when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+    }
+
+    @Test
+    void rejectsAnOrderWithoutADocumentBeforeSavingOrReservingStock() {
+        when(user.getDocumentNumber()).thenReturn(null);
+
+        assertThrows(InvalidRequestException.class,
+                () -> controller.create(request(1, "CORDOBA-CENTRO"), null, authenticatedUser));
+
+        verify(orders, never()).save(any(CustomerOrder.class));
+        verify(stock, never()).reserve(any(CustomerOrder.class));
+        verify(variants, never()).findByIdAndActiveTrueAndProduct_ActiveTrue(any());
     }
 
     @Test
