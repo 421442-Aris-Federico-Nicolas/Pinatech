@@ -71,7 +71,7 @@
                   @if (item.product.images[0]; as image) {
                     <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'" decoding="async">
                   } @else { <div class="product-mark" aria-hidden="true">PIN</div> }
-                  <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span> · Color: {{ item.variant.colorName }} · Cantidad: {{ item.quantity }}</small></div>
+                  <div class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span>@if(hasVisibleColorVariants(item.product.variants)){ · Color: {{ item.variant.colorName }} } · Cantidad: {{ item.quantity }}</small></div>
                   <span>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }} lista</span>
                 </article></li>
               }

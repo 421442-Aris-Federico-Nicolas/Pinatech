@@ -170,7 +170,7 @@
 
           <ul class="items" aria-label="Productos del pedido">
             @for (item of order.items; track item.variantId) {
-              <li><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></li>
+              <li><span><strong>{{ item.quantity }} ×</strong> {{ item.productName }}@if(!isDefaultProductVariantName(item.colorName)){ · {{ item.colorName }} }</span><strong>{{ item.subtotal | currency:order.currency:'symbol-narrow':'1.2-2' }}</strong></li>
             }
           </ul>
 

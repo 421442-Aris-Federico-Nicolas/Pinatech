@@ -60,6 +60,29 @@ describe('OrdersComponent', () => {
     expect(fixture.nativeElement.querySelector('.badges')?.tagName).toBe('UL');
   });
 
+  it('omits the technical variant from order items', async () => {
+    const orderWithoutColor: Order = {
+      ...order,
+      items: [{ ...order.items[0], colorName: 'Unico', colorHex: null }],
+    };
+    await TestBed.configureTestingModule({
+      imports: [OrdersComponent],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: { mine: () => of([orderWithoutColor]) } },
+        { provide: BankTransferService, useValue: { get: vi.fn(), uploadProof: vi.fn() } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ onlinePaymentsEnabled: false, paymentMethods: [] }) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(OrdersComponent);
+    fixture.detectChanges();
+    const items = fixture.nativeElement.querySelector('.items') as HTMLElement;
+
+    expect(items.textContent).toContain('2 × Teclado');
+    expect(items.textContent).not.toContain('Unico');
+  });
+
   it('shows a recoverable error when loading fails', async () => {
     const retry = new Subject<Order[]>();
     const mine = vi.fn()

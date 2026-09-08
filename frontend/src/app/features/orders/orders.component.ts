@@ -7,6 +7,7 @@ import { CancellationReasonCode, Order, OrderService, ShipmentSummary, ShipmentT
 import { BankTransferDetails, BankTransferService } from '../../core/orders/bank-transfer.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
+import { isDefaultProductVariantName } from '../../core/utils/product-variant';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
@@ -46,6 +47,7 @@ export class OrdersComponent {
   readonly trackingLoading = signal<number[]>([]);
   readonly trackingErrors = signal<Record<number, string>>({});
   readonly estadoTono = estadoTono;
+  readonly isDefaultProductVariantName = isDefaultProductVariantName;
 
   constructor() {
     this.load();

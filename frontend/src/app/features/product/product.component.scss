@@ -8,6 +8,7 @@ main { margin: auto; max-width: 1440px; padding: var(--space-6) clamp(var(--spac
 .gallery, .commerce-panel, .product-heading { min-width: 0; }
 
 .carousel { display: grid; gap: var(--space-4); grid-template-columns: 84px minmax(0, 1fr); outline: 0; }
+.carousel.single-image { grid-template-columns: minmax(0, 1fr); }
 .carousel:focus-visible { border-radius: var(--radius-lg); outline: var(--focus-outline); outline-offset: 5px; }
 .carousel-stage, .visual { background: radial-gradient(circle at 50% 45%, var(--color-surface-raised), var(--color-bg-deep) 72%); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); min-height: clamp(480px, 53vw, 700px); overflow: hidden; position: relative; }
 .carousel-stage { align-items: center; display: flex; justify-content: center; margin: 0; }

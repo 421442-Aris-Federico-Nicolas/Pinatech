@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
 import { Product } from '../catalog/catalog.service';
 import { AdminComponent } from './admin.component';
-import { AdminOrder, AdminService } from './admin.service';
+import { AdminOrder, AdminService, ProductPayload } from './admin.service';
 
 describe('AdminComponent payments', () => {
   const renderedOrder: Order = {
@@ -182,6 +182,78 @@ describe('AdminComponent payments', () => {
 
     expect(createProduct).not.toHaveBeenCalled();
     expect(component.error()).toContain('peso entero entre 10 y 10000000');
+  });
+
+  it('creates a product without visible colors using one technical inventory variant', async () => {
+    const saved: Product = {
+      id: 5, name: 'Disco SSD', slug: 'disco-ssd', description: 'Almacenamiento interno', price: 100,
+      categoryId: 3, categoryName: 'Discos', brandId: 8, brandName: 'Pina', images: [], specifications: [],
+      shippingWeightGrams: 100, shippingHeightCm: 2, shippingWidthCm: 8, shippingLengthCm: 12,
+      shippingClassificationId: 1, mustKeepVertical: false,
+      variants: [{ id: 51, colorName: 'Único', colorHex: null, imageId: null, inStock: false, availableQuantity: 0 }],
+    };
+    let submitted: ProductPayload | undefined;
+    const createProduct = vi.fn((payload: ProductPayload) => {
+      submitted = payload;
+      return of(saved);
+    });
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [] }), categories: () => of([{ id: 3, name: 'Discos', slug: 'discos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]), inventories: () => of([]), orders: () => of([]), pendingBankTransferProofs: () => of([]),
+          createProduct,
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    const component = fixture.componentInstance;
+    component.section.set('catalog');
+    Object.assign(component.form, {
+      name: saved.name, slug: saved.slug, description: saved.description, price: saved.price,
+      categoryId: saved.categoryId, brandId: saved.brandId, shippingWeightGrams: 100,
+      shippingHeightCm: 2, shippingWidthCm: 8, shippingLengthCm: 12, shippingClassificationId: 1,
+    });
+    fixture.detectChanges();
+
+    expect(component.form.hasColorVariants).toBe(false);
+    expect((fixture.nativeElement.querySelector('[name="hasColorVariants"]') as HTMLInputElement).checked).toBe(false);
+    expect(fixture.nativeElement.querySelector('.variants-editor > article')).toBeNull();
+
+    component.saveProduct();
+
+    expect(createProduct).toHaveBeenCalledWith(expect.objectContaining({
+      variants: [{ colorName: 'Único', colorHex: null, imageId: null }],
+    }));
+    expect(submitted).not.toHaveProperty('hasColorVariants');
+  });
+
+  it('recognizes a historical Unico variant as a product without visible colors', async () => {
+    const productWithoutColor: Product = {
+      id: 5, name: 'Disco SSD', slug: 'disco-ssd', description: 'Almacenamiento interno', price: 100,
+      categoryId: 3, categoryName: 'Discos', brandId: 8, brandName: 'Pina', images: [], specifications: [],
+      variants: [{ id: 51, colorName: 'Unico', colorHex: null, imageId: null, inStock: true, availableQuantity: 2 }],
+    };
+    await TestBed.configureTestingModule({
+      imports: [AdminComponent],
+      providers: [{
+        provide: AdminService,
+        useValue: {
+          products: () => of({ content: [productWithoutColor] }), categories: () => of([{ id: 3, name: 'Discos', slug: 'discos' }]),
+          brands: () => of([{ id: 8, name: 'Pina' }]), inventories: () => of([]), orders: () => of([]), pendingBankTransferProofs: () => of([]),
+        },
+      }],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AdminComponent);
+    fixture.componentInstance.section.set('catalog');
+    fixture.componentInstance.select(productWithoutColor);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.form.hasColorVariants).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('stock general');
+    expect(fixture.nativeElement.querySelector('.variants-editor > article')).toBeNull();
   });
 
   it('offers saved product images per color and clears associations when an image is deleted', async () => {

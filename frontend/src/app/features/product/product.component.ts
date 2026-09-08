@@ -8,6 +8,7 @@ import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { bankTransferPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { hasVisibleColorVariants } from '../../core/utils/product-variant';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { CatalogService, Product, ProductVariant } from '../catalog/catalog.service';
@@ -38,6 +39,7 @@ export class ProductComponent {
   readonly quantity = signal(1);
   readonly selectedVariantId = signal<number | null>(null);
   readonly selectedVariant = computed<ProductVariant | null>(() => this.product()?.variants.find((variant) => variant.id === this.selectedVariantId()) ?? null);
+  readonly hasColorVariants = computed(() => hasVisibleColorVariants(this.product()?.variants ?? []));
   readonly quantityInCart = computed(() => this.cart.items().find((item) => item.variant.id === this.selectedVariantId())?.quantity ?? 0);
   readonly maxAddable = computed(() => {
     const variant = this.selectedVariant();
@@ -146,10 +148,12 @@ export class ProductComponent {
     if (!product || !variant?.inStock) return;
     const result = this.cart.add(product, variant, this.quantity());
     const message = result.added === 0
-      ? `Ya tenés todas las unidades disponibles para este color en el carrito (${result.limit}).`
+      ? this.hasColorVariants()
+        ? `Ya tenés todas las unidades disponibles para este color en el carrito (${result.limit}).`
+        : `Ya tenés todas las unidades disponibles en el carrito (${result.limit}).`
       : result.capped
-        ? `Se ${result.added === 1 ? 'agregó 1 unidad' : `agregaron ${result.added} unidades`}; solo hay ${result.limit} disponibles para este color.`
-        : `${result.added === 1 ? '1 unidad agregada' : `${result.added} unidades agregadas`} en color ${variant.colorName}.`;
+        ? `Se ${result.added === 1 ? 'agregó 1 unidad' : `agregaron ${result.added} unidades`}; solo hay ${result.limit} disponibles${this.hasColorVariants() ? ' para este color' : ''}.`
+        : `${result.added === 1 ? '1 unidad agregada' : `${result.added} unidades agregadas`}${this.hasColorVariants() ? ` en color ${variant.colorName}` : ''}.`;
     const notification = result.capped
       ? this.notifications.warning(message, 'Ver carrito')
       : this.notifications.success(message, 'Ver carrito');

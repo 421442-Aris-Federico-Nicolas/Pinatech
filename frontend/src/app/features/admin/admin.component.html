@@ -108,7 +108,7 @@
               <div class="order-detail" [id]="'order-detail-' + order.id" animate.leave="order-detail-leave" [attr.aria-hidden]="expandedOrder() === order.id ? null : 'true'" [attr.inert]="expandedOrder() === order.id ? null : ''">
                 <div class="order-items">
                   <h3>Detalle del pedido</h3>
-                  @for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }} · {{ item.colorName }}</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}
+                  @for(item of order.items;track item.variantId){<p><span>{{ item.quantity }} × {{ item.productName }}@if(!isDefaultProductVariantName(item.colorName)){ · {{ item.colorName }} }</span><strong>{{ item.subtotal | number:'1.0-2' }} ARS</strong></p>}
                   @if (order.fulfillmentMethod === 'DELIVERY') {
                     <section class="delivery-detail" aria-label="Datos de entrega">
                       <h3>Entrega a domicilio</h3>
@@ -169,20 +169,25 @@
                 <label class="vertical-option"><input type="checkbox" [(ngModel)]="form.mustKeepVertical" name="mustKeepVertical"><span><strong>Mantener vertical</strong><small>Indica al operador que no debe inclinar el paquete.</small></span></label>
               </div>
             </section>
-          <section class="variants-editor">
-             <div class="section-label"><div><h3>Colores y variantes</h3><p>Cada color tendrá su propio stock. Podés asociarlo a una imagen ya guardada del producto.</p></div><button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button></div>
-            @for (variant of form.variants; track variant.id ?? $index; let index = $index) {
-              <article>
-                <label><span>Nombre del color</span><input [(ngModel)]="variant.colorName" [name]="'variantName' + index" autocomplete="off" spellcheck="true" maxlength="100" placeholder="Ej. Negro…"></label>
-                <label class="color-field"><span>Muestra</span><input type="color" [ngModel]="variant.colorHex || '#7D8798'" (ngModelChange)="variant.colorHex = $event" [name]="'variantHex' + index"></label>
-                <div class="variant-image-field">
-                  <app-select label="Imagen asociada" [options]="productImageOptions()" [(ngModel)]="variant.imageId" [name]="'variantImage' + index" [disabled]="!selected()?.images?.length" />
-                  @if (variantImage(variant.imageId); as image) { <img [src]="imageUrl(image.contentUrl)" alt="" width="52" height="52" loading="lazy"> }
-                </div>
-                <div class="specification-actions"><button type="button" [disabled]="index === 0" (click)="moveVariant(index, -1)" aria-label="Subir color">↑</button><button type="button" [disabled]="index === form.variants.length - 1" (click)="moveVariant(index, 1)" aria-label="Bajar color">↓</button><button type="button" class="remove-specification" [disabled]="form.variants.length === 1" (click)="removeVariant(index)">Quitar</button></div>
-              </article>
-            }
-          </section>
+            <section class="variants-editor">
+              <div class="section-label"><div><h3>Variantes de color</h3><p>Activá esta opción solamente cuando el cliente deba elegir un color.</p></div>@if(form.hasColorVariants){<button appButton="outlined" type="button" [disabled]="form.variants.length >= 20" (click)="addVariant()">+ Agregar color</button>}</div>
+              <label class="variant-mode-option vertical-option"><input type="checkbox" [ngModel]="form.hasColorVariants" (ngModelChange)="setColorVariantMode($event)" name="hasColorVariants"><span><strong>Este producto tiene opciones de color</strong><small>Si está desactivado, tendrá un único stock general y no se mostrará “Color: Único” al cliente.</small></span></label>
+              @if (form.hasColorVariants) {
+                @for (variant of form.variants; track variant.id ?? $index; let index = $index) {
+                  <article>
+                    <label><span>Nombre del color</span><input [(ngModel)]="variant.colorName" [name]="'variantName' + index" autocomplete="off" spellcheck="true" maxlength="100" placeholder="Ej. Negro…"></label>
+                    <label class="color-field"><span>Muestra</span><input type="color" [ngModel]="variant.colorHex || '#7D8798'" (ngModelChange)="variant.colorHex = $event" [name]="'variantHex' + index"></label>
+                    <div class="variant-image-field">
+                      <app-select label="Imagen asociada" [options]="productImageOptions()" [(ngModel)]="variant.imageId" [name]="'variantImage' + index" [disabled]="!selected()?.images?.length" />
+                      @if (variantImage(variant.imageId); as image) { <img [src]="imageUrl(image.contentUrl)" alt="" width="52" height="52" loading="lazy"> }
+                    </div>
+                    <div class="specification-actions"><button type="button" [disabled]="index === 0" (click)="moveVariant(index, -1)" aria-label="Subir color">↑</button><button type="button" [disabled]="index === form.variants.length - 1" (click)="moveVariant(index, 1)" aria-label="Bajar color">↓</button><button type="button" class="remove-specification" [disabled]="form.variants.length === 1" (click)="removeVariant(index)">Quitar</button></div>
+                  </article>
+                }
+              } @else {
+                <p class="variant-mode-note">El stock se administrará como stock general del producto.</p>
+              }
+            </section>
           <section class="specifications-editor">
              <div class="section-label"><div><h3>Características del producto</h3><p>Agrupalas por tema y marcá las más importantes como destacadas.</p></div><button appButton="outlined" type="button" [disabled]="form.specifications.length >= 60" (click)="addSpecification()">+ Agregar característica</button></div>
             @for (specification of form.specifications; track $index; let index = $index) {
@@ -221,10 +226,10 @@
     @if (!loading() && section() === 'inventory') {
       <section class="inventory-layout">
         <div class="inventory-products">
-          @for(product of products();track product.id){@for(variant of product.variants;track variant.id){@if(stockForVariant(variant.id);as stock){<button type="button" [class.selected]="selectedVariantId() === variant.id" [attr.aria-pressed]="selectedVariantId() === variant.id" [class.low]="stock.availableQuantity <= 5" (click)="select(product, true, variant.id)"><span class="stock-indicator" aria-hidden="true" [style.background]="variant.colorHex || null"></span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ variant.colorName }}</small></span><span class="stock-numbers"><strong>{{ stock.availableQuantity }}</strong><small>disponibles</small></span><span class="reserved"><strong>{{ stock.reservedQuantity }}</strong><small>reservadas</small></span></button>}}}
+          @for(product of products();track product.id){@for(variant of product.variants;track variant.id){@if(stockForVariant(variant.id);as stock){<button type="button" [class.selected]="selectedVariantId() === variant.id" [attr.aria-pressed]="selectedVariantId() === variant.id" [class.low]="stock.availableQuantity <= 5" (click)="select(product, true, variant.id)"><span class="stock-indicator" aria-hidden="true" [style.background]="variant.colorHex || null"></span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ hasVisibleColorVariants(product.variants) ? variant.colorName : 'Stock general' }}</small></span><span class="stock-numbers"><strong>{{ stock.availableQuantity }}</strong><small>disponibles</small></span><span class="reserved"><strong>{{ stock.reservedQuantity }}</strong><small>reservadas</small></span></button>}}}
         </div>
         <aside appCard class="panel stock-editor">
-          @if(selected();as product){<form (ngSubmit)="adjustStock()"><p class="panel-kicker">Ajuste manual</p><h2>{{ product.name }}</h2>@if(inventory();as current){<p>{{ current.colorName }}</p><div class="stock-summary"><div><strong>{{ current.availableQuantity }}</strong><span>Disponibles</span></div><div><strong>{{ current.reservedQuantity }}</strong><span>Reservadas</span></div></div>}<app-input label="Cantidad a sumar o restar" type="number" [(ngModel)]="adjustment" name="stockAdjustment" inputMode="numeric" [disabled]="adjustingStock()" required /><app-textarea label="Motivo del movimiento" [rows]="3" [(ngModel)]="adjustmentReason" name="stockReason" autocomplete="off" spellcheck="true" placeholder="Ej. Corrección por conteo físico…" [disabled]="adjustingStock()" required /><button appButton="filled" type="submit" [disabled]="adjustingStock()">{{ adjustingStock() ? 'Aplicando…' : 'Aplicar ajuste' }}</button><small class="stock-help">Usá valores negativos para descontar unidades. Las reservas no se modifican manualmente.</small></form>}@else{<div class="select-prompt"><iconify-icon aria-hidden="true" icon="line-md:arrow-left"></iconify-icon><h2>Seleccioná un color</h2><p>Podrás consultar y ajustar su disponibilidad.</p></div>}
+          @if(selected();as product){<form (ngSubmit)="adjustStock()"><p class="panel-kicker">Ajuste manual</p><h2>{{ product.name }}</h2>@if(inventory();as current){<p>{{ hasVisibleColorVariants(product.variants) ? current.colorName : 'Stock general' }}</p><div class="stock-summary"><div><strong>{{ current.availableQuantity }}</strong><span>Disponibles</span></div><div><strong>{{ current.reservedQuantity }}</strong><span>Reservadas</span></div></div>}<app-input label="Cantidad a sumar o restar" type="number" [(ngModel)]="adjustment" name="stockAdjustment" inputMode="numeric" [disabled]="adjustingStock()" required /><app-textarea label="Motivo del movimiento" [rows]="3" [(ngModel)]="adjustmentReason" name="stockReason" autocomplete="off" spellcheck="true" placeholder="Ej. Corrección por conteo físico…" [disabled]="adjustingStock()" required /><button appButton="filled" type="submit" [disabled]="adjustingStock()">{{ adjustingStock() ? 'Aplicando…' : 'Aplicar ajuste' }}</button><small class="stock-help">Usá valores negativos para descontar unidades. Las reservas no se modifican manualmente.</small></form>}@else{<div class="select-prompt"><iconify-icon aria-hidden="true" icon="line-md:arrow-left"></iconify-icon><h2>Seleccioná un producto o variante</h2><p>Podrás consultar y ajustar su disponibilidad.</p></div>}
         </aside>
       </section>
     }
