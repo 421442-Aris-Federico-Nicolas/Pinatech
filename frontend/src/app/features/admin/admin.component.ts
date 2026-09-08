@@ -7,6 +7,7 @@ import { NotificationService } from '../../core/notifications/notification.servi
 import { CancellationReasonCode } from '../../core/orders/order.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel, estadoTono } from '../../core/utils/estado-label';
+import { DEFAULT_PRODUCT_VARIANT_NAME, hasVisibleColorVariants, isDefaultProductVariantName } from '../../core/utils/product-variant';
 import { summarizeUploadResults, UploadResult } from '../../core/utils/upload-results';
 import { AppBadgeDirective } from '../../shared/ui/app-badge.directive';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
@@ -16,12 +17,12 @@ import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
-import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, PendingBankTransferProof, ProductPayload } from './admin.service';
+import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, PendingBankTransferProof, ProductPayload, ProductVariantPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 const ORDER_FILTERS = ['ALL', 'PENDING_PAYMENT', 'PAID', 'PREPARING', 'READY', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
-interface ProductForm extends ProductPayload {}
+interface ProductForm extends ProductPayload { hasColorVariants: boolean; }
 interface PendingProductImage { file: File; previewUrl: string; altText: string; }
 interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
@@ -133,6 +134,8 @@ export class AdminComponent {
     { value: 'OTHER', label: 'Otro motivo' },
   ];
   readonly estadoTono = estadoTono;
+  readonly hasVisibleColorVariants = hasVisibleColorVariants;
+  readonly isDefaultProductVariantName = isDefaultProductVariantName;
 
   constructor() {
     const section = this.route?.snapshot.queryParamMap.get('section');
@@ -285,21 +288,24 @@ export class AdminComponent {
       this.failAndFocus('No puede haber características con el mismo nombre.', `[name="specName${duplicateSpecification}"]`);
       return;
     }
-    const incompleteVariant = this.form.variants.findIndex((variant) => !variant.colorName.trim());
-    if (!this.form.variants.length || incompleteVariant >= 0) {
-      this.failAndFocus('Agregá al menos un color y completá todos sus nombres.', incompleteVariant >= 0 ? `[name="variantName${incompleteVariant}"]` : '.variants-editor button');
-      return;
+    if (this.form.hasColorVariants) {
+      const incompleteVariant = this.form.variants.findIndex((variant) => !variant.colorName.trim());
+      if (!this.form.variants.length || incompleteVariant >= 0) {
+        this.failAndFocus('Agregá al menos un color y completá todos sus nombres.', incompleteVariant >= 0 ? `[name="variantName${incompleteVariant}"]` : '.variants-editor button');
+        return;
+      }
+      const colors = this.form.variants.map((variant) => variant.colorName.trim().toLowerCase());
+      const duplicateColor = colors.findIndex((color, index) => colors.indexOf(color) !== index);
+      if (duplicateColor >= 0) {
+        this.failAndFocus('No puede haber colores repetidos.', `[name="variantName${duplicateColor}"]`);
+        return;
+      }
     }
-    const colors=this.form.variants.map((variant)=>variant.colorName.trim().toLowerCase());
-    const duplicateColor = colors.findIndex((color, index) => colors.indexOf(color) !== index);
-    if (duplicateColor >= 0) {
-      this.failAndFocus('No puede haber colores repetidos.', `[name="variantName${duplicateColor}"]`);
-      return;
-    }
+    const payload = this.productPayload();
     this.saving.set(true);
     const request = this.selected()
-      ? this.service.updateProduct(this.selected()!.id, this.form)
-      : this.service.createProduct(this.form);
+      ? this.service.updateProduct(this.selected()!.id, payload)
+      : this.service.createProduct(payload);
     const wasEditing = !!this.selected();
     const pendingImages = [...this.pendingImages()];
     request.subscribe({
@@ -369,6 +375,14 @@ export class AdminComponent {
   addVariant(): void {
     if (this.form.variants.length >= 20) return this.fail('Podés agregar hasta 20 colores por producto.');
     this.form.variants = [...this.form.variants, { colorName: '', colorHex: '#7D8798', imageId: null }];
+    this.clearMessages();
+  }
+
+  setColorVariantMode(enabled: boolean): void {
+    this.form.hasColorVariants = enabled;
+    if (enabled && this.form.variants.length === 1 && isDefaultProductVariantName(this.form.variants[0].colorName)) {
+      this.form.variants = [{ ...this.form.variants[0], colorName: '', colorHex: '#7D8798' }];
+    }
     this.clearMessages();
   }
 
@@ -924,7 +938,8 @@ export class AdminComponent {
     return {
       name: '', slug: '', description: '', price: 0, categoryId: this.categories()[0]?.id ?? 0, brandId: this.brands()[0]?.id ?? 0,
       shippingWeightGrams: 0, shippingHeightCm: 0, shippingWidthCm: 0, shippingLengthCm: 0, shippingClassificationId: 1,
-      mustKeepVertical: false, specifications: [], variants: [{ colorName: 'Único', colorHex: null, imageId: null }],
+      mustKeepVertical: false, specifications: [], hasColorVariants: false,
+      variants: [{ colorName: DEFAULT_PRODUCT_VARIANT_NAME, colorHex: null, imageId: null }],
     };
   }
   private finishProductSave(product: Product, message: string, preservePendingImages = false): void {
@@ -986,8 +1001,16 @@ export class AdminComponent {
       shippingClassificationId: product.shippingClassificationId ?? 1,
       mustKeepVertical: product.mustKeepVertical ?? false,
       specifications: product.specifications.map(({ groupName, name, value, highlighted }) => ({ groupName, name, value, highlighted })),
+      hasColorVariants: hasVisibleColorVariants(product.variants),
       variants: product.variants.map(({ id, colorName, colorHex, imageId }) => ({ id, colorName, colorHex, imageId: imageId ?? null })),
     };
+  }
+  private productPayload(): ProductPayload {
+    const { hasColorVariants, ...payload } = this.form;
+    if (hasColorVariants) return payload;
+    const defaultVariant: ProductVariantPayload = { colorName: DEFAULT_PRODUCT_VARIANT_NAME, colorHex: null, imageId: null };
+    if (this.form.variants[0]?.id) defaultVariant.id = this.form.variants[0].id;
+    return { ...payload, variants: [defaultVariant] };
   }
   private productState(): string { return JSON.stringify(this.form); }
   private confirmDiscardProductChanges(): boolean {

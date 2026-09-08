@@ -10,6 +10,7 @@ import { FulfillmentMethod, PaymentMethod } from '../../core/orders/order.servic
 import { bankTransferPrice, listPrice, priceWithoutNationalTax, roundMoney } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { estadoLabel } from '../../core/utils/estado-label';
+import { hasVisibleColorVariants } from '../../core/utils/product-variant';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
@@ -24,6 +25,7 @@ import { CHECKOUT_WINDOW, CheckoutCapabilities, CheckoutService, ShippingQuoteOp
 })
 export class CheckoutComponent {
   readonly imageUrl = resolveApiContentUrl;
+  readonly hasVisibleColorVariants = hasVisibleColorVariants;
   readonly cart = inject(CartService);
   private readonly checkoutService = inject(CheckoutService);
   private readonly browserWindow = inject(CHECKOUT_WINDOW);

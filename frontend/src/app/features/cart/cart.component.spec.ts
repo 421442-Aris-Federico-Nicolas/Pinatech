@@ -87,6 +87,39 @@ describe('CartComponent', () => {
     expect(cart.checkout).not.toHaveBeenCalled();
   });
 
+  it('does not expose the technical variant for a product without colors', async () => {
+    const itemWithoutColor: CartItem = {
+      ...item,
+      product: {
+        ...item.product,
+        variants: [{ id: 11, colorName: 'Único', colorHex: null, inStock: true, availableQuantity: 5 }],
+      },
+      variant: { id: 11, colorName: 'Único', colorHex: null, inStock: true, availableQuantity: 5 },
+    };
+    const cart = {
+      items: signal([itemWithoutColor]), count: signal(2), total: signal(3000),
+      stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
+      setQuantity: vi.fn(), add: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
+      reconcile: vi.fn(() => of(true)), legacyCartDiscarded: signal(false), dismissLegacyCartWarning: vi.fn(),
+      notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CartComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CartComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Color:');
+    expect(fixture.nativeElement.textContent).not.toContain('Único');
+    expect(fixture.nativeElement.querySelector('.remove').getAttribute('aria-label')).toBe('Eliminar Teclado del carrito');
+  });
+
   it('preserves the bank-transfer checkout selection through login', async () => {
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000),

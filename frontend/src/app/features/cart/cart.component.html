@@ -18,7 +18,7 @@
             <div class="item-info">
                <small><span translate="no">{{ item.product.brandName }}</span> · {{ item.product.categoryName }}</small>
                <a [routerLink]="['/products', item.product.id]" [queryParams]="{ variant: item.variant.id }" translate="no">{{ item.product.name }}</a>
-              <span>Color: {{ item.variant.colorName }}</span>
+              @if (hasVisibleColorVariants(item.product.variants)) { <span>Color: {{ item.variant.colorName }}</span> }
               <span>Precio unitario: {{ unitPrice(item) | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
               <span class="stock-note">Stock disponible: {{ cart.stockLimit(item.variant) }}</span>
             </div>
@@ -28,7 +28,7 @@
                 <button type="button" [disabled]="item.quantity >= cart.stockLimit(item.variant)" (click)="cart.setQuantity(item.variant.id, item.quantity + 1)" [attr.aria-label]="item.quantity >= cart.stockLimit(item.variant) ? 'Alcanzaste el stock disponible de ' + item.product.name : 'Agregar una unidad de ' + item.product.name">+</button>
             </div>
             <strong class="subtotal" [attr.aria-label]="'Total de ' + item.product.name + ': ' + (itemTotal(item) | currency:'ARS':'symbol-narrow':'1.2-2')">{{ itemTotal(item) | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong>
-              <button class="remove" appButton="text" tone="danger" type="button" (click)="removeItem(item)" [attr.aria-label]="'Eliminar ' + item.product.name + ', color ' + item.variant.colorName + ', del carrito'">Eliminar</button>
+              <button class="remove" appButton="text" tone="danger" type="button" (click)="removeItem(item)" [attr.aria-label]="hasVisibleColorVariants(item.product.variants) ? 'Eliminar ' + item.product.name + ', color ' + item.variant.colorName + ', del carrito' : 'Eliminar ' + item.product.name + ' del carrito'">Eliminar</button>
           </article>
         }
         <button class="clear" data-cart-motion="clear" appButton="text" tone="danger" type="button" (click)="clear()">Vaciar carrito</button>

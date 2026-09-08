@@ -69,6 +69,38 @@ describe('CheckoutComponent', () => {
     fixture.detectChanges();
   }
 
+  it('omits the technical variant from the product summary', async () => {
+    const itemWithoutColor: CartItem = {
+      ...item,
+      product: {
+        ...item.product,
+        variants: [{ id: 11, colorName: 'Único', colorHex: null, inStock: true, availableQuantity: 5 }],
+      },
+      variant: { id: 11, colorName: 'Único', colorHex: null, inStock: true, availableQuantity: 5 },
+    };
+    const cart = {
+      items: signal([itemWithoutColor]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({
+      imports: [CheckoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: CartService, useValue: cart },
+        { provide: CheckoutService, useValue: { capabilities: () => of(capabilities) } },
+        { provide: CHECKOUT_WINDOW, useValue: { location: { assign: vi.fn() } } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    const details = fixture.nativeElement.querySelector('.product-details') as HTMLElement;
+
+    expect(details.textContent).toContain('Marca · Cantidad: 2');
+    expect(details.textContent).not.toContain('Color:');
+    expect(details.textContent).not.toContain('Único');
+  });
+
   it('creates the order, creates the Mercado Pago preference and redirects in that order', async () => {
     const calls: string[] = [];
     const assign = vi.fn(() => calls.push('redirect'));

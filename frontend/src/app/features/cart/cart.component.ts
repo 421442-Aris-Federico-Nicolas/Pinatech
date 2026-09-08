@@ -6,6 +6,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { CartItem, CartService } from '../../core/cart/cart.service';
 import { bankTransferPrice } from '../../core/payments/payment-pricing';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
+import { hasVisibleColorVariants } from '../../core/utils/product-variant';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
@@ -21,6 +22,7 @@ const EASE_IN_OUT = 'cubic-bezier(0.77, 0, 0.175, 1)';
 })
 export class CartComponent {
   readonly imageUrl = resolveApiContentUrl;
+  readonly hasVisibleColorVariants = hasVisibleColorVariants;
   readonly cart = inject(CartService);
   readonly auth = inject(AuthService);
   readonly pendingUndo = signal<{ message: string; items: CartItem[] } | null>(null);

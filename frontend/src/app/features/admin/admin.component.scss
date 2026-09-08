@@ -1087,6 +1087,14 @@ main {
 .vertical-option small {
   color: var(--color-text-subtle);
 }
+.variants-editor .variant-mode-option { display: flex; }
+.variants-editor .variant-mode-option input {
+  accent-color: var(--color-cyan);
+  min-height: auto;
+  padding: 0;
+  width: 18px;
+}
+.variant-mode-note { font-size: var(--text-xs); margin: 0; }
 .section-label > button,
 .section-label .file-button {
   background: #112b39;

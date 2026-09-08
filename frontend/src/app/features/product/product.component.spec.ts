@@ -138,6 +138,39 @@ describe('ProductComponent', () => {
     expect(component.currentImage()?.id).toBe(101);
   });
 
+  it('uses the full gallery width and hides color controls for a product with one image and no color', async () => {
+    const productWithoutColor: Product = {
+      ...product,
+      images: [{ id: 101, contentUrl: '/images/disk.jpg', altText: 'Disco SSD', displayOrder: 0 }],
+      variants: [{ id: 11, colorName: 'Unico', colorHex: null, inStock: true, availableQuantity: 5 }],
+    };
+    await TestBed.configureTestingModule({
+      imports: [ProductComponent],
+      providers: [
+        { provide: CatalogService, useValue: { product: () => of(productWithoutColor) } },
+        { provide: CartService, useValue: { add: vi.fn(), items: signal([]), stockLimit: (variant: Product['variants'][number]) => variant.availableQuantity } },
+        { provide: CheckoutService, useValue: { capabilities: () => of({ fulfillmentMethods: [], pickupLocations: [] }) } },
+        { provide: Router, useValue: { navigate: vi.fn() } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ id: 1 }), queryParamMap: convertToParamMap({}) },
+            queryParamMap: of(convertToParamMap({})),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(ProductComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.carousel')?.classList).toContain('single-image');
+    expect(fixture.nativeElement.querySelector('.carousel-stage img')?.getAttribute('src')).toContain('/images/disk.jpg');
+    expect(fixture.nativeElement.querySelector('.carousel-thumbnails')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.variants')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Unico');
+  });
+
   it('warns with the actual quantity when the cart cap is reached', async () => {
     const warning = vi.fn(() => ({ onAction: () => EMPTY }));
     const add = vi.fn(() => ({ requested: 5, added: 1, quantity: 5, limit: 5, capped: true }));
