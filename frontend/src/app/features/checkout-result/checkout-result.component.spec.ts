@@ -149,6 +149,26 @@ describe('CheckoutResultComponent', () => {
     fixture.destroy();
   });
 
+  it.each([
+    ['IN_MEDIATION', 'Pago en mediación'],
+    ['CHARGEBACK', 'Pago contracargado'],
+  ] as const)('renders %s as a terminal dispute state', async (paymentStatus, message) => {
+    const get = vi.fn(() => of({ ...order, paymentStatus }));
+    await TestBed.configureTestingModule({ imports: [CheckoutResultComponent], providers: [provideRouter([]),
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ orderId: '42' }) } } },
+      { provide: OrderService, useValue: { get } },
+    ] }).compileComponents();
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(CheckoutResultComponent);
+    vi.advanceTimersByTime(10000);
+    fixture.detectChanges();
+
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).toContain(message);
+    expect(fixture.nativeElement.textContent).not.toContain('Todavía no recibimos');
+    fixture.destroy();
+  });
+
   it('renders the sale mascot only for the server-approved payment status', async () => {
     const get = vi.fn(() => of({ ...order, paymentStatus: 'APPROVED' as const }));
     await TestBed.configureTestingModule({

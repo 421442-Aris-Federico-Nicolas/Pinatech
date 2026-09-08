@@ -82,6 +82,32 @@ class RestClientMercadoPagoGatewayTest {
     }
 
     @Test
+    void addsOnlyTheGuestPublicIdToGuestPreferenceBackUrls() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties());
+        UUID attemptId = UUID.randomUUID();
+        UUID guestPublicId = UUID.randomUUID();
+        String expected = "https://store.example/checkout/result?orderId=42&guestOrder=" + guestPublicId;
+        server.expect(requestTo("https://api.mercadopago.com/checkout/preferences"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.back_urls.success").value(expected))
+                .andExpect(jsonPath("$.back_urls.pending").value(expected))
+                .andExpect(jsonPath("$.back_urls.failure").value(expected))
+                .andRespond(withSuccess(
+                        "{\"id\":\"pref-guest\",\"sandbox_init_point\":\"https://sandbox\"}",
+                        MediaType.APPLICATION_JSON));
+
+        gateway.createPreference(new PaymentPreferenceRequest(
+                attemptId, 42L, new BigDecimal("100.00"), "ARS",
+                Instant.parse("2026-08-17T20:00:00Z"),
+                List.of(new PaymentPreferenceRequest.Item("7", "Keyboard", 1, new BigDecimal("100.00"))),
+                guestPublicId));
+
+        server.verify();
+    }
+
+    @Test
     void resolvesThePreferenceFromTheAuthoritativeMerchantOrder() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

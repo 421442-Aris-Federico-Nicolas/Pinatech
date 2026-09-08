@@ -36,8 +36,7 @@ public record SellerOrderSnapshot(
     }
 
     public static SellerOrderSnapshot from(CustomerOrder order, Instant eventDate) {
-        var user = order.getUser();
-        String customerName = (user.getFirstName() + " " + user.getLastName()).trim();
+        var buyer = order.getBuyer();
         return new SellerOrderSnapshot(
                 order.getId(),
                 order.getCreatedAt(),
@@ -51,9 +50,9 @@ public record SellerOrderSnapshot(
                 order.getPaymentSurcharge(),
                 order.getShippingCost(),
                 order.getTotal(),
-                customerName,
-                user.getEmail(),
-                user.getPhone(),
+                buyer.fullName(),
+                buyer.getEmail(),
+                buyer.getPhone(),
                 order.getFulfillmentMethod() == null ? null : order.getFulfillmentMethod().name(),
                 order.getFulfillmentStatus().name(),
                 order.getDeliveryMethod(),

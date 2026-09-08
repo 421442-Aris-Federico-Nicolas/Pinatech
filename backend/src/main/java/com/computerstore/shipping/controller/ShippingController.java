@@ -32,7 +32,8 @@ public class ShippingController {
     }
     @GetMapping("/api/shipping/orders/{orderId}/tracking") @PreAuthorize("hasRole('CUSTOMER')") @Transactional(readOnly = true)
     public ShipmentResponse tracking(@PathVariable Long orderId, @AuthenticationPrincipal AuthenticatedUser auth) {
-        var order = orders.findById(orderId).filter(value -> value.getUser().getId().equals(auth.id()))
+        var order = orders.findById(orderId).filter(value -> value.getUser() != null
+                        && value.getUser().getId().equals(auth.id()))
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
         return response(shipments.findByOrderId(order.getId()).orElseThrow(() -> new ResourceNotFoundException("Shipment not found.")));
     }

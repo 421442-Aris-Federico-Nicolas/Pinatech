@@ -59,6 +59,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/health", "/actuator/health",
                                 "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/checkout/capabilities").permitAll()
+                        .requestMatchers("/api/guest-checkout/**", "/api/guest-orders/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/mercado-pago").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/shipping/webhooks/zipnova/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**").permitAll()
@@ -96,7 +97,9 @@ public class SecurityConfiguration {
             }
         }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Idempotency-Key"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Idempotency-Key",
+                "X-Guest-CSRF", "X-Order-Access-Token"));
+        configuration.setExposedHeaders(List.of("Location", "Retry-After"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

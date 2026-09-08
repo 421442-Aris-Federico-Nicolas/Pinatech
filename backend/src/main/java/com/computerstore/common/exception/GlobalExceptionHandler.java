@@ -97,6 +97,13 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "business-rule-conflict", "Business rule conflict", exception.getMessage(), request);
     }
 
+    @ExceptionHandler(GuestCheckoutAccountRequiredException.class)
+    ProblemDetail handleGuestCheckoutAccountRequired(
+            GuestCheckoutAccountRequiredException exception, HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "guest-checkout-account-required", "Account sign-in required",
+                exception.getMessage(), request);
+    }
+
     @ExceptionHandler(UnauthorizedResourceAccessException.class)
     ProblemDetail handleForbidden(UnauthorizedResourceAccessException exception, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "You cannot access this resource.", request);

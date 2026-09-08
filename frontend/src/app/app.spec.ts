@@ -7,6 +7,7 @@ import { afterEach, vi } from 'vitest';
 import { App } from './app';
 import { routes } from './app.routes';
 import { customerGuard } from './core/guards/customer.guard';
+import { checkoutAudienceGuard } from './core/guards/checkout-audience.guard';
 import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { NotificationService } from './core/notifications/notification.service';
 
@@ -389,9 +390,12 @@ describe('App', () => {
     expect(overlays.children.length).toBe(2);
   });
 
-  it('protects customer order and checkout result routes', () => {
+  it('keeps account orders protected while checkout and its result allow guests', () => {
     expect(routes.find((route) => route.path === 'orders')?.canActivate).toContain(customerGuard);
-    expect(routes.find((route) => route.path === 'checkout/result')?.canActivate).toContain(customerGuard);
+    expect(routes.find((route) => route.path === 'checkout')?.canActivate).toContain(checkoutAudienceGuard);
+    expect(routes.find((route) => route.path === 'checkout/result')?.canActivate).toContain(checkoutAudienceGuard);
+    expect(routes.find((route) => route.path === 'pedido/:publicId')?.canActivate).toContain(checkoutAudienceGuard);
+    expect(routes.find((route) => route.path === 'checkout')?.canActivate).not.toContain(customerGuard);
   });
 
   it('skips focus on initial load, preserves it for query changes and focuses new pages', async () => {

@@ -2,6 +2,7 @@ package com.computerstore.profile.service;
 
 import java.time.Instant;
 import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import com.computerstore.auth.repository.RefreshTokenRepository;
@@ -21,6 +22,7 @@ import com.computerstore.user.domain.UserAddress;
 import com.computerstore.user.repository.UserAccountRepository;
 import com.computerstore.user.repository.UserAddressRepository;
 import com.computerstore.user.service.AccountActionTokenService;
+import com.computerstore.user.service.AccountEmailLockService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,6 +37,7 @@ public class ProfileService {
     private final AccountActionTokenService tokenService;
     private final TransactionalEmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final AccountEmailLockService emailLock;
 
     public ProfileService(
             UserAccountRepository userRepository,
@@ -42,7 +45,8 @@ public class ProfileService {
             RefreshTokenRepository refreshTokenRepository,
             AccountActionTokenService tokenService,
             TransactionalEmailService emailService,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            AccountEmailLockService emailLock
     ) {
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
@@ -50,6 +54,7 @@ public class ProfileService {
         this.tokenService = tokenService;
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
+        this.emailLock = emailLock;
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +102,7 @@ public class ProfileService {
                 .filter(UserAccount::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
         requireCurrentPassword(user, currentPassword);
-        String targetEmail = requestedEmail.trim().toLowerCase();
+        String targetEmail = requestedEmail.trim().toLowerCase(Locale.ROOT);
         if (user.getEmail().equalsIgnoreCase(targetEmail)) {
             throw new InvalidRequestException("The new email must differ from the current email.");
         }
@@ -115,6 +120,7 @@ public class ProfileService {
                 .filter(UserAccount::isActive)
                 .orElseThrow(() -> new InvalidRequestException("The account action token is invalid or expired."));
         String targetEmail = actionToken.getTargetEmail();
+        emailLock.lock(targetEmail);
         userRepository.findByEmailIgnoreCase(targetEmail)
                 .filter(existing -> !existing.getId().equals(user.getId()))
                 .ifPresent(existing -> {

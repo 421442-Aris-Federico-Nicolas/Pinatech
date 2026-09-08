@@ -20,6 +20,7 @@ import com.computerstore.user.domain.UserAccount;
 import com.computerstore.user.repository.UserAccountRepository;
 import com.computerstore.user.repository.UserAddressRepository;
 import com.computerstore.user.service.AccountActionTokenService;
+import com.computerstore.user.service.AccountEmailLockService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,7 @@ class ProfileServiceTest {
     @Mock private AccountActionTokenService tokens;
     @Mock private TransactionalEmailService emails;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AccountEmailLockService emailLock;
     @Mock private AccountActionToken actionToken;
     @Mock private UserAccount tokenUser;
     @Mock private UserAccount user;
@@ -46,7 +48,7 @@ class ProfileServiceTest {
     @BeforeEach
     void setUp() {
         service = new ProfileService(
-                users, addresses, refreshTokens, tokens, emails, passwordEncoder);
+                users, addresses, refreshTokens, tokens, emails, passwordEncoder, emailLock);
     }
 
     @Test
@@ -64,6 +66,7 @@ class ProfileServiceTest {
 
         service.confirmEmailChange("raw-token");
 
+        verify(emailLock).lock("new@example.com");
         verify(user).changeEmail("new@example.com");
         verify(user).markEmailVerified();
         verify(user).incrementSessionVersion();

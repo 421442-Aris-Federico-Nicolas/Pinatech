@@ -59,12 +59,19 @@ public class OrderEmailOutboxService {
         if (!entries.existsByOrderIdAndEventType(order.getId(), event)) enqueue(order, event);
     }
 
+    public void enqueueSellerOrderCreated(CustomerOrder order) {
+        if (sellerRecipient.isEmpty()) return;
+        Instant now = Instant.now(clock);
+        entries.save(new EmailOutboxEntry(order, OrderEmailEventType.SELLER_ORDER_CREATED, sellerRecipient,
+                serialize(SellerOrderSnapshot.from(order, now)), now));
+    }
+
     public void enqueueTracking(CustomerOrder order, ShipmentTrackingSnapshot snapshot, String shipmentKey) {
         if (entries.existsByOrderIdAndEventTypeAndDeduplicationKey(
                 order.getId(), OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE, shipmentKey)) return;
         Instant now = Instant.now(clock);
         entries.save(new EmailOutboxEntry(order, OrderEmailEventType.SHIPMENT_TRACKING_AVAILABLE,
-                order.getUser().getEmail(), serializeTracking(snapshot), shipmentKey, now));
+                order.getBuyer().getEmail(), serializeTracking(snapshot), shipmentKey, now));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -73,7 +80,8 @@ public class OrderEmailOutboxService {
         return entries.findNextDueForUpdate(now).map(entry -> {
             UUID leaseToken = entry.lease(now.plusSeconds(60));
             return new Instruction(entry.getId(), leaseToken, entry.getEventType(), entry.getOrder().getId(),
-                    entry.getRecipient(), entry.getCustomerName(), entry.getRejectionReason(), entry.getSellerPayload());
+                    entry.getOrderPublicId(), entry.isGuestOrder(), entry.getRecipient(), entry.getCustomerName(),
+                    entry.getRejectionReason(), entry.getSellerPayload());
         });
     }
 
@@ -94,7 +102,8 @@ public class OrderEmailOutboxService {
                     throw new IllegalStateException("Customer order email cannot contain a seller snapshot.");
                 }
                 email.sendOrderEvent(instruction.id(), instruction.recipient(), instruction.customerName(),
-                        instruction.eventType(), instruction.orderId(), instruction.rejectionReason());
+                        instruction.eventType(), instruction.orderId(), instruction.orderPublicId(),
+                        instruction.guestOrder(), instruction.rejectionReason());
             }
             completion.success(instruction.id(), instruction.leaseToken());
         } catch (RuntimeException exception) {
@@ -142,6 +151,7 @@ public class OrderEmailOutboxService {
         catch (JsonProcessingException exception) { throw new IllegalStateException("Shipment email snapshot could not be decoded.", exception); }
     }
 
-    public record Instruction(UUID id, UUID leaseToken, OrderEmailEventType eventType, Long orderId, String recipient,
-                                String customerName, String rejectionReason, String sellerPayload) {}
+    public record Instruction(UUID id, UUID leaseToken, OrderEmailEventType eventType, Long orderId,
+                              UUID orderPublicId, boolean guestOrder, String recipient, String customerName,
+                              String rejectionReason, String sellerPayload) {}
 }

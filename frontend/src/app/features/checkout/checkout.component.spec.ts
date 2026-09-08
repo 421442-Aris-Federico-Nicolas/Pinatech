@@ -433,7 +433,7 @@ describe('CheckoutComponent', () => {
   it('does not create an order when Mercado Pago is disabled', async () => {
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
-      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+      checkout: vi.fn(() => of(order)), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],
@@ -539,18 +539,19 @@ describe('CheckoutComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Elegí cómo pagar');
   });
 
-  it('blocks checkout until the customer verifies their email', async () => {
+  it('allows Mercado Pago without a verified account email', async () => {
     authenticatedUser.set({ ...authenticatedUser(), emailVerified: false });
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
-      checkout: vi.fn(() => of(order)), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+      checkout: vi.fn(() => of(order)), completeCheckout: vi.fn(), reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [CheckoutComponent],
       providers: [
         provideRouter([]),
         { provide: CartService, useValue: cart },
-        { provide: CheckoutService, useValue: { capabilities: () => of(capabilities) } },
+        { provide: CheckoutService, useValue: { capabilities: () => of(capabilities), mercadoPago: () => of(payment) } },
+        { provide: CHECKOUT_WINDOW, useValue: { location: { assign: vi.fn() } } },
       ],
     }).compileComponents();
 
@@ -561,18 +562,31 @@ describe('CheckoutComponent', () => {
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
+    expect(cart.checkout).toHaveBeenCalledWith('MERCADO_PAGO', expect.any(Object));
+    expect(fixture.nativeElement.querySelector('.verification-required')).toBeNull();
+    expect(requestEmailVerification).not.toHaveBeenCalled();
+  });
+
+  it('still requires a verified account email for bank transfer', async () => {
+    authenticatedUser.set({ ...authenticatedUser(), emailVerified: false });
+    const cart = {
+      items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
+      checkout: vi.fn(() => of({ ...order, paymentMethod: 'BANK_TRANSFER' as const })),
+      reconcile: vi.fn(() => of(true)), notice: signal(''), dismissNotice: vi.fn(),
+    };
+    await TestBed.configureTestingModule({ imports: [CheckoutComponent], providers: [provideRouter([]),
+      { provide: CartService, useValue: cart },
+      { provide: CheckoutService, useValue: { capabilities: () => of({ ...capabilities, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'] }) } },
+    ] }).compileComponents();
+    const fixture = TestBed.createComponent(CheckoutComponent);
+    fixture.detectChanges();
+    enterPaymentStep(fixture);
+    fixture.componentInstance.selectedPaymentMethod.set('BANK_TRANSFER');
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
     expect(cart.checkout).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Verificá tu email para comprar');
-    expect(fixture.nativeElement.querySelector('.verification-required a')?.getAttribute('href')).toBe('/profile');
-    expect(getComputedStyle(fixture.nativeElement.querySelector('.verification-required')).getPropertyValue('--feedback-actions-column').trim()).toBe('2 / -1');
-    expect(getComputedStyle(fixture.nativeElement.querySelector('.verification-actions')).width).not.toBe('0px');
-    expect((fixture.nativeElement.querySelector('button[aria-label="Pagar con Mercado Pago"]') as HTMLButtonElement).disabled).toBe(true);
-    const resend = [...fixture.nativeElement.querySelectorAll('.verification-required button')]
-      .find((button: HTMLButtonElement) => button.textContent?.includes('Reenviar verificación')) as HTMLButtonElement;
-    resend.click();
-    fixture.detectChanges();
-    expect(requestEmailVerification).toHaveBeenCalledWith('ada@example.com');
-    expect(fixture.nativeElement.textContent).toContain('te enviamos un nuevo enlace');
   });
 
   it('blocks checkout when pickup is not configured', async () => {

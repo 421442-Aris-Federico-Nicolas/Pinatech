@@ -26,10 +26,17 @@ public final class ArgentineProvinceMapper {
             Map.entry("T", "Tucumán"), Map.entry("TUCUMAN", "Tucumán"));
     private ArgentineProvinceMapper() {}
     public static String name(String supplied) {
+        return province(supplied).name();
+    }
+    public static Province province(String supplied) {
         String key = Normalizer.normalize(supplied == null ? "" : supplied.trim().toUpperCase(), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "").replaceFirst("^AR-", "");
         String value = NAMES.get(key);
         if (value == null) throw new InvalidRequestException("The address province is not recognized for Argentina.");
-        return value;
+        String code = NAMES.entrySet().stream().filter(entry -> entry.getValue().equals(value)
+                        && entry.getKey().length() == 1).map(Map.Entry::getKey).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Argentine province code is missing."));
+        return new Province(code, value);
     }
+    public record Province(String code, String name) {}
 }

@@ -12,7 +12,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.computerstore.common.exception.InvalidRequestException;
-import com.computerstore.common.exception.EmailVerificationRequiredException;
 import com.computerstore.common.exception.ReservationExpiredException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.common.exception.BusinessRuleException;
@@ -108,11 +107,22 @@ public class PaymentAttemptTransactionalService {
         String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
         var order = orders.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
+        return prepare(order, idempotencyKey);
+    }
+
+    @Transactional(noRollbackFor = ReservationExpiredException.class)
+    public PaymentPreparation prepareGuest(Long orderId, String suppliedIdempotencyKey) {
+        properties.requireEnabled();
+        String idempotencyKey = normalizeIdempotencyKey(suppliedIdempotencyKey);
+        var order = orders.findByIdForUpdate(orderId).filter(com.computerstore.order.domain.CustomerOrder::isGuest)
+                .orElseThrow(() -> new ResourceNotFoundException("Guest order not found."));
+        return prepare(order, idempotencyKey);
+    }
+
+    private PaymentPreparation prepare(com.computerstore.order.domain.CustomerOrder order, String idempotencyKey) {
+        Long orderId = order.getId();
         Instant now = Instant.now(clock);
 
-        if (!order.getUser().isEmailVerified()) {
-            throw new EmailVerificationRequiredException();
-        }
         if (order.getPaymentMethod() != PaymentMethod.MERCADO_PAGO) {
             throw new InvalidRequestException("Mercado Pago checkout is only available for Mercado Pago orders.");
         }
@@ -422,7 +432,8 @@ public class PaymentAttemptTransactionalService {
         }
         return new PaymentPreferenceRequest(
                 attempt.getPublicId(), attempt.getOrder().getId(), attempt.getAmount(), attempt.getCurrency(),
-                attempt.getExpiresAt(), items);
+                attempt.getExpiresAt(), items,
+                attempt.getOrder().isGuest() ? attempt.getOrder().getPublicId() : null);
     }
 
     private PaymentCheckoutResponse response(PaymentAttempt attempt) {

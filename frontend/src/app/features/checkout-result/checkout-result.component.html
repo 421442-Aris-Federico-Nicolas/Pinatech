@@ -27,6 +27,18 @@
             <p>{{ currentOrder.cancellationReason ? 'El pedido fue cancelado. El reintegro total está en proceso.' : 'El pago llegó después del vencimiento del pedido. Iniciamos la devolución automáticamente.' }}</p>
           </app-feedback>
         }
+        @case ('mediation') {
+          <app-feedback class="state pending" tone="warning" announce="polite">
+            <h1>Pago en mediación</h1>
+            <p>Mercado Pago está revisando un reclamo sobre este pago. No inicies otro intento mientras dure la revisión.</p>
+          </app-feedback>
+        }
+        @case ('chargeback') {
+          <app-feedback class="state rejected" tone="error" announce="polite">
+            <h1>Pago contracargado</h1>
+            <p>El pago fue revertido después de acreditarse. Revisá el pedido o contactanos si necesitás ayuda.</p>
+          </app-feedback>
+        }
         @case ('rejected') {
           <app-feedback class="state rejected" tone="error" announce="polite">
             <h1>Pago rechazado</h1>

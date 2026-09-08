@@ -57,12 +57,20 @@ app:
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
   cookies:
     secure: ${REFRESH_COOKIE_SECURE:false}
+  guest-checkout:
+    cookie-name: ${GUEST_CHECKOUT_COOKIE_NAME:guest_checkout}
+    cookie-secure: ${GUEST_CHECKOUT_COOKIE_SECURE:${REFRESH_COOKIE_SECURE:false}}
+    cookie-same-site: ${GUEST_CHECKOUT_COOKIE_SAME_SITE:Lax}
+    session-ttl: ${GUEST_CHECKOUT_SESSION_TTL:PT24H}
+    challenge-ttl: ${GUEST_CHECKOUT_CHALLENGE_TTL:PT10M}
+    challenge-cooldown: ${GUEST_CHECKOUT_CHALLENGE_COOLDOWN:PT1M}
   auth-rate-limit:
     max-login-attempts: ${AUTH_MAX_LOGIN_ATTEMPTS:5}
     max-registration-attempts: ${AUTH_MAX_REGISTRATION_ATTEMPTS:3}
     max-refresh-attempts: ${AUTH_MAX_REFRESH_ATTEMPTS:20}
     max-account-action-attempts: ${AUTH_MAX_ACCOUNT_ACTION_ATTEMPTS:5}
     window-ms: ${AUTH_RATE_LIMIT_WINDOW_MS:60000}
+    max-buckets: ${AUTH_RATE_LIMIT_MAX_BUCKETS:10000}
   account-tokens:
     email-verification-ttl: ${EMAIL_VERIFICATION_TTL:PT24H}
     password-reset-ttl: ${PASSWORD_RESET_TTL:PT1H}
@@ -93,6 +101,8 @@ app:
       instructions: ${PICKUP_INSTRUCTIONS:}
       hours: ${PICKUP_HOURS:}
   shipping:
+    quote-rate-limit:
+      max-buckets: ${SHIPPING_QUOTE_RATE_LIMIT_MAX_BUCKETS:10000}
     zipnova:
       enabled: ${ZIPNOVA_ENABLED:false}
       production-confirmation: ${ZIPNOVA_PRODUCTION_CONFIRMATION:false}

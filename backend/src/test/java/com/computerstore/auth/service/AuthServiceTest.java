@@ -29,6 +29,7 @@ import com.computerstore.user.domain.RoleName;
 import com.computerstore.user.domain.UserAccount;
 import com.computerstore.user.repository.RoleRepository;
 import com.computerstore.user.repository.UserAccountRepository;
+import com.computerstore.user.service.AccountEmailLockService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,13 +47,14 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private AccountLifecycleService accountLifecycleService;
+    @Mock private AccountEmailLockService emailLock;
 
     private AuthService service;
 
     @BeforeEach
     void setUp() {
         service = new AuthService(users, roles, refreshTokens, passwordEncoder, jwtService,
-                accountLifecycleService, 60_000);
+                accountLifecycleService, emailLock, 60_000);
     }
 
     private void stubJwt() {
@@ -95,6 +97,7 @@ class AuthServiceTest {
         service.register(new RegisterRequest(
                 "Customer", "Example", "customer@example.com", "Password1", null));
 
+        verify(emailLock).lock("customer@example.com");
         ArgumentCaptor<RefreshToken> tokens = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokens, times(2)).save(tokens.capture());
         assertNotEquals(tokens.getAllValues().get(0).getFamilyId(), tokens.getAllValues().get(1).getFamilyId());

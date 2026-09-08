@@ -11,8 +11,14 @@ public record PaymentPreferenceRequest(
         BigDecimal amount,
         String currency,
         Instant expiresAt,
-        List<Item> items
+        List<Item> items,
+        UUID guestOrderPublicId
 ) {
+    public PaymentPreferenceRequest(UUID attemptId, Long orderId, BigDecimal amount, String currency,
+                                    Instant expiresAt, List<Item> items) {
+        this(attemptId, orderId, amount, currency, expiresAt, items, null);
+    }
+
     public record Item(String id, String title, int quantity, BigDecimal unitPrice) {
     }
 }

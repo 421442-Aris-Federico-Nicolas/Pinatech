@@ -1,11 +1,11 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpContext, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { environment } from '../../../environments/environment';
-import { authInterceptor } from './auth.interceptor';
+import { authInterceptor, GUEST_REQUEST } from './auth.interceptor';
 
 describe('authInterceptor', () => {
   let http: HttpClient;
@@ -91,6 +91,17 @@ describe('authInterceptor', () => {
     retry.flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(refreshSession).toHaveBeenCalledOnce();
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(navigation).toBeNull();
+  });
+
+  it('does not refresh or navigate for an expected guest 401', () => {
+    const url = `${environment.apiBaseUrl}/guest-orders/missing`;
+    http.get(url, { context: new HttpContext().set(GUEST_REQUEST, true) }).subscribe({ error: () => undefined });
+
+    httpTesting.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(refreshSession).not.toHaveBeenCalled();
     expect(clearSession).not.toHaveBeenCalled();
     expect(navigation).toBeNull();
   });

@@ -23,6 +23,10 @@ public class EmailOutboxEntry {
     private String recipient;
     @Column(name = "customer_name", nullable = false, length = 200)
     private String customerName;
+    @Column(name = "order_public_id", nullable = false, updatable = false)
+    private UUID orderPublicId;
+    @Column(name = "guest_order", nullable = false, updatable = false)
+    private boolean guestOrder;
     @Column(name = "rejection_reason", length = 1000)
     private String rejectionReason;
     @Column(name = "seller_payload", columnDefinition = "text")
@@ -53,8 +57,10 @@ public class EmailOutboxEntry {
         this.id = UUID.randomUUID();
         this.order = order;
         this.eventType = eventType;
-        this.recipient = order.getUser().getEmail();
-        this.customerName = order.getUser().getFirstName();
+        this.recipient = order.getBuyer().getEmail();
+        this.customerName = order.getBuyer().getFirstName();
+        this.orderPublicId = order.getPublicId();
+        this.guestOrder = order.isGuest();
         this.rejectionReason = reason;
         this.deduplicationKey = "single";
         this.status = EmailOutboxStatus.PENDING;
@@ -68,7 +74,9 @@ public class EmailOutboxEntry {
         this.order = order;
         this.eventType = eventType;
         this.recipient = recipient;
-        this.customerName = order.getUser().getFirstName();
+        this.customerName = order.getBuyer().getFirstName();
+        this.orderPublicId = order.getPublicId();
+        this.guestOrder = order.isGuest();
         this.eventPayload = sellerPayload;
         this.deduplicationKey = "single";
         this.status = EmailOutboxStatus.PENDING;
@@ -115,6 +123,8 @@ public class EmailOutboxEntry {
     public CustomerOrder getOrder() { return order; }
     public String getRecipient() { return recipient; }
     public String getCustomerName() { return customerName; }
+    public UUID getOrderPublicId() { return orderPublicId; }
+    public boolean isGuestOrder() { return guestOrder; }
     public String getRejectionReason() { return rejectionReason; }
     public String getSellerPayload() { return eventPayload; }
     public String getEventPayload() { return eventPayload; }

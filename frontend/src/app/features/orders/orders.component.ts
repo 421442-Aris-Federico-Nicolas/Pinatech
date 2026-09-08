@@ -230,7 +230,7 @@ export class OrdersComponent {
     });
     const allowedType = ['image/jpeg', 'image/png', 'application/pdf'].includes(file.type);
     const allowedExtension = /\.(?:jpe?g|png|pdf)$/i.test(file.name);
-    if (!allowedType && !allowedExtension) {
+    if (!allowedExtension || (file.type !== '' && !allowedType)) {
       this.proofErrors.update((current) => ({ ...current, [orderId]: 'El comprobante debe ser JPEG, PNG o PDF.' }));
       return;
     }

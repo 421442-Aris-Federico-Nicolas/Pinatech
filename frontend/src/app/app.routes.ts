@@ -4,6 +4,7 @@ import { adminGuard } from './core/guards/admin.guard';
 import { technicalGuard } from './core/guards/technical.guard';
 import { customerGuard } from './core/guards/customer.guard';
 import { unsavedAdminGuard } from './core/guards/unsaved-admin.guard';
+import { checkoutAudienceGuard } from './core/guards/checkout-audience.guard';
 
 export const routes: Routes = [
   {
@@ -20,8 +21,9 @@ export const routes: Routes = [
   { path: 'reset-password', title: 'Restablecer contraseña | Pinatech', loadComponent: () => import('./features/account-actions/reset-password.component').then((component) => component.ResetPasswordComponent) },
   { path: 'confirm-email-change', title: 'Confirmar cambio de email | Pinatech', loadComponent: () => import('./features/account-actions/confirm-email-change.component').then((component) => component.ConfirmEmailChangeComponent) },
   { path: 'cart', title: 'Carrito | Pinatech', loadComponent: () => import('./features/cart/cart.component').then((component) => component.CartComponent) },
-  { path: 'checkout', title: 'Finalizar compra | Pinatech', canActivate: [authGuard, customerGuard], loadComponent: () => import('./features/checkout/checkout.component').then((component) => component.CheckoutComponent) },
-  { path: 'checkout/result', title: 'Estado del pago | Pinatech', canActivate: [authGuard, customerGuard], loadComponent: () => import('./features/checkout-result/checkout-result.component').then((component) => component.CheckoutResultComponent) },
+  { path: 'checkout', title: 'Finalizar compra | Pinatech', canActivate: [checkoutAudienceGuard], loadComponent: () => import('./features/checkout/checkout-page.component').then((component) => component.CheckoutPageComponent) },
+  { path: 'checkout/result', title: 'Estado del pago | Pinatech', canActivate: [checkoutAudienceGuard], loadComponent: () => import('./features/checkout-result/checkout-result-page.component').then((component) => component.CheckoutResultPageComponent) },
+  { path: 'pedido/:publicId', title: 'Tu pedido | Pinatech', canActivate: [checkoutAudienceGuard], loadComponent: () => import('./features/guest-order/guest-order.component').then((component) => component.GuestOrderComponent) },
   { path: 'orders', title: 'Mis pedidos', canActivate: [authGuard, customerGuard], loadComponent: () => import('./features/orders/orders.component').then((component) => component.OrdersComponent) },
   { path: 'tickets', title: 'Servicio técnico', canActivate: [authGuard], loadComponent: () => import('./features/tickets/tickets.component').then((component) => component.TicketsComponent) },
   { path: 'technical', title: 'Panel técnico', canActivate: [authGuard, technicalGuard], loadComponent: () => import('./features/technical/technical.component').then((component) => component.TechnicalComponent) },

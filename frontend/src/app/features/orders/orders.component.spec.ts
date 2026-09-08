@@ -236,6 +236,12 @@ describe('OrdersComponent', () => {
     expect(fixture.componentInstance.proofErrors()[42]).toContain('JPEG, PNG o PDF');
 
     const valid = new File(['proof'], 'proof.pdf', { type: 'application/pdf' });
+    const validWithoutMime = new File(['proof'], 'scan.pdf', { type: '' });
+    fixture.componentInstance.selectProof(42, { target: { files: [validWithoutMime], value: 'scan.pdf' } } as unknown as Event);
+    expect(fixture.componentInstance.selectedProofs()[42]).toBe(validWithoutMime);
+    const mismatchedMime = new File(['proof'], 'scan.pdf', { type: 'text/plain' });
+    fixture.componentInstance.selectProof(42, { target: { files: [mismatchedMime], value: 'scan.pdf' } } as unknown as Event);
+    expect(fixture.componentInstance.selectedProofs()[42]).toBeUndefined();
     fixture.componentInstance.selectProof(42, { target: { files: [valid], value: 'proof.pdf' } } as unknown as Event);
     const invalidAfterValid = new File(['x'], 'proof.txt', { type: 'text/plain' });
     fixture.componentInstance.selectProof(42, { target: { files: [invalidAfterValid], value: 'proof.txt' } } as unknown as Event);

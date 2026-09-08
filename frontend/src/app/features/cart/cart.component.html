@@ -41,11 +41,9 @@
           <button appButton="filled" type="button" disabled aria-busy="true">Verificando disponibilidad…</button>
         } @else if (reconcileError()) {
           <button appButton="filled" type="button" disabled>Verificá la disponibilidad para continuar</button>
-        } @else if (auth.isAuthenticated()) {
-           <a appButton="filled" routerLink="/checkout" [queryParams]="checkoutQueryParams">Revisar pedido y pago</a>
         } @else {
-           <a appButton="filled" routerLink="/login" [queryParams]="{ returnUrl: checkoutReturnUrl }" aria-label="Ingresar para continuar al checkout">Ingresar para continuar</a>
-          <small>Tu carrito se conservará al iniciar sesión.</small>
+           <a appButton="filled" routerLink="/checkout" [queryParams]="checkoutQueryParams">Revisar pedido y pago</a>
+          @if (!auth.isAuthenticated()) { <small>Podés comprar como invitado. <a routerLink="/login" [queryParams]="{ returnUrl: checkoutReturnUrl }">Ingresar</a> o <a routerLink="/register" [queryParams]="{ returnUrl: checkoutReturnUrl }">crear una cuenta</a> son opcionales.</small> }
         }
       </aside>
     </div>

@@ -1,6 +1,7 @@
 package com.computerstore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +19,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
+import com.computerstore.guest.domain.GuestCheckoutSession;
+import com.computerstore.guest.repository.GuestCheckoutSessionRepository;
+import com.computerstore.guest.service.GuestChallengeAttemptService;
+import com.computerstore.user.service.AccountEmailLockService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.time.Instant;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -24,6 +36,11 @@ class DatabaseMigrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired private GuestCheckoutSessionRepository guestSessions;
+    @Autowired private GuestChallengeAttemptService guestChallengeAttempts;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private AccountEmailLockService accountEmailLock;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
     void appliesAllMigrationsAndValidatesJpaMappings() {
@@ -263,9 +280,27 @@ class DatabaseMigrationTest {
                 JOIN categories category ON category.id = selected.category_id
                 WHERE section.title = 'Potencia para tu equipo' AND category.slug = 'perifericos'
                 """, Integer.class));
-        assertEquals("30", jdbc.queryForObject(
+        assertEquals("31", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'guest_checkout_sessions'
+                """, Integer.class));
+        assertEquals("YES", jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'customer_orders' AND column_name = 'user_id'
+                """, String.class));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'customer_orders'
+                  AND indexname IN ('uq_customer_orders_guest_idempotency_key',
+                                    'uq_customer_orders_one_pending_per_guest')
+                """, Integer.class));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'email_outbox'
+                  AND column_name IN ('order_public_id', 'guest_order') AND is_nullable = 'NO'
+                """, Integer.class));
     }
 
     @Test
@@ -407,6 +442,72 @@ class DatabaseMigrationTest {
         }
     }
 
+    @Test
+    void snapshotsRegisteredBuyersAndPreventsIdentityChanges() {
+        String email = "snapshot-" + UUID.randomUUID() + "@example.com";
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash, phone, document_number)
+                VALUES ('Snapshot', 'Buyer', ?, 'hash', '3515550101', '12345678') RETURNING id
+                """, Long.class, email);
+        Long orderId = null;
+        try {
+            orderId = jdbc.queryForObject("""
+                    INSERT INTO customer_orders (
+                        user_id, status, subtotal, total, reservation_expires_at,
+                        currency, payment_status, fulfillment_status, payment_method
+                    ) VALUES (?, 'PENDING_PAYMENT', 100, 100, CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+                              'ARS', 'PENDING', 'PENDING', 'MERCADO_PAGO') RETURNING id
+                    """, Long.class, userId);
+            assertEquals(email, jdbc.queryForObject(
+                    "SELECT buyer_email FROM customer_orders WHERE id = ?", String.class, orderId));
+            assertEquals("12345678", jdbc.queryForObject(
+                    "SELECT buyer_document_number FROM customer_orders WHERE id = ?", String.class, orderId));
+            Long immutableOrderId = orderId;
+            assertThrows(DataAccessException.class, () -> jdbc.update(
+                    "UPDATE customer_orders SET buyer_email = 'changed@example.com' WHERE id = ?", immutableOrderId));
+        } finally {
+            if (orderId != null) jdbc.update("DELETE FROM customer_orders WHERE id = ?", orderId);
+            jdbc.update("DELETE FROM users WHERE id = ?", userId);
+        }
+    }
+
+    @Test
+    void persistsAndLocksGuestChallengeAfterFiveFailures() {
+        Instant now = Instant.now();
+        GuestCheckoutSession session = new GuestCheckoutSession(
+                UUID.randomUUID().toString().replace("-", "").repeat(2), "b".repeat(64), now, now.plusSeconds(3600));
+        session.startChallenge("challenge@example.com", passwordEncoder.encode("123456"), now, now.plusSeconds(600));
+        guestSessions.save(session);
+        try {
+            for (int attempt = 1; attempt <= 5; attempt++) {
+                assertTrue(!guestChallengeAttempts.verify(
+                        session.getTokenHash(), "challenge@example.com", "000000").valid());
+                GuestCheckoutSession persisted = guestSessions.findById(session.getId()).orElseThrow();
+                assertEquals(attempt, persisted.getChallengeAttempts());
+            }
+            assertNull(guestSessions.findById(session.getId()).orElseThrow().getChallengeHash());
+        } finally {
+            guestSessions.deleteById(session.getId());
+        }
+    }
+
+    @Test
+    void allowsOnlyOnePendingOrderPerGuestAtDatabaseLevel() {
+        UUID sessionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO guest_checkout_sessions (id, token_hash, csrf_hash, created_at, expires_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+                """, sessionId, "c".repeat(64), "d".repeat(64));
+        Long firstOrderId = null;
+        try {
+            firstOrderId = insertGuestPendingOrder(sessionId, "first");
+            assertThrows(DataIntegrityViolationException.class, () -> insertGuestPendingOrder(sessionId, "second"));
+        } finally {
+            jdbc.update("DELETE FROM customer_orders WHERE guest_session_id = ?", sessionId);
+            jdbc.update("DELETE FROM guest_checkout_sessions WHERE id = ?", sessionId);
+        }
+    }
+
     private Long insertAttempt(Long orderId, String key) {
         return jdbc.queryForObject("""
                 INSERT INTO payment_attempts (
@@ -415,5 +516,56 @@ class DatabaseMigrationTest {
                 ) VALUES (?, ?, 'MERCADO_PAGO', 'CREATED', ?, 100, 'ARS',
                           CURRENT_TIMESTAMP + INTERVAL '10 minutes') RETURNING id
                 """, Long.class, UUID.randomUUID(), orderId, key);
+    }
+
+    private Long insertGuestPendingOrder(UUID sessionId, String key) {
+        return jdbc.queryForObject("""
+                INSERT INTO customer_orders (
+                    guest_session_id, guest_access_token_hash, buyer_first_name, buyer_last_name, buyer_email,
+                    buyer_phone, buyer_document_number, status, subtotal, total, reservation_expires_at,
+                    currency, payment_status, fulfillment_status, payment_method, idempotency_key, request_hash
+                ) VALUES (?, ?, 'Guest', 'Buyer', 'guest@example.com', '3515550101', '12345678',
+                    'PENDING_PAYMENT', 100, 100, CURRENT_TIMESTAMP + INTERVAL '10 minutes', 'ARS',
+                    'PENDING', 'PENDING', 'MERCADO_PAGO', ?, ?)
+                RETURNING id
+                """, Long.class, sessionId, "e".repeat(64), key, "f".repeat(64));
+    }
+
+    @Test
+    void accountEmailLockSerializesConcurrentIdentityDecisions() throws Exception {
+        TransactionTemplate transactions = new TransactionTemplate(transactionManager);
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> transactions.executeWithoutResult(status -> {
+                accountEmailLock.lock("ada@example.com");
+                firstLocked.countDown();
+                await(releaseFirst);
+            }));
+            assertTrue(firstLocked.await(5, TimeUnit.SECONDS));
+            var second = executor.submit(() -> transactions.executeWithoutResult(status -> {
+                secondStarted.countDown();
+                accountEmailLock.lock("ada@example.com");
+            }));
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+
+            Thread.sleep(200);
+            assertFalse(second.isDone());
+            releaseFirst.countDown();
+            first.get(5, TimeUnit.SECONDS);
+            second.get(5, TimeUnit.SECONDS);
+        } finally {
+            releaseFirst.countDown();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
     }
 }

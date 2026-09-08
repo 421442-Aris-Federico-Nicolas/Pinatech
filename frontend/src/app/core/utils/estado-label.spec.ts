@@ -24,4 +24,11 @@ describe('estadoLabel', () => {
     expect(estadoLabel('in_transit', 'envio')).toBe('En tránsito');
     expect(estadoTono('INCIDENT', 'envio')).toBe('warning');
   });
+
+  it('labels payment disputes with terminal customer-facing tones', () => {
+    expect(estadoLabel('IN_MEDIATION', 'pago')).toBe('Pago en mediación');
+    expect(estadoTono('IN_MEDIATION', 'pago')).toBe('warning');
+    expect(estadoLabel('CHARGEBACK', 'pago')).toBe('Pago contracargado');
+    expect(estadoTono('CHARGEBACK', 'pago')).toBe('danger');
+  });
 });

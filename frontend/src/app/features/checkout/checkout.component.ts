@@ -311,7 +311,7 @@ export class CheckoutComponent {
     return this.selectedPaymentEnabled(capabilities)
       && this.fulfillmentEnabled(capabilities)
       && this.documentNumberPresent()
-      && this.emailVerified();
+      && (this.selectedPaymentMethod() === 'MERCADO_PAGO' || this.emailVerified());
   }
 
   dismissConfirmation(): void {

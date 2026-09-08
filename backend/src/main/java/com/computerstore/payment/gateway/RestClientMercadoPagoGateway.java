@@ -43,6 +43,9 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
     public PaymentPreference createPreference(PaymentPreferenceRequest request) {
         properties.requireEnabled();
         String resultPath = "/checkout/result?orderId=" + request.orderId();
+        if (request.guestOrderPublicId() != null) {
+            resultPath += "&guestOrder=" + request.guestOrderPublicId();
+        }
         List<Map<String, Object>> items = request.items().stream()
                 .map(item -> Map.<String, Object>of(
                         "id", item.id(),

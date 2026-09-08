@@ -1,0 +1,104 @@
+<main>
+  @if (cart.notice()) { <app-feedback class="page-feedback" tone="warning" announce="polite">{{ cart.notice() }}<button feedback-actions appButton="text" type="button" (click)="cart.dismissNotice()">Cerrar aviso</button></app-feedback> }
+  @if (!cart.items().length) {
+    <section appCard class="empty" aria-labelledby="guest-empty-title"><p class="eyebrow">Checkout invitado</p><h1 id="guest-empty-title">Tu carrito está vacío</h1><p>Agregá productos desde el catálogo para comenzar un pedido.</p><a appButton="filled" routerLink="/catalog">Ver catálogo</a></section>
+  } @else {
+    <header class="page-header">
+      <div><p class="eyebrow">Checkout invitado</p><h1>{{ checkoutStep() === 'SHIPPING' ? 'Datos y entrega' : 'Elegí cómo pagar' }}</h1><p>Comprá sin crear una cuenta. Solo pedimos los datos necesarios para preparar y entregar tu pedido.</p></div>
+      <a appButton="text" routerLink="/cart">Editar carrito</a>
+    </header>
+
+    <nav class="checkout-steps" aria-label="Progreso del checkout">
+      <button type="button" [class.active]="checkoutStep() === 'SHIPPING'" [attr.aria-current]="checkoutStep() === 'SHIPPING' ? 'step' : null" (click)="returnToShipping()"><span>1</span><span><strong>Datos y entrega</strong><small>Contacto, retiro o envío</small></span></button>
+      <button type="button" [class.active]="checkoutStep() === 'PAYMENT'" [attr.aria-current]="checkoutStep() === 'PAYMENT' ? 'step' : null" [disabled]="!fulfillmentEnabled()" (click)="continueToPayment()"><span>2</span><span><strong>Pago</strong><small>Elegí cómo pagar</small></span></button>
+    </nav>
+    <p class="visually-hidden" role="status" aria-live="polite">{{ stepAnnouncement() }}</p>
+
+    <div class="checkout-layout" [attr.aria-busy]="loadingSession() || reconciling() || loadingCapabilities() || checkingEligibility() || submitting()">
+      <div class="details">
+        @if (checkoutStep() === 'SHIPPING') {
+          <section appCard class="panel products" aria-labelledby="guest-products-title">
+            <div class="section-heading section-heading--plain"><div><p>Tu carrito</p><h2 id="guest-products-title">Productos</h2></div></div>
+            <ul class="product-list">@for (item of cart.items(); track item.variant.id; let first = $first) { <li><article>@if (item.product.images[0]; as image) { <img class="product-image" [src]="imageUrl(image.contentUrl)" [alt]="image.altText || item.product.name" width="46" height="46" [attr.loading]="first ? 'eager' : 'lazy'"> } @else { <span class="product-mark" aria-hidden="true">PIN</span> }<span class="product-details"><strong>{{ item.product.name }}</strong><small><span translate="no">{{ item.product.brandName }}</span>@if (hasVisibleColorVariants(item.product.variants)) { · {{ item.variant.colorName }} } · Cantidad: {{ item.quantity }}</small></span><b>{{ item.product.price * item.quantity | currency:'ARS':'symbol-narrow':'1.2-2' }} lista</b></article></li> }</ul>
+          </section>
+
+          <section appCard class="panel" aria-labelledby="customer-title">
+            <div class="section-heading"><span>01</span><div><p>Contacto</p><h2 id="customer-title" tabindex="-1">Tus datos</h2></div></div>
+            <form class="guest-form" [formGroup]="form.controls.customer" novalidate>
+              <app-input label="Nombre" name="firstName" formControlName="firstName" autocomplete="given-name" [maxLength]="100" required [error]="form.controls.customer.controls.firstName.touched && form.controls.customer.controls.firstName.invalid ? 'Ingresá un nombre válido.' : ''" />
+              <app-input label="Apellido" name="lastName" formControlName="lastName" autocomplete="family-name" [maxLength]="100" required [error]="form.controls.customer.controls.lastName.touched && form.controls.customer.controls.lastName.invalid ? 'Ingresá un apellido válido.' : ''" />
+              <app-input class="wide-field" label="Email" type="email" name="email" formControlName="email" autocomplete="email" inputMode="email" [maxLength]="254" required hint="Usaremos este email para informarte el estado del pedido." [error]="form.controls.customer.controls.email.touched && form.controls.customer.controls.email.invalid ? 'Ingresá un email válido.' : ''" />
+              <app-input label="Teléfono" type="tel" name="phone" formControlName="phone" autocomplete="tel" inputMode="tel" [maxLength]="50" required [error]="form.controls.customer.controls.phone.touched && form.controls.customer.controls.phone.invalid ? 'Ingresá al menos 6 dígitos.' : ''" />
+              <app-input label="DNI o CUIT" name="documentNumber" formControlName="documentNumber" autocomplete="off" inputMode="numeric" [maxLength]="50" required [error]="form.controls.customer.controls.documentNumber.touched && form.controls.customer.controls.documentNumber.invalid ? 'Ingresá entre 6 y 11 dígitos.' : ''" />
+            </form>
+            <p class="account-alternatives">¿Preferís usar una cuenta? <a routerLink="/login" [queryParams]="{ returnUrl: '/checkout' }">Ingresá</a> o <a routerLink="/register" [queryParams]="{ email: form.controls.customer.controls.email.value, returnUrl: '/checkout' }">creá una cuenta</a>. No es obligatorio para comprar.</p>
+          </section>
+
+          <section appCard class="panel" aria-labelledby="guest-fulfillment-title">
+            <div class="section-heading"><span>02</span><div><p>Método de entrega</p><h2 id="guest-fulfillment-title" tabindex="-1">¿Cómo querés recibirlo?</h2></div></div>
+            @if (reconciling() || loadingCapabilities()) { <p class="loading" role="status">Consultando opciones de entrega…</p> }
+            @else if (capabilities(); as options) {
+              <fieldset class="delivery-options" [disabled]="submitting() || checkingEligibility()"><legend>Opciones disponibles</legend>
+                @if (pickupEnabled(options)) { @for (location of options.pickupLocations; track location.code) {
+                  <div class="choice-card" [class.selected]="selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code">
+                    <label class="choice-main"><input type="radio" name="deliveryOption" [value]="location.code" [checked]="selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code" (change)="selectPickup($event)"><span><strong>Retiro en el local</strong><small>{{ location.name }} · Sin costo</small></span></label>
+                    @if (selectedFulfillmentMethod() === 'PICKUP' && selectedPickupCode() === location.code) { <div class="choice-reveal"><address>@for (line of location.addressLines; track $index) { <span>{{ line }}</span> }<span>{{ location.locality }}, {{ location.provinceCode }} · CP {{ location.postalCode }}</span></address><p><strong>Horarios:</strong> {{ location.hours }}</p><p><strong>Indicaciones:</strong> {{ location.instructions }}</p><label class="pickup-consent"><input type="checkbox" [checked]="pickupAccepted()" (change)="setPickupAccepted($event)"><span>Entiendo que debo retirar en Córdoba</span></label></div> }
+                  </div>
+                } }
+                @if (deliveryEnabled(options)) {
+                  <div class="choice-card" [class.selected]="selectedFulfillmentMethod() === 'DELIVERY'"><label class="choice-main"><input type="radio" name="deliveryOption" value="DELIVERY" [checked]="selectedFulfillmentMethod() === 'DELIVERY'" (change)="selectDelivery()"><span><strong>Entrega a domicilio</strong><small>Calculamos opciones para tu dirección</small></span></label></div>
+                }
+              </fieldset>
+              @if (selectedFulfillmentMethod() === 'DELIVERY') {
+                <form class="guest-form address-form" [formGroup]="form.controls.address" novalidate aria-labelledby="address-title">
+                  <h3 id="address-title">Dirección de entrega</h3>
+                  <app-input class="wide-field" label="Calle" name="street" formControlName="street" autocomplete="address-line1" [maxLength]="150" required [error]="form.controls.address.controls.street.touched && form.controls.address.controls.street.invalid ? 'Ingresá la calle.' : ''" />
+                  <app-input label="Número" name="streetNumber" formControlName="streetNumber" autocomplete="address-line2" [maxLength]="30" required [error]="form.controls.address.controls.streetNumber.touched && form.controls.address.controls.streetNumber.invalid ? 'Ingresá la altura.' : ''" />
+                  <app-input label="Piso / departamento (opcional)" name="floorApartment" formControlName="floorApartment" autocomplete="address-line3" [maxLength]="50" [error]="form.controls.address.controls.floorApartment.touched && form.controls.address.controls.floorApartment.invalid ? 'Usá hasta 50 caracteres.' : ''" />
+                  <app-input label="Localidad" name="locality" formControlName="locality" autocomplete="address-level2" [maxLength]="120" required [error]="form.controls.address.controls.locality.touched && form.controls.address.controls.locality.invalid ? 'Ingresá la localidad.' : ''" />
+                  <app-select label="Provincia" name="province" formControlName="province" placeholder="Elegí una provincia" [options]="provinces" required [error]="form.controls.address.controls.province.touched && form.controls.address.controls.province.invalid ? 'Elegí una provincia argentina.' : ''" />
+                  <app-input label="Código postal" name="postalCode" formControlName="postalCode" autocomplete="postal-code" [maxLength]="12" required [error]="form.controls.address.controls.postalCode.touched && form.controls.address.controls.postalCode.invalid ? 'Ingresá un código postal válido.' : ''" />
+                  <app-input class="wide-field" label="Referencia (opcional)" name="reference" formControlName="reference" autocomplete="off" [maxLength]="300" [error]="form.controls.address.controls.reference.touched && form.controls.address.controls.reference.invalid ? 'Usá hasta 300 caracteres.' : ''" />
+                  <p class="country"><strong>País:</strong> Argentina (AR)</p>
+                </form>
+                <button class="quote-button" appButton="outlined" type="button" (click)="loadShippingQuotes()" [disabled]="loadingQuotes() || loadingSession() || accountRequired()">{{ loadingQuotes() ? 'Calculando envío…' : shippingQuotes().length ? 'Calcular nuevamente' : 'Calcular envío' }}</button>
+                @if (quoteError()) { <app-feedback class="quote-feedback" tone="warning" announce="polite">{{ quoteError() }}</app-feedback> }
+                @if (shippingQuotes().length && !quoteExpired()) { <fieldset class="quote-options"><legend>Opciones de envío</legend>@for (quote of shippingQuotes(); track quote.shippingQuoteId) { <label class="quote-card" [class.selected]="selectedShippingQuoteId() === quote.shippingQuoteId"><input type="radio" name="shippingQuote" [value]="quote.shippingQuoteId" [checked]="selectedShippingQuoteId() === quote.shippingQuoteId" (change)="selectShippingQuote($event)"><span><strong>{{ quote.carrier }} · {{ quote.service }}</strong><small>@if (quote.estimatedDeliveryAt) { Entrega estimada: {{ quote.estimatedDeliveryAt | date:'mediumDate' }} · }Válida hasta {{ quote.expiresAt | date:'shortTime' }}</small></span><b>{{ quote.amount | currency:quote.currency:'symbol-narrow':'1.2-2' }}</b></label> }</fieldset> }
+              }
+            }
+          </section>
+        } @else {
+          <section appCard class="panel payment-panel" aria-labelledby="guest-payment-title">
+            <div class="section-heading"><span>03</span><div><p>Método de pago</p><h2 id="guest-payment-title" tabindex="-1">¿Cómo querés pagar?</h2></div></div>
+            @if (capabilities(); as options) { <fieldset class="payment-methods" [disabled]="submitting() || accountRequired()"><legend>Opciones disponibles</legend>
+              @if (bankTransferEnabled(options)) { <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'BANK_TRANSFER'"><input type="radio" name="paymentMethod" value="BANK_TRANSFER" [checked]="selectedPaymentMethod() === 'BANK_TRANSFER'" (change)="selectPaymentMethod($event)"><span class="payment-brand">−{{ options.bankTransferDiscountRate | percent:'1.0-0' }}</span><span><strong>Transferencia bancaria</strong><small>{{ transferPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · requiere confirmar tu email</small></span></label> }
+              @if (mercadoPagoEnabled(options)) { <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'MERCADO_PAGO'"><input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="selectedPaymentMethod() === 'MERCADO_PAGO'" (change)="selectPaymentMethod($event)"><span class="payment-brand"><img src="/mercadopago-logo.png" alt="" width="84" height="46"></span><span><strong translate="no">Mercado Pago</strong><small>{{ mercadoPagoPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · no requiere verificar el email</small></span></label> }
+            </fieldset> }
+            @if (selectedPaymentMethod() === 'BANK_TRANSFER') {
+              <section class="guest-verification" aria-labelledby="verification-title"><h3 id="verification-title">Confirmá tu email</h3>
+                @if (guestEmailVerified()) { <app-feedback tone="success" announce="polite">Email confirmado para esta compra.</app-feedback> }
+                @else { <p id="guest-code-help">Enviaremos un código de 6 dígitos a <strong>{{ form.controls.customer.controls.email.value || 'tu email' }}</strong>. Si cambiás el email, tendrás que confirmarlo nuevamente.</p><button appButton="outlined" type="button" (click)="requestVerification()" [disabled]="requestingCode() || loadingSession() || accountRequired()">{{ requestingCode() ? 'Enviando código…' : 'Enviar código' }}</button><div class="code-row"><label for="guest-code">Código de 6 dígitos</label><input id="guest-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" [value]="verificationCode()" (input)="updateVerificationCode($event)" [attr.aria-invalid]="verificationError() ? 'true' : null" [attr.aria-describedby]="verificationDescriptionIds()"><button appButton="filled" type="button" (click)="confirmVerification()" [disabled]="confirmingCode() || verificationCode().length !== 6 || accountRequired()">{{ confirmingCode() ? 'Confirmando…' : 'Confirmar código' }}</button></div> }
+                @if (verificationNotice()) { <p id="guest-code-notice" class="verification-notice" role="status">{{ verificationNotice() }}</p> }
+                @if (verificationError()) { <p id="guest-code-error" class="field-error" role="alert">{{ verificationError() }}</p> }
+              </section>
+            }
+            <button class="step-back" appButton="text" type="button" (click)="returnToShipping()" [disabled]="submitting()">Volver a entrega</button>
+          </section>
+        }
+      </div>
+
+      <aside appCard class="summary" aria-labelledby="guest-summary-title"><p class="eyebrow">Resumen</p><h2 id="guest-summary-title">Tu pedido</h2>
+        <div><span>Productos</span><strong>{{ selectedPricing().subtotal | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+        <div><span>Entrega</span><strong>{{ selectedFulfillmentMethod() === 'DELIVERY' ? (selectedShippingCost() | currency:'ARS':'symbol-narrow':'1.2-2') : selectedFulfillmentMethod() === 'PICKUP' ? 'Sin costo' : 'A definir' }}</strong></div>
+        @if (selectedPaymentMethod() === 'BANK_TRANSFER') { <div class="discount"><span>Descuento por transferencia</span><strong>− {{ selectedPricing().discount | currency:'ARS':'symbol-narrow':'1.2-2' }}</strong></div> }
+        <div class="total"><span>Total</span><strong>{{ selectedTotal() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+        @if (sessionError()) { <app-feedback class="summary-feedback" tone="error" announce="assertive">{{ sessionError() }}<button feedback-actions appButton="outlined" type="button" (click)="initializeSession()" [disabled]="loadingSession()">Reintentar</button></app-feedback> }
+        @if (reconciliationError()) { <app-feedback class="summary-feedback" tone="error" announce="assertive">{{ reconciliationError() }}<button feedback-actions appButton="outlined" type="button" (click)="reconcileCheckout()">Reintentar</button></app-feedback> }
+        @if (capabilitiesError()) { <app-feedback class="summary-feedback" tone="error" announce="assertive">{{ capabilitiesError() }}<button feedback-actions appButton="outlined" type="button" (click)="loadCapabilities()">Reintentar</button></app-feedback> }
+        @if (checkoutStep() === 'SHIPPING') { <button appButton="filled" type="button" (click)="continueToPayment()" [disabled]="loadingSession() || reconciling() || loadingCapabilities() || checkingEligibility() || accountRequired() || !fulfillmentEnabled()">{{ checkingEligibility() ? 'Verificando email…' : 'Continuar al pago' }}</button><small>Completá tus datos y elegí una opción de entrega.</small> }
+        @else { <button appButton="filled" type="button" (click)="submit()" [disabled]="submitting() || !canSubmit()" [attr.aria-busy]="submitting()">{{ submitting() ? 'Registrando pedido…' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Pagar con Mercado Pago' : 'Crear pedido por transferencia' }}</button><small>El estado del pago siempre se confirma con nuestro servidor.</small> }
+        @if (submitError()) { <app-feedback id="guest-account-required" class="summary-feedback" tone="error" announce="assertive" tabindex="-1">{{ submitError() }}@if (accountRequired()) { <a feedback-actions appButton="text" routerLink="/login" [queryParams]="{ returnUrl: '/checkout' }">Iniciar sesión y volver al checkout</a> } @else if (createdPublicId(); as publicId) { <a feedback-actions appButton="text" [routerLink]="['/pedido', publicId]">Abrir pedido</a> } @else if (!guest.session()) { <button feedback-actions appButton="text" type="button" (click)="initializeSession()">Actualizar sesión</button> }</app-feedback> }
+      </aside>
+    </div>
+  }
+</main>

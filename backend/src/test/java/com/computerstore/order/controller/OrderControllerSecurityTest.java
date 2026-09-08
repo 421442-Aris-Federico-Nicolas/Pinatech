@@ -85,7 +85,7 @@ class OrderControllerSecurityTest {
     }
 
     @Test
-    void checkoutReturnsAStableProblemWhenEmailIsNotVerified() throws Exception {
+    void mercadoPagoCheckoutDoesNotRejectAnUnverifiedEmailBeforeProfileValidation() throws Exception {
         UserAccount account = org.mockito.Mockito.mock(UserAccount.class);
         when(account.isActive()).thenReturn(true);
         when(account.isEmailVerified()).thenReturn(false);
@@ -99,10 +99,8 @@ class OrderControllerSecurityTest {
                                  "fulfillmentMethod":"PICKUP","pickupLocationCode":"CORDOBA-CENTRO",
                                  "pickupLocationVersion":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                                 """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.type").value(
-                        "https://computer-store.dev/errors/email-verification-required"))
-                .andExpect(jsonPath("$.title").value("Email verification required"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://computer-store.dev/errors/invalid-request"));
     }
 
     private AuthenticatedUser principal(String role) {

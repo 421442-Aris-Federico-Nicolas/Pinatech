@@ -15,6 +15,10 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     boolean existsByEmailIgnoreCase(String email);
 
+    @Query(value = "select 1 from pg_advisory_xact_lock(hashtextextended(concat('account-email:', :normalizedEmail), 0))",
+            nativeQuery = true)
+    Integer lockNormalizedEmail(@Param("normalizedEmail") String normalizedEmail);
+
     Optional<UserAccount> findByIdAndActiveTrue(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

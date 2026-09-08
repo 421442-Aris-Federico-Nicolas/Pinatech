@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.computerstore.order.domain.CustomerOrder;
 import com.computerstore.shipping.gateway.ZipnovaGateway;
 import com.computerstore.user.domain.UserAccount;
+import com.computerstore.guest.domain.GuestCheckoutSession;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -16,7 +17,8 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "shipping_quotes")
 public class ShippingQuote {
     @Id private UUID id;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id") private UserAccount user;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id") private UserAccount user;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "guest_session_id") private GuestCheckoutSession guestSession;
     @Column(name = "cart_hash", nullable = false, length = 64) private String cartHash;
     @Column(name = "profile_hash", nullable = false, length = 64) private String profileHash;
     @Column(name = "carrier_id", nullable = false) private long carrierId;
@@ -44,9 +46,20 @@ public class ShippingQuote {
         this.createdAt = createdAt; this.expiresAt = expiresAt;
     }
 
+    public ShippingQuote(GuestCheckoutSession guestSession, String cartHash, String profileHash,
+                         ZipnovaGateway.QuoteOption option, String tags, Instant createdAt, Instant expiresAt) {
+        this.id = UUID.randomUUID(); this.guestSession = guestSession; this.cartHash = cartHash;
+        this.profileHash = profileHash; this.carrierId = option.carrierId(); this.carrierName = option.carrierName();
+        this.serviceCode = option.serviceCode(); this.serviceName = option.serviceName();
+        this.logisticType = option.logisticType(); this.amount = option.priceInclTax(); this.currency = "ARS";
+        this.estimatedDeliveryAt = option.estimatedDelivery(); this.tags = tags;
+        this.createdAt = createdAt; this.expiresAt = expiresAt;
+    }
+
     public void consume(CustomerOrder order) { this.consumedOrder = order; }
     public UUID getId() { return id; }
     public UserAccount getUser() { return user; }
+    public GuestCheckoutSession getGuestSession() { return guestSession; }
     public String getCartHash() { return cartHash; }
     public String getProfileHash() { return profileHash; }
     public long getCarrierId() { return carrierId; }
