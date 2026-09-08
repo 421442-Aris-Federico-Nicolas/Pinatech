@@ -5,12 +5,18 @@ import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.inventory.domain.InventoryMovement;
 import com.computerstore.inventory.dto.InventoryAdjustmentRequest;
 import com.computerstore.inventory.dto.InventoryResponse;
+import com.computerstore.inventory.dto.InventoryPageResponse;
+import com.computerstore.inventory.dto.InventorySummaryResponse;
 import com.computerstore.inventory.repository.InventoryMovementRepository;
 import com.computerstore.inventory.repository.InventoryRepository;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.user.repository.UserAccountRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
@@ -55,6 +62,27 @@ public class InventoryController {
     @Transactional(readOnly = true)
     public List<InventoryResponse> list() {
         return repository.findAllActive().stream().map(this::toResponse).toList();
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('ADMIN','TECHNICIAN')")
+    @Transactional(readOnly = true)
+    public Page<InventoryPageResponse> page(
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid page or size (1-100).");
+        }
+        return repository.findActivePage(search.trim(), PageRequest.of(page, size))
+                .map(InventoryPageResponse::from);
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ADMIN','TECHNICIAN')")
+    @Transactional(readOnly = true)
+    public InventorySummaryResponse summary() {
+        return repository.summarizeActive();
     }
 
     @PostMapping("/adjustments")

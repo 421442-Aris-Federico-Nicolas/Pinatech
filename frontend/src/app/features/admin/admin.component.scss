@@ -1207,3 +1207,21 @@ main {
     justify-content: flex-end;
   }
 }
+:host .admin-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+:host .admin-search app-input { flex: 1 1 180px; min-width: 0; }
+
+:host .admin-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}

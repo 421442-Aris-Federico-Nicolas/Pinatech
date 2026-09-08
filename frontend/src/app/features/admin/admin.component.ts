@@ -1,8 +1,9 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray } from 'rxjs';
+import { catchError, concatMap, finalize, forkJoin, from, map, of, toArray, Subject, takeUntil, mergeMap } from 'rxjs';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { CancellationReasonCode } from '../../core/orders/order.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
@@ -17,7 +18,7 @@ import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
-import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, PendingBankTransferProof, ProductPayload, ProductVariantPayload } from './admin.service';
+import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, InventoryListItem, OrdersSummary, InventorySummary, ProductListItem, PendingBankTransferProof, ProductPayload, ProductVariantPayload } from './admin.service';
 
 type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
@@ -43,16 +44,30 @@ export class AdminComponent {
   private readonly notifications = inject(NotificationService);
   private productSnapshot = '';
   private proofPreviewGeneration = 0;
+  private readonly cancelLoad = new Subject<void>();
+  private readonly cancelDetail = new Subject<void>();
+  private readonly cancelOrderDetail = new Subject<void>();
+  readonly requestedOrder = signal<AdminOrder | null>(null);
+  private readonly cancelPreview = new Subject<void>();
+  readonly detailLoading = signal(false);
+  readonly previewLoading = signal<string | null>(null);
+  readonly page = signal(0);
+  readonly totalPages = signal(0);
+  readonly totalElements = signal(0);
+  search = '';
+  readonly ordersSummary = signal<OrdersSummary | null>(null);
+  readonly inventorySummary = signal<InventorySummary | null>(null);
   private cancellationTrigger: HTMLElement | null = null;
   private refundTrigger: HTMLElement | null = null;
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
   readonly sidebarCollapsed = signal(false);
   readonly loading = signal(false);
-  readonly products = signal<Product[]>([]);
+  readonly products = signal<ProductListItem[]>([]);
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
   readonly inventories = signal<Inventory[]>([]);
+  readonly inventoryRows = signal<InventoryListItem[]>([]);
   readonly orders = signal<AdminOrder[]>([]);
   readonly pendingTransferProofs = signal<PendingBankTransferProof[]>([]);
   readonly proofPreviewUrls = signal<Record<string, string[]>>({});
@@ -96,29 +111,19 @@ export class AdminComponent {
   cancellationDetail = '';
   refundReference = '';
 
-  readonly soldOrders = computed(() => this.orders().filter((order) => order.paymentStatus === 'APPROVED'));
-  readonly revenue = computed(() => this.soldOrders().reduce((total, order) => total + order.total, 0));
-  readonly averageTicket = computed(() => this.soldOrders().length ? this.revenue() / this.soldOrders().length : 0);
-  readonly activeOrders = computed(() => this.orders().filter((order) => !['DELIVERED', 'CANCELLED'].includes(order.status)).length);
-  readonly lowStock = computed(() => this.inventories().filter((item) => item.availableQuantity <= 5).length);
-  readonly availableUnits = computed(() => this.inventories().reduce((total, item) => total + item.availableQuantity, 0));
-  readonly recentOrders = computed(() => this.orders().slice(0, 5));
-  readonly filteredOrders = computed(() => this.orderFilter() === 'ALL'
-    ? this.orders()
-    : this.orders().filter((order) => order.status === this.orderFilter()));
-  readonly salesChart = computed(() => {
-    const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - (6 - index));
-      const total = this.soldOrders()
-        .filter((order) => new Date(order.createdAt).toDateString() === date.toDateString())
-        .reduce((sum, order) => sum + order.total, 0);
-      return { label: new Intl.DateTimeFormat('es-AR', { weekday: 'short' }).format(date).replace('.', ''), total };
-    });
-    const maximum = Math.max(...days.map((day) => day.total), 1);
-    return days.map((day) => ({ ...day, height: day.total ? Math.max(12, day.total / maximum * 100) : 4 }));
+  readonly soldOrders = computed(() => this.ordersSummary()?.soldOrders ?? 0);
+  readonly revenue = computed(() => this.ordersSummary()?.revenue ?? 0);
+  readonly averageTicket = computed(() => this.ordersSummary()?.averageTicket ?? 0);
+  readonly activeOrders = computed(() => this.ordersSummary()?.activeOrders ?? 0);
+  readonly lowStock = computed(() => this.inventorySummary()?.lowStock ?? 0);
+  readonly availableUnits = computed(() => this.inventorySummary()?.availableUnits ?? 0);
+  readonly recentOrders = computed(() => this.ordersSummary()?.recentOrders ?? []);
+  readonly filteredOrders = computed(() => {
+    const requested = this.requestedOrder();
+    return requested && requested.id === this.expandedOrder() && !this.orders().some((order) => order.id === requested.id)
+      ? [requested, ...this.orders()] : this.orders();
   });
+  readonly salesChart = computed(() => this.ordersSummary()?.salesChart ?? []);
   readonly categoryOptions = computed<readonly AppSelectOption[]>(() => this.categories().map((category) => ({ value: category.id, label: category.name })));
   readonly brandOptions = computed<readonly AppSelectOption[]>(() => this.brands().map((brand) => ({ value: brand.id, label: brand.name })));
   readonly productImageOptions = computed<readonly AppSelectOption[]>(() => [
@@ -147,62 +152,77 @@ export class AdminComponent {
     if (orderId > 0) this.expandedOrder.set(orderId);
     this.productSnapshot = this.productState();
     this.destroyRef.onDestroy(() => {
+      this.cancelLoad.next();
+      this.cancelDetail.next();
+      this.cancelOrderDetail.next();
       this.revokePendingImages();
       this.clearProofPreviews();
     });
     this.reload(true);
   }
 
-  reload(force = false, preserveMessages = false): void {
-    if (this.loading() || this.saving() || this.deactivatingProduct() || this.adjustingStock()
+  reload(force = false, preserveMessages = false, refreshDetail = true): void {
+    if (this.saving() || this.deactivatingProduct() || this.adjustingStock()
+      || this.proofReviewing() !== null || this.taxonomySaving() || this.deletingTaxonomy() || this.deletingImage() !== null
       || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null
       || this.ordersRefreshing() || this.shipmentDocumentLoading() !== null
       || (!force && !this.confirmDiscardProductChanges())) return;
     if (!preserveMessages) this.clearMessages();
+    this.cancelLoad.next();
+    this.cancelDetail.next();
+    this.cancelOrderDetail.next();
+    this.clearProofPreviews();
     this.loading.set(true);
+    const section = this.section();
     forkJoin({
-      products: this.service.products(),
-      categories: this.service.categories(),
-      brands: this.service.brands(),
-      inventories: this.service.inventories(),
-      orders: this.service.orders(),
-      transferProofs: this.service.pendingBankTransferProofs(),
-    }).pipe(finalize(() => this.loading.set(false))).subscribe({
-      next: ({ products, categories, brands, inventories, orders, transferProofs }) => {
-        this.products.set(products.content);
-        this.categories.set(categories);
-        this.brands.set(brands);
-        this.inventories.set(inventories);
-        this.orders.set(orders);
-        this.pendingTransferProofs.set(transferProofs);
-        this.loadProofPreviews(transferProofs);
-        const requestedId = Number(this.route?.snapshot.queryParamMap.get('product'));
-        const selectedId = this.selected()?.id ?? (requestedId > 0 ? requestedId : null);
-        if (selectedId) {
-          const product = products.content.find((candidate) => candidate.id === selectedId) ?? null;
-          this.selected.set(product);
-          const requestedVariantId = Number(this.route?.snapshot.queryParamMap.get('variant'));
-          const currentVariantId = this.selectedVariantId() ?? (requestedVariantId > 0 ? requestedVariantId : null);
-          const variantId = product?.variants.some((variant) => variant.id === currentVariantId) ? currentVariantId : product?.variants[0]?.id ?? null;
-          this.selectedVariantId.set(variantId);
-          this.inventory.set(inventories.find((item) => item.variantId === variantId) ?? null);
-          if (product) {
-            Object.assign(this.form, this.productForm(product));
-            this.productSnapshot = this.productState();
-          }
-        } else {
-          this.initializeTaxonomySelections();
+      products: section === 'catalog' ? this.service.products(this.search, this.page()) : of(null),
+      categories: section === 'catalog' ? this.service.categories() : of(null),
+      brands: section === 'catalog' ? this.service.brands() : of(null),
+      inventories: section === 'inventory' ? this.service.inventoryPage(this.search, this.page()) : of(null),
+      orders: section === 'sales' ? this.service.ordersPage(this.page(), this.orderFilter()) : of(null),
+      summary: section === 'overview' || section === 'sales' ? this.service.ordersSummary() : of(null),
+      stock: section === 'overview' ? this.service.inventorySummary() : of(null),
+      transferProofs: section === 'sales' ? this.service.pendingBankTransferProofs() : of(null),
+    }).pipe(takeUntil(this.cancelLoad), finalize(() => this.loading.set(false))).subscribe({
+      next: ({ products, categories, brands, inventories, orders, summary, stock, transferProofs }) => {
+        if (products) this.products.set(products.content);
+        if (categories) this.categories.set(categories);
+        if (brands) this.brands.set(brands);
+        if (inventories) {
+          this.inventoryRows.set(inventories.content);
+          this.inventories.set(inventories.content);
+          if (!refreshDetail) this.syncSelectedInventory();
         }
+        if (orders) { this.orders.set(orders.content); this.loadRequestedOrder(); }
+        if (summary) this.ordersSummary.set(summary);
+        if (stock) this.inventorySummary.set(stock);
+        if (transferProofs) this.pendingTransferProofs.set(transferProofs);
+        const result = products ?? inventories ?? orders;
+        if (result) { this.page.set(result.number); this.totalPages.set(result.totalPages); this.totalElements.set(result.totalElements); }
+        if (section === 'catalog' && !this.selected() && this.productState() === this.productSnapshot) this.initializeTaxonomySelections();
+        const id = this.selected()?.id ?? Number(this.route?.snapshot.queryParamMap.get('product'));
+        if (refreshDetail && id > 0 && (section === 'catalog' || section === 'inventory')) this.loadProduct(id, (this.selectedVariantId() ?? Number(this.route?.snapshot.queryParamMap.get('variant'))) || undefined, true);
       },
       error: () => this.fail('No se pudieron cargar los datos de administración.'),
     });
   }
 
   navigate(section: AdminSection): boolean {
+    if (section === this.section()) return true;
+    if (this.saving() || this.adjustingStock() || this.taxonomySaving() || this.deletingTaxonomy() || this.deletingImage() !== null || this.deactivatingProduct() || this.proofReviewing() !== null || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null || this.ordersRefreshing()) return false;
     if (section !== this.section() && !this.confirmDiscardProductChanges()) return false;
+    this.cancelLoad.next();
+    if (this.section() === 'catalog') {
+      this.clearPendingImages();
+      Object.assign(this.form, this.selected() ? this.productForm(this.selected()!) : this.emptyProduct());
+      this.productSnapshot = this.productState();
+    }
     this.section.set(section);
     this.syncUrl({ section, product: section === 'catalog' || section === 'inventory' ? this.selected()?.id ?? null : null, order: section === 'sales' ? this.expandedOrder() : null });
     this.clearMessages();
+    this.page.set(0);
+    this.search = '';
+    this.reload(true);
     return true;
   }
   sectionTitle(): string { return { overview: 'Resumen del negocio', sales: 'Ventas y pedidos', catalog: 'Catálogo', inventory: 'Inventario' }[this.section()]; }
@@ -215,12 +235,48 @@ export class AdminComponent {
 
   openNewProduct(): void { if (this.navigate('catalog')) this.resetProduct(); }
 
+  changePage(page: number): void {
+    if (page < 0 || page >= this.totalPages() || this.saving() || this.adjustingStock() || this.ordersRefreshing() || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null || this.proofReviewing() !== null) return;
+    this.page.set(page);
+    this.reload(true, false, false);
+  }
+
+  searchPage(): void {
+    if (this.saving() || this.adjustingStock()) return;
+    this.page.set(0);
+    this.reload(true, false, false);
+  }
+
+  loadProduct(id: number, variantId?: number, force = false): void {
+    if ((!force && !this.confirmDiscardProductChanges()) || this.saving() || this.adjustingStock()) return;
+    this.cancelDetail.next();
+    this.detailLoading.set(true);
+    this.service.product(id).pipe(takeUntil(this.cancelDetail), finalize(() => this.detailLoading.set(false))).subscribe({
+      next: (product) => {
+        this.select(product, false, variantId, true);
+        if (this.section() === 'inventory') this.syncSelectedInventory();
+      },
+      error: () => this.fail('No se pudo cargar el detalle del producto.'),
+    });
+  }
+
+  private syncSelectedInventory(): void {
+    const variantId = this.selectedVariantId();
+    const row = this.inventories().find((item) => item.variantId === variantId);
+    this.inventory.set(row ?? null);
+    if (variantId === null || row) return;
+    this.service.inventory(variantId).pipe(takeUntil(this.cancelDetail), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (stock) => this.inventory.set(stock),
+      error: () => this.fail('No se pudo cargar el stock seleccionado.'),
+    });
+  }
+
   select(product: Product, openInventory = false, variantId?: number, force = false): void {
     if (!force && this.selected()?.id !== product.id && !this.confirmDiscardProductChanges()) return;
     this.clearPendingImages();
     this.selected.set(product);
     Object.assign(this.form, this.productForm(product));
-    const selectedVariantId = variantId ?? product.variants[0]?.id ?? null;
+    const selectedVariantId = product.variants.some((variant) => variant.id === variantId) ? variantId! : product.variants[0]?.id ?? null;
     this.selectedVariantId.set(selectedVariantId);
     this.inventory.set(this.inventories().find((item) => item.variantId === selectedVariantId) ?? null);
     this.productSnapshot = this.productState();
@@ -230,6 +286,7 @@ export class AdminComponent {
 
   resetProduct(force = false): void {
     if (!force && !this.confirmDiscardProductChanges()) return;
+    this.cancelDetail.next();
     this.clearPendingImages();
     this.selected.set(null);
     this.inventory.set(null);
@@ -244,7 +301,7 @@ export class AdminComponent {
   }
 
   saveProduct(productForm?: NgForm): void {
-    if (this.saving()) return;
+    if (this.saving() || this.detailLoading()) return;
     this.clearMessages();
     if (productForm?.invalid) {
       this.fail('Revisá los campos requeridos del producto.');
@@ -308,7 +365,7 @@ export class AdminComponent {
       : this.service.createProduct(payload);
     const wasEditing = !!this.selected();
     const pendingImages = [...this.pendingImages()];
-    request.subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (product) => {
         if (!pendingImages.length) {
           this.saving.set(false);
@@ -322,6 +379,7 @@ export class AdminComponent {
             catchError(() => of<UploadResult<PendingProductImage, ProductImage>>({ pending: item, uploaded: null })),
           )),
           toArray(),
+          takeUntilDestroyed(this.destroyRef),
           finalize(() => this.saving.set(false)),
         ).subscribe((results) => {
           const { uploaded, succeeded, failed } = summarizeUploadResults(results);
@@ -412,7 +470,7 @@ export class AdminComponent {
     if (!product || this.deletingImage() !== null || !confirm(`¿Eliminar la imagen "${this.imageLabel(image)}"?`)) return;
     this.deletingImage.set(image.id);
     this.clearMessages();
-    this.service.deleteProductImage(product.id, image.id).pipe(finalize(() => this.deletingImage.set(null))).subscribe({
+    this.service.deleteProductImage(product.id, image.id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.deletingImage.set(null))).subscribe({
       next: () => {
         const formWasClean = this.productState() === this.productSnapshot && !this.pendingImages().length;
         const variants = product.variants.map((variant) => variant.imageId === image.id ? { ...variant, imageId: null } : variant);
@@ -431,8 +489,8 @@ export class AdminComponent {
     const product = this.selected();
     if (!product || this.saving() || this.deactivatingProduct() || !confirm(`¿Dar de baja "${product.name}"?`)) return;
     this.deactivatingProduct.set(true);
-    this.service.deleteProduct(product.id).pipe(finalize(() => this.deactivatingProduct.set(false))).subscribe({
-      next: () => { this.succeed('Producto dado de baja.'); this.resetProduct(true); this.reload(false, true); },
+    this.service.deleteProduct(product.id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.deactivatingProduct.set(false))).subscribe({
+      next: () => { this.deactivatingProduct.set(false); this.succeed('Producto dado de baja.'); this.resetProduct(true); this.reload(false, true); },
       error: () => this.fail('No se pudo dar de baja el producto.'),
     });
   }
@@ -450,7 +508,7 @@ export class AdminComponent {
       ? this.service.createCategory({ name, slug })
       : this.service.updateCategory(editing, { name, slug });
     this.taxonomySaving.set(true);
-    request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.taxonomySaving.set(false))).subscribe({
       next: (category) => {
         this.categories.update((categories) => editing === null ? [...categories, category] : categories.map((current) => current.id === category.id ? category : current));
         if (!this.isValidTaxonomyId(this.form.categoryId, this.categories())) this.form.categoryId = category.id;
@@ -479,7 +537,7 @@ export class AdminComponent {
     if (this.deletingTaxonomy() || !confirm(`¿Eliminar la categoría "${category.name}"? Solo se puede eliminar si no tiene productos activos.`)) return;
     this.deletingTaxonomy.set(key);
     this.clearMessages();
-    this.service.deleteCategory(category.id).pipe(finalize(() => this.deletingTaxonomy.set(''))).subscribe({
+    this.service.deleteCategory(category.id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.deletingTaxonomy.set(''))).subscribe({
       next: () => {
         if (this.editingCategoryId === category.id) this.cancelCategoryEdit();
         this.categories.update((categories) => categories.filter((current) => current.id !== category.id));
@@ -499,7 +557,7 @@ export class AdminComponent {
     const editing = this.editingBrandId;
     const request = editing === null ? this.service.createBrand(name) : this.service.updateBrand(editing, name);
     this.taxonomySaving.set(true);
-    request.pipe(finalize(() => this.taxonomySaving.set(false))).subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.taxonomySaving.set(false))).subscribe({
       next: (brand) => {
         this.brands.update((brands) => editing === null ? [...brands, brand] : brands.map((current) => current.id === brand.id ? brand : current));
         if (!this.isValidTaxonomyId(this.form.brandId, this.brands())) this.form.brandId = brand.id;
@@ -526,7 +584,7 @@ export class AdminComponent {
     if (this.deletingTaxonomy() || !confirm(`¿Eliminar la marca "${brand.name}"? Solo se puede eliminar si no tiene productos activos.`)) return;
     this.deletingTaxonomy.set(key);
     this.clearMessages();
-    this.service.deleteBrand(brand.id).pipe(finalize(() => this.deletingTaxonomy.set(''))).subscribe({
+    this.service.deleteBrand(brand.id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.deletingTaxonomy.set(''))).subscribe({
       next: () => {
         if (this.editingBrandId === brand.id) this.cancelBrandEdit();
         this.brands.update((brands) => brands.filter((current) => current.id !== brand.id));
@@ -538,7 +596,7 @@ export class AdminComponent {
 
   adjustStock(): void {
     const current = this.inventory();
-    if (this.adjustingStock()) return;
+    if (this.adjustingStock() || this.detailLoading()) return;
     if (!current) {
       this.failAndFocus('Indicá un color, un ajuste distinto de cero y su motivo.', '.inventory-products button');
       return;
@@ -552,9 +610,10 @@ export class AdminComponent {
       return;
     }
     this.adjustingStock.set(true);
-    this.service.adjustInventory(current.variantId, Number(this.adjustment), this.adjustmentReason.trim()).pipe(finalize(() => this.adjustingStock.set(false))).subscribe({
+    this.service.adjustInventory(current.variantId, Number(this.adjustment), this.adjustmentReason.trim()).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.adjustingStock.set(false))).subscribe({
       next: (inventory) => {
         this.inventory.set(inventory);
+        this.inventoryRows.update((items) => items.map((item) => item.variantId === inventory.variantId ? { ...item, ...inventory } : item));
         this.inventories.update((items) => items.map((item) => item.variantId === inventory.variantId ? inventory : item));
         this.adjustment = 0;
         this.adjustmentReason = '';
@@ -570,14 +629,11 @@ export class AdminComponent {
     if (action.danger && !confirm(`¿Cancelar el pedido #${order.id}? El stock reservado o preparado volverá a estar disponible.`)) return;
     this.clearMessages();
     this.orderUpdating.set(order.id);
-    this.service.updateOrderStatus(order.id, action.status).pipe(finalize(() => this.orderUpdating.set(null))).subscribe({
+    this.service.updateOrderStatus(order.id, action.status).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.orderUpdating.set(null))).subscribe({
       next: (updated) => {
         this.orders.update((orders) => orders.map((current) => current.id === updated.id ? updated : current));
         this.succeed(`Pedido #${order.id} actualizado a ${this.statusLabel(updated.status).toLowerCase()}.`);
-        this.service.inventories().subscribe({
-          next: (inventories) => this.inventories.set(inventories),
-          error: () => this.notifications.warning('El pedido se actualizó, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
-        });
+        this.refreshOrdersAfterShipmentAction();
       },
       error: () => this.fail('No se pudo actualizar el pedido. La reserva puede haber vencido.'),
     });
@@ -638,7 +694,7 @@ export class AdminComponent {
     if (replacement && !confirm(`¿Crear un envío de reemplazo para el pedido #${order.id}? El pedido y el pago actuales seguirán vigentes.`)) return;
     this.clearMessages();
     this.shipmentUpdating.set(order.id);
-    this.service.retryShipment(order.id).pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
+    this.service.retryShipment(order.id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.shipmentUpdating.set(null))).subscribe({
       next: () => {
         this.succeed(replacement
           ? `Envío de reemplazo solicitado para el pedido #${order.id}.`
@@ -691,7 +747,7 @@ export class AdminComponent {
     this.cancellationError.set('');
     this.shipmentUpdating.set(order.id);
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.cancellation-dialog')?.focus());
-    this.service.cancelShipment(order.id, payload).subscribe({
+    this.service.cancelShipment(order.id, payload).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         this.shipmentUpdating.set(null);
         this.updateLocalOrder(updated);
@@ -739,12 +795,13 @@ export class AdminComponent {
     this.refundError.set('');
     this.refundConfirming.set(order.id);
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('.refund-dialog')?.focus());
-    this.service.confirmBankTransferRefund(order.id, reference || undefined).subscribe({
+    this.service.confirmBankTransferRefund(order.id, reference || undefined).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         this.refundConfirming.set(null);
         this.updateLocalOrder(updated);
         this.dismissRefundDialog();
         this.succeed(`Reintegro del pedido #${order.id} confirmado.`);
+        this.refreshOrdersAfterShipmentAction();
       },
       error: () => {
         this.refundError.set('No pudimos confirmar el resultado. Estamos actualizando el pedido antes de que vuelvas a intentar.');
@@ -785,7 +842,7 @@ export class AdminComponent {
     const key = `${order.id}-${kind}`;
     this.shipmentDocumentLoading.set(key);
     const request = kind === 'label' ? this.service.shipmentLabel(order.id) : this.service.shipmentDocument(order.id);
-    request.pipe(finalize(() => this.shipmentDocumentLoading.set(null))).subscribe({
+    request.pipe(takeUntil(this.cancelLoad), takeUntilDestroyed(this.destroyRef), finalize(() => this.shipmentDocumentLoading.set(null))).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
@@ -811,10 +868,17 @@ export class AdminComponent {
     return estadoLabel(status, 'pedido');
   }
 
-  statusCount(status: string): number { return this.orders().filter((order) => order.status === status).length; }
-  filterOrders(status: string): void { this.orderFilter.set(status); this.syncUrl({ orderStatus: status }); }
-  openOrder(orderId: number): void { this.expandedOrder.set(orderId); this.navigate('sales'); this.syncUrl({ order: orderId }); }
+  statusCount(status: string): number { const counts = this.ordersSummary()?.statusCounts ?? {}; return status === 'ALL' ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[status] ?? 0; }
+  filterOrders(status: string): void {
+    if (!ORDER_FILTERS.includes(status) || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null || this.ordersRefreshing() || this.proofReviewing() !== null) return;
+    this.orderFilter.set(status);
+    this.page.set(0);
+    this.syncUrl({ orderStatus: status });
+    if (this.section() === 'sales') this.reload(true);
+  }
+  openOrder(orderId: number): void { this.expandedOrder.set(orderId); this.filterOrders('ALL'); this.navigate('sales'); this.syncUrl({ order: orderId }); }
   toggleOrder(orderId: number): void {
+    this.cancelOrderDetail.next();
     const previous = this.expandedOrder();
     const expanded = previous === orderId ? null : orderId;
     this.expandedOrder.set(expanded);
@@ -849,7 +913,7 @@ export class AdminComponent {
     if (this.proofReviewing() !== null) return;
     this.proofReviewing.set(proof.id);
     this.clearProofError(proof.id);
-    this.service.approveBankTransferProof(proof.id, amount, reference).pipe(finalize(() => this.proofReviewing.set(null))).subscribe({
+    this.service.approveBankTransferProof(proof.id, amount, reference).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.proofReviewing.set(null))).subscribe({
       next: () => this.finishProofReview(proof, 'Comprobante aprobado y pago acreditado.'),
       error: () => this.setProofError(proof.id, 'No se pudo aprobar el comprobante.'),
     });
@@ -868,21 +932,23 @@ export class AdminComponent {
     if (this.proofReviewing() !== null) return;
     this.proofReviewing.set(proof.id);
     this.clearProofError(proof.id);
-    this.service.rejectBankTransferProof(proof.id, reason).pipe(finalize(() => this.proofReviewing.set(null))).subscribe({
+    this.service.rejectBankTransferProof(proof.id, reason).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.proofReviewing.set(null))).subscribe({
       next: () => this.finishProofReview(proof, 'Comprobante rechazado; el cliente podrá ver el motivo.'),
       error: () => this.setProofError(proof.id, 'No se pudo rechazar el comprobante.'),
     });
   }
 
-  private loadProofPreviews(proofs: PendingBankTransferProof[]): void {
-    this.clearProofPreviews();
+  loadProofPreviews(proof: PendingBankTransferProof): void {
+    if (this.previewLoading() !== null || this.proofPreviewsReady(proof) || this.section() !== 'sales') return;
+    this.previewLoading.set(proof.id);
+    this.clearProofError(proof.id);
     const generation = ++this.proofPreviewGeneration;
-    for (const proof of proofs) {
-      const requests = Array.from({ length: proof.previewCount }, (_, index) => this.service.bankTransferProofPreview(proof.id, index));
-      if (!requests.length) continue;
-      forkJoin(requests).subscribe({
-        next: (blobs) => {
-          const urls = blobs.map((blob) => URL.createObjectURL(blob));
+    from(Array.from({ length: proof.previewCount }, (_, index) => index)).pipe(
+      mergeMap((index) => this.service.bankTransferProofPreview(proof.id, index).pipe(map((blob) => ({ index, blob }))), 2),
+      toArray(), takeUntil(this.cancelPreview), finalize(() => this.previewLoading.set(null)),
+    ).subscribe({
+        next: (results) => {
+          const urls = results.sort((a, b) => a.index - b.index).map(({ blob }) => URL.createObjectURL(blob));
           if (generation !== this.proofPreviewGeneration) {
             urls.forEach((url) => URL.revokeObjectURL(url));
             return;
@@ -891,23 +957,17 @@ export class AdminComponent {
         },
         error: () => this.setProofError(proof.id, 'No se pudo cargar la vista previa sanitizada.'),
       });
-    }
   }
 
   private finishProofReview(proof: PendingBankTransferProof, message: string): void {
+    if (this.previewLoading() === proof.id) this.cancelPreview.next();
     this.pendingTransferProofs.update((proofs) => proofs.filter((current) => current.id !== proof.id));
     this.revokeProofPreviews(proof.id);
     delete this.proofAmounts[proof.id];
     delete this.proofReferences[proof.id];
     delete this.proofRejectionReasons[proof.id];
     this.notifications.success(message);
-    forkJoin({ orders: this.service.orders(), inventories: this.service.inventories() }).subscribe({
-      next: ({ orders, inventories }) => {
-        this.orders.set(orders);
-        this.inventories.set(inventories);
-      },
-      error: () => this.notifications.warning('La revisión se registró, pero no pudimos sincronizar pedidos y stock. Usá Actualizar para reintentar.'),
-    });
+    this.refreshOrdersAfterShipmentAction();
   }
 
   private clearProofError(proofId: string): void {
@@ -929,6 +989,7 @@ export class AdminComponent {
   }
 
   private clearProofPreviews(): void {
+    this.cancelPreview.next();
     this.proofPreviewGeneration++;
     Object.values(this.proofPreviewUrls()).flat().forEach((url) => URL.revokeObjectURL(url));
     this.proofPreviewUrls.set({});
@@ -956,12 +1017,9 @@ export class AdminComponent {
       this.select(product, false, undefined, true);
     }
     this.succeed(message, preservePendingImages ? 'warning' : 'success');
-    this.service.inventories().subscribe({
-      next: (inventories) => {
-        this.inventories.set(inventories);
-        this.inventory.set(inventories.find((item) => item.variantId === this.selectedVariantId()) ?? null);
-      },
-      error: () => this.notifications.warning('El producto se guardó, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
+    this.service.products(this.search, this.page()).pipe(takeUntil(this.cancelLoad), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (page) => { this.products.set(page.content); this.totalElements.set(page.totalElements); this.totalPages.set(page.totalPages); },
+      error: () => this.notifications.warning('El producto se guardo, pero no pudimos actualizar la lista.'),
     });
   }
   private clearPendingImages(): void { this.revokePendingImages(); this.pendingImages.set([]); }
@@ -1019,26 +1077,35 @@ export class AdminComponent {
   }
   private refreshOrdersAfterShipmentAction(): void {
     this.ordersRefreshing.set(true);
-    this.service.orders().pipe(finalize(() => this.ordersRefreshing.set(false))).subscribe({
-      next: (orders) => this.orders.set(orders),
+    forkJoin({ orders: this.service.ordersPage(this.page(), this.orderFilter()), summary: this.service.ordersSummary() }).pipe(takeUntil(this.cancelLoad), takeUntilDestroyed(this.destroyRef), finalize(() => this.ordersRefreshing.set(false))).subscribe({
+      next: ({ orders, summary }) => { this.orders.set(orders.content); this.totalPages.set(orders.totalPages); this.totalElements.set(orders.totalElements); this.ordersSummary.set(summary); this.loadRequestedOrder(); },
       error: () => this.notifications.warning('La acción se registró, pero no pudimos actualizar el estado del envío. Usá Actualizar para reintentar.'),
     });
   }
-  private updateLocalOrder(updated: AdminOrder): void {
-    this.orders.update((orders) => orders.map((order) => order.id === updated.id ? updated : order));
-  }
-  private refreshInventoriesAfterCancellation(): void {
-    this.service.inventories().subscribe({
-      next: (inventories) => this.inventories.set(inventories),
-      error: () => this.notifications.warning('El pedido se canceló, pero no pudimos sincronizar el stock. Usá Actualizar para reintentar.'),
+  private loadRequestedOrder(): void {
+    this.cancelOrderDetail.next();
+    this.requestedOrder.set(null);
+    const id = this.expandedOrder();
+    if (this.section() !== 'sales' || id === null || this.orders().some((order) => order.id === id)) return;
+    this.service.order(id).pipe(takeUntil(this.cancelOrderDetail), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (order) => this.requestedOrder.set(order),
+      error: () => this.fail(`No se pudo cargar el pedido #${id}.`),
     });
   }
+
+  private updateLocalOrder(updated: AdminOrder): void {
+    this.orders.update((orders) => orders.map((order) => order.id === updated.id ? updated : order));
+    if (this.requestedOrder()?.id === updated.id) this.requestedOrder.set(updated);
+  }
+  private refreshInventoriesAfterCancellation(): void {
+    this.refreshOrdersAfterShipmentAction();
+  }
   private refreshCancellationAfterError(orderId: number, scope: CancellationScope): void {
-    this.service.orders().pipe(finalize(() => this.shipmentUpdating.set(null))).subscribe({
-      next: (orders) => {
-        this.orders.set(orders);
-        const updated = orders.find((order) => order.id === orderId);
-        if (!updated || this.cancellationOrder()?.id !== orderId) return;
+    // Reconcile by ID, not by the filtered page: cancellation can move the order out of that page.
+    this.service.order(orderId).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.shipmentUpdating.set(null))).subscribe({
+      next: (updated) => {
+        if (this.cancellationOrder()?.id !== orderId) return;
+        this.updateLocalOrder(updated);
         const completed = this.cancellationCompleted(updated, scope);
         if (completed) {
           this.dismissCancellationDialog();
@@ -1061,14 +1128,14 @@ export class AdminComponent {
     });
   }
   private refreshRefundAfterError(orderId: number): void {
-    this.service.orders().pipe(finalize(() => this.refundConfirming.set(null))).subscribe({
-      next: (orders) => {
-        this.orders.set(orders);
-        const updated = orders.find((order) => order.id === orderId);
-        if (!updated || this.refundOrder()?.id !== orderId) return;
+    this.service.order(orderId).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.refundConfirming.set(null))).subscribe({
+      next: (updated) => {
+        if (this.refundOrder()?.id !== orderId) return;
+        this.updateLocalOrder(updated);
         if (updated.paymentStatus === 'REFUNDED') {
           this.dismissRefundDialog();
           this.succeed(`Reintegro del pedido #${orderId} confirmado.`);
+          this.refreshOrdersAfterShipmentAction();
         } else if (!this.canConfirmBankTransferRefund(updated)) {
           this.dismissRefundDialog();
           this.notifications.warning('El pedido cambió de estado y ya no admite confirmar este reintegro.');

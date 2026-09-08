@@ -10,7 +10,7 @@ import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.comp
 import { AppInputComponent } from '../../shared/ui/input/app-input.component';
 import { PinatechEmptyStateComponent } from '../../shared/ui/pinatech-empty-state/pinatech-empty-state.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, Product } from './catalog.service';
+import { Brand, CatalogFilters, CatalogService, CatalogSort, Category, Page, ProductListItemResponse } from './catalog.service';
 
 const SORTS: CatalogSort[] = ['name,asc', 'name,desc', 'price,asc', 'price,desc'];
 const MAX_FILTER_PRICE = 80_000_000_000_000;
@@ -32,7 +32,7 @@ export class CatalogComponent {
   private invalidPriceParams = false;
 
   readonly filters: CatalogFilters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
-  readonly page = signal<Page<Product> | null>(null);
+  readonly page = signal<Page<ProductListItemResponse> | null>(null);
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
   readonly sort = signal<CatalogSort>('name,asc');
@@ -113,7 +113,7 @@ export class CatalogComponent {
       minPrice: this.filters.minPrice === null ? null : listPriceForTransferMinimum(this.filters.minPrice),
       maxPrice: this.filters.maxPrice === null ? null : listPriceForTransferMaximum(this.filters.maxPrice),
     };
-    this.request = this.service.getProducts(queryFilters, page, this.sort())
+    this.request = this.service.getProductCards(queryFilters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
   }

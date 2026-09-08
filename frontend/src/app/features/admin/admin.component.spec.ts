@@ -1,9 +1,23 @@
-import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { TestBed, TestModuleMetadata } from '@angular/core/testing';
+import { map, of } from 'rxjs';
 import { Order } from '../../core/orders/order.service';
 import { Product } from '../catalog/catalog.service';
 import { AdminComponent } from './admin.component';
 import { AdminOrder, AdminService, ProductPayload } from './admin.service';
+
+const summary = { soldOrders: 1, revenue: 110, averageTicket: 110, activeOrders: 1, statusCounts: { PAID: 1 }, salesChart: [], recentOrders: [] };
+function configureAdminTest(metadata: TestModuleMetadata) {
+  for (const provider of metadata.providers ?? []) {
+    if (provider && typeof provider === 'object' && 'provide' in provider && provider.provide === AdminService && 'useValue' in provider) {
+      const stub = provider.useValue;
+      stub.ordersSummary = () => of(summary);
+      stub.inventorySummary = () => of({ lowStock: 0, availableUnits: 0 });
+      stub.ordersPage = () => stub.orders().pipe(map((content: AdminOrder[]) => ({ content, number: 0, size: 20, totalPages: 1, totalElements: content.length })));
+      stub.product = (id: number) => stub.products().pipe(map((page: { content: Product[] }) => page.content.find((product) => product.id === id)));
+    }
+  }
+  return TestBed.configureTestingModule(metadata);
+}
 
 describe('AdminComponent payments', () => {
   const renderedOrder: Order = {
@@ -15,7 +29,7 @@ describe('AdminComponent payments', () => {
   };
 
   async function createSalesFixture(animationsEnabled = false) {
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -27,13 +41,13 @@ describe('AdminComponent payments', () => {
       animationsEnabled,
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
-    fixture.componentInstance.section.set('sales');
+    fixture.componentInstance.navigate('sales');
     fixture.detectChanges();
     return fixture;
   }
 
-  it('calculates sales KPIs only from approved, non-refunded payments and cannot mark orders paid', async () => {
-    await TestBed.configureTestingModule({
+  it('uses global summary KPIs rather than page orders and cannot mark orders paid', async () => {
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -58,7 +72,7 @@ describe('AdminComponent payments', () => {
       { ...base, id: 3, paymentStatus: 'PENDING', total: 300 },
     ]);
 
-    expect(component.soldOrders().map((order) => order.id)).toEqual([1]);
+    expect(component.soldOrders()).toBe(1);
     expect(component.revenue()).toBe(110);
     expect(component.averageTicket()).toBe(110);
     expect(component.orderActions('PENDING_PAYMENT').map((action) => action.label)).toEqual(['Cancelar']);
@@ -74,7 +88,7 @@ describe('AdminComponent payments', () => {
 
   it('initializes real taxonomy selections and does not refresh over dirty product edits without confirmation', async () => {
     const products = vi.fn(() => of({ content: [] }));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -89,6 +103,7 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const component = TestBed.createComponent(AdminComponent).componentInstance;
 
+    component.navigate('catalog');
     expect(component.form.categoryId).toBe(3);
     expect(component.form.brandId).toBe(8);
     component.section.set('catalog');
@@ -103,7 +118,7 @@ describe('AdminComponent payments', () => {
 
   it('uses shared editor controls and rejects a nonpositive product price', async () => {
     const createProduct = vi.fn();
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -120,7 +135,7 @@ describe('AdminComponent payments', () => {
 
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('catalog');
+    component.navigate('catalog');
     Object.assign(component.form, {
       name: 'Mouse', slug: 'mouse', description: 'Mouse profesional', price: 0, categoryId: 3, brandId: 8,
     });
@@ -143,7 +158,7 @@ describe('AdminComponent payments', () => {
       shippingClassificationId: 2, mustKeepVertical: true,
       variants: [{ id: 51, colorName: 'Negro', colorHex: '#000000', imageId: null, inStock: true, availableQuantity: 2 }],
     };
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -156,7 +171,7 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('catalog');
+    component.navigate('catalog');
     component.select(product);
     fixture.detectChanges();
 
@@ -197,7 +212,7 @@ describe('AdminComponent payments', () => {
       submitted = payload;
       return of(saved);
     });
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -210,7 +225,7 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('catalog');
+    component.navigate('catalog');
     Object.assign(component.form, {
       name: saved.name, slug: saved.slug, description: saved.description, price: saved.price,
       categoryId: saved.categoryId, brandId: saved.brandId, shippingWeightGrams: 100,
@@ -236,7 +251,7 @@ describe('AdminComponent payments', () => {
       categoryId: 3, categoryName: 'Discos', brandId: 8, brandName: 'Pina', images: [], specifications: [],
       variants: [{ id: 51, colorName: 'Unico', colorHex: null, imageId: null, inStock: true, availableQuantity: 2 }],
     };
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -247,7 +262,7 @@ describe('AdminComponent payments', () => {
       }],
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
-    fixture.componentInstance.section.set('catalog');
+    fixture.componentInstance.navigate('catalog');
     fixture.componentInstance.select(productWithoutColor);
     fixture.detectChanges();
 
@@ -264,7 +279,7 @@ describe('AdminComponent payments', () => {
       variants: [{ id: 51, colorName: 'Negro', colorHex: '#000000', imageId: 21, inStock: true, availableQuantity: 2 }],
     };
     const deleteProductImage = vi.fn(() => of(void 0));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -278,7 +293,7 @@ describe('AdminComponent payments', () => {
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
     component.select(product);
-    component.section.set('catalog');
+    component.navigate('catalog');
     fixture.detectChanges();
 
     expect(component.form.variants[0].imageId).toBe(21);
@@ -331,7 +346,7 @@ describe('AdminComponent payments', () => {
         trackingCode: 'TRACK-41', trackingUrl: 'https://tracking.example/41', estimatedDeliveryAt: '2026-08-20T10:00:00Z', incident: false,
       },
     };
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -343,7 +358,7 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('sales');
+    component.navigate('sales');
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -365,7 +380,7 @@ describe('AdminComponent payments', () => {
     expect(component.canDownloadShipmentDocuments({ ...deliveryOrder, shipment: { ...deliveryOrder.shipment!, providerStatus: 'new' } })).toBe(false);
   });
 
-  it('cancels through the in-component dialog, requires an order reason and refreshes stock', async () => {
+  it('cancels through the in-component dialog, requires an order reason and refreshes the sales page', async () => {
     const deliveryOrder: AdminOrder = {
       ...renderedOrder,
       fulfillmentMethod: 'DELIVERY', deliveryMethod: 'ZIPNOVA',
@@ -380,19 +395,19 @@ describe('AdminComponent payments', () => {
     };
     const cancelShipment = vi.fn(() => of(cancelledOrder));
     const inventories = vi.fn(() => of([]));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
         useValue: {
           products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories,
-          orders: () => of([deliveryOrder]), pendingBankTransferProofs: () => of([]), cancelShipment,
+          orders: vi.fn().mockReturnValueOnce(of([deliveryOrder])).mockReturnValue(of([cancelledOrder])), pendingBankTransferProofs: () => of([]), cancelShipment,
         },
       }],
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('sales');
+    component.navigate('sales');
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -436,7 +451,7 @@ describe('AdminComponent payments', () => {
 
     expect(cancelShipment).toHaveBeenCalledWith(41, { scope: 'ORDER', reasonCode: 'LOGISTICS_PROBLEM', internalDetail: 'Sin cobertura alternativa' });
     expect(component.orders()[0]).toEqual(cancelledOrder);
-    expect(inventories).toHaveBeenCalledTimes(2);
+    expect(inventories).not.toHaveBeenCalled();
     expect(component.cancellationOrder()).toBeNull();
     browserConfirmation.mockRestore();
   });
@@ -451,7 +466,7 @@ describe('AdminComponent payments', () => {
       },
     };
     const retryShipment = vi.fn(() => of(void 0));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -462,7 +477,7 @@ describe('AdminComponent payments', () => {
       }],
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
-    fixture.componentInstance.section.set('sales');
+    fixture.componentInstance.navigate('sales');
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -515,19 +530,19 @@ describe('AdminComponent payments', () => {
     };
     const refunded: AdminOrder = { ...pendingRefund, paymentStatus: 'REFUNDED' };
     const confirmBankTransferRefund = vi.fn(() => of(refunded));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
         useValue: {
           products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]), inventories: () => of([]),
-          orders: () => of([pendingRefund]), pendingBankTransferProofs: () => of([]), confirmBankTransferRefund,
+          orders: vi.fn().mockReturnValueOnce(of([pendingRefund])).mockReturnValue(of([refunded])), pendingBankTransferProofs: () => of([]), confirmBankTransferRefund,
         },
       }],
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('sales');
+    component.navigate('sales');
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -566,7 +581,7 @@ describe('AdminComponent payments', () => {
       .mockReturnValueOnce(of([failedOrder]))
       .mockReturnValueOnce(of([refreshedOrder]));
     const retryShipment = vi.fn(() => of(void 0));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -578,6 +593,7 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const component = TestBed.createComponent(AdminComponent).componentInstance;
 
+    component.navigate('sales');
     component.retryShipment(failedOrder);
 
     expect(retryShipment).toHaveBeenCalledWith(41);
@@ -593,19 +609,19 @@ describe('AdminComponent payments', () => {
       status: 'PREPARING',
       fulfillmentStatus: 'PREPARING',
     }));
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
         useValue: {
           products: () => of({ content: [] }), categories: () => of([]), brands: () => of([]),
-          inventories, orders: () => of([renderedOrder]), pendingBankTransferProofs: () => of([]),
+          inventories, orders: vi.fn().mockReturnValueOnce(of([renderedOrder])).mockReturnValue(of([{ ...renderedOrder, status: 'PREPARING', fulfillmentStatus: 'PREPARING' }])), pendingBankTransferProofs: () => of([]),
           updateOrderStatus,
         },
       }],
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
-    fixture.componentInstance.section.set('sales');
+    fixture.componentInstance.navigate('sales');
     fixture.detectChanges();
 
     (fixture.nativeElement.querySelector('.order-summary') as HTMLButtonElement).click();
@@ -618,7 +634,7 @@ describe('AdminComponent payments', () => {
     expect(action).toBeTruthy();
     expect(updateOrderStatus).toHaveBeenCalledWith(41, 'PREPARING');
     expect(fixture.componentInstance.orders()[0].status).toBe('PREPARING');
-    expect(inventories).toHaveBeenCalledTimes(2);
+    expect(inventories).not.toHaveBeenCalled();
   });
 
   it('settles rapid order toggles on the final expanded state', async () => {
@@ -678,7 +694,7 @@ describe('AdminComponent payments', () => {
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-    await TestBed.configureTestingModule({
+    await configureAdminTest({
       imports: [AdminComponent],
       providers: [{
         provide: AdminService,
@@ -692,7 +708,8 @@ describe('AdminComponent payments', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(AdminComponent);
     const component = fixture.componentInstance;
-    component.section.set('sales');
+    component.navigate('sales');
+    component.loadProofPreviews(proof);
     fixture.detectChanges();
 
     component.approveProof(proof);

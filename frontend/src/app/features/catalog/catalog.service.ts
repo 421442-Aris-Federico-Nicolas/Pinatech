@@ -5,6 +5,18 @@ import { environment } from '../../../environments/environment';
 export interface ProductImage { id: number; contentUrl: string; altText: string; originalFilename?: string | null; displayOrder: number; }
 export interface ProductSpecification { id: number; groupName: string; name: string; value: string; highlighted: boolean; displayOrder: number; }
 export interface ProductVariant { id: number; colorName: string; colorHex: string | null; imageId?: number | null; inStock: boolean; availableQuantity: number; }
+export interface ProductListItemResponse {
+  id: number;
+  name: string;
+  slug: string;
+  price: number;
+  categoryId: number;
+  categoryName: string;
+  brandId: number;
+  brandName: string;
+  images: ProductImage[];
+  inStock: boolean;
+}
 export interface Product {
   id: number;
   name: string;
@@ -36,6 +48,14 @@ export class CatalogService {
   private readonly http = inject(HttpClient);
 
   getProducts(filters: CatalogFilters, page: number, sort: CatalogSort = 'name,asc', pageSize = 12) {
+    return this.http.get<Page<Product>>(`${environment.apiBaseUrl}/products`, { params: this.listParams(filters, page, sort, pageSize) });
+  }
+
+  getProductCards(filters: CatalogFilters, page: number, sort: CatalogSort = 'name,asc', pageSize = 12) {
+    return this.http.get<Page<ProductListItemResponse>>(`${environment.apiBaseUrl}/products/cards`, { params: this.listParams(filters, page, sort, pageSize) });
+  }
+
+  private listParams(filters: CatalogFilters, page: number, sort: CatalogSort, pageSize: number) {
     const size = Math.min(100, Math.max(1, Math.floor(pageSize)));
     let params = new HttpParams().set('page', page).set('size', size).set('sort', sort);
     if (filters.search.trim()) params = params.set('search', filters.search.trim());
@@ -43,7 +63,7 @@ export class CatalogService {
     if (filters.brandId !== null) params = params.set('brandId', filters.brandId);
     if (filters.minPrice !== null) params = params.set('minPrice', filters.minPrice);
     if (filters.maxPrice !== null) params = params.set('maxPrice', filters.maxPrice);
-    return this.http.get<Page<Product>>(`${environment.apiBaseUrl}/products`, { params });
+    return params;
   }
 
   product(id: number) { return this.http.get<Product>(`${environment.apiBaseUrl}/products/${id}`); }

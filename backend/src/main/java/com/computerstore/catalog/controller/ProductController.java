@@ -3,6 +3,7 @@ package com.computerstore.catalog.controller;
 import java.math.BigDecimal;
 import com.computerstore.catalog.domain.Product;
 import com.computerstore.catalog.dto.ProductSummaryResponse;
+import com.computerstore.catalog.dto.ProductListItemResponse;
 import com.computerstore.catalog.repository.ProductRepository;
 import com.computerstore.catalog.repository.ProductSpecificationRepository;
 import com.computerstore.catalog.repository.ProductVariantRepository;
@@ -37,7 +38,13 @@ public class ProductController {
     private final ProductImageService productImages;
     public ProductController(ProductRepository repository, ProductSpecificationRepository specifications, ProductVariantRepository variants, InventoryRepository inventory, ProductImageService productImages) { this.repository = repository; this.specifications = specifications; this.variants = variants; this.inventory = inventory; this.productImages = productImages; }
     @GetMapping public Page<ProductSummaryResponse> list(@RequestParam(required = false) String search, @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long brandId, @RequestParam(required = false) BigDecimal minPrice, @RequestParam(required = false) BigDecimal maxPrice, @PageableDefault(size = 12, sort = "name") Pageable pageable) {
-        Specification<Product> spec = (root, query, cb) -> cb.isTrue(root.get("active"));
+        Specification<Product> spec = (root, query, cb) -> {
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("category");
+                root.fetch("brand");
+            }
+            return cb.isTrue(root.get("active"));
+        };
         if (search != null && !search.isBlank()) spec = spec.and((r,q,cb) -> cb.like(cb.lower(r.get("name")), "%" + search.trim().toLowerCase() + "%"));
         if (categoryId != null) spec = spec.and((r,q,cb) -> cb.equal(r.get("category").get("id"), categoryId));
         if (brandId != null) spec = spec.and((r,q,cb) -> cb.equal(r.get("brand").get("id"), brandId));
@@ -55,8 +62,19 @@ public class ProductController {
         return products.map(product -> toResponse(product, images.getOrDefault(product.getId(), List.of()),
                 productSpecifications.getOrDefault(product.getId(), List.of()), productVariants.getOrDefault(product.getId(), List.of())));
     }
+    @GetMapping("/cards")
+    public Page<ProductListItemResponse> cards(@RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) BigDecimal minPrice, @RequestParam(required = false) BigDecimal maxPrice,
+            @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+        String pattern = search == null || search.isBlank() ? null : "%" + search.trim().toLowerCase() + "%";
+        return repository.findCards(pattern, categoryId, brandId, minPrice, maxPrice,
+                PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100),
+                        pageable.getSort().and(Sort.by("id"))));
+    }
+
     @GetMapping("/{id}") public ProductSummaryResponse detail(@PathVariable Long id) {
-        Product product = repository.findById(id).filter(Product::isActive)
+        Product product = repository.findDetailById(id).filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found."));
         return toResponse(product, productImages.responsesForProduct(id), specificationResponses(id), variantResponses(List.of(id)).getOrDefault(id,List.of()));
     }
@@ -69,7 +87,18 @@ public class ProductController {
         headers.setContentLength(content.sizeBytes());
         headers.setContentDisposition(ContentDisposition.inline()
                 .filename(content.fileName(), StandardCharsets.UTF_8).build());
-        headers.setCacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic());
+        headers.setCacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic().immutable());
+        return ResponseEntity.ok().headers(headers).body(new FileSystemResource(content.path()));
+    }
+
+    @GetMapping("/images/{imageId}/thumbnail")
+    public ResponseEntity<Resource> imageThumbnail(@PathVariable Long imageId) {
+        var content = productImages.thumbnail(imageId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.IMAGE_JPEG);
+        headers.setContentLength(content.sizeBytes());
+        headers.setContentDisposition(ContentDisposition.inline().filename(content.fileName()).build());
+        headers.setCacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic().immutable());
         return ResponseEntity.ok().headers(headers).body(new FileSystemResource(content.path()));
     }
 

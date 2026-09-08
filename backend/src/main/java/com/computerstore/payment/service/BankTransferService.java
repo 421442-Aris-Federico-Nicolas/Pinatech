@@ -129,12 +129,12 @@ public class BankTransferService {
 
     @Transactional(readOnly = true)
     public PreviewContent preview(UUID proofId, int index) {
-        BankTransferProof proof = proofs.findById(proofId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bank transfer proof not found."));
-        if (index < 0 || index >= proof.getPreviews().size()) {
+        if (index < 0) {
             throw new ResourceNotFoundException("Proof preview not found.");
         }
-        Path path = storage.load(proof.getPreviews().get(index).getStorageKey());
+        String key = proofs.findPreviewStorageKey(proofId, index)
+                .orElseThrow(() -> new ResourceNotFoundException("Proof preview not found."));
+        Path path = storage.load(key);
         return new PreviewContent(path);
     }
 

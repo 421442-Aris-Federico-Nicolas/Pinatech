@@ -6,6 +6,7 @@ import com.computerstore.catalog.dto.ProductImageResponse;
 import com.computerstore.catalog.repository.ProductImageRepository;
 import com.computerstore.catalog.repository.ProductRepository;
 import com.computerstore.common.exception.BusinessRuleException;
+import com.computerstore.common.exception.FileStorageException;
 import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.storage.LocalImageStorage;
@@ -15,6 +16,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
@@ -91,6 +94,21 @@ public class ProductImageService {
         }
         return new ProductImageContent(storage.load(image.getStorageKey()), image.getContentType(),
                 image.getOriginalFilename(), image.getSizeBytes());
+    }
+
+    @Transactional(readOnly = true)
+    public ProductImageContent thumbnail(Long imageId) {
+        ProductImage image = images.findByIdAndProductActiveTrue(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product image not found."));
+        if (image.getStorageKey() == null) {
+            throw new ResourceNotFoundException("Image content not found.");
+        }
+        Path path = storage.thumbnail(image.getStorageKey());
+        try {
+            return new ProductImageContent(path, "image/jpeg", "image-" + imageId + ".jpg", Files.size(path));
+        } catch (IOException exception) {
+            throw new FileStorageException("Could not read image thumbnail.", exception);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -16,6 +16,21 @@ describe('CatalogService', () => {
 
   afterEach(() => httpTesting.verify());
 
+  it('uses the lightweight endpoint with all filters and bounded pagination', () => {
+    service.getProductCards({ search: ' teclado ', categoryId: 2, brandId: 3, minPrice: 100, maxPrice: 5000 }, 1, 'price,desc', 500).subscribe();
+    const request = httpTesting.expectOne((candidate) => candidate.url === `${environment.apiBaseUrl}/products/cards`);
+    expect(request.request.params.keys().sort()).toEqual(['brandId', 'categoryId', 'maxPrice', 'minPrice', 'page', 'search', 'size', 'sort']);
+    expect(request.request.params.get('search')).toBe('teclado');
+    expect(request.request.params.get('categoryId')).toBe('2');
+    expect(request.request.params.get('brandId')).toBe('3');
+    expect(request.request.params.get('minPrice')).toBe('100');
+    expect(request.request.params.get('maxPrice')).toBe('5000');
+    expect(request.request.params.get('page')).toBe('1');
+    expect(request.request.params.get('size')).toBe('100');
+    expect(request.request.params.get('sort')).toBe('price,desc');
+    request.flush({ content: [], totalPages: 0, totalElements: 0, number: 1, size: 100 });
+  });
+
   it('sends active filters, page and supported sorting to the public API', () => {
     service.getProducts({ search: ' teclado ', categoryId: 2, brandId: 3, minPrice: 100, maxPrice: 5000 }, 1, 'price,desc').subscribe();
 

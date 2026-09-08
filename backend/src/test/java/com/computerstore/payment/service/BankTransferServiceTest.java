@@ -59,6 +59,27 @@ class BankTransferServiceTest {
     }
 
     @Test
+    void previewLoadsOnlyTheRequestedStorageKey() {
+        when(proofs.findPreviewStorageKey(proofId, 1)).thenReturn(Optional.of("page-1"));
+        when(storage.load("page-1")).thenReturn(java.nio.file.Path.of("page-1.png"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(java.nio.file.Path.of("page-1.png"),
+                service.preview(proofId, 1).path());
+        verify(proofs, never()).findById(proofId);
+        verify(proof, never()).getPreviews();
+    }
+
+    @Test
+    void invalidOrMissingPreviewNeverLoadsStorage() {
+        assertThrows(com.computerstore.common.exception.ResourceNotFoundException.class,
+                () -> service.preview(proofId, -1));
+        assertThrows(com.computerstore.common.exception.ResourceNotFoundException.class,
+                () -> service.preview(proofId, 99));
+        verify(proofs, never()).findPreviewStorageKey(proofId, -1);
+        org.mockito.Mockito.verifyNoInteractions(storage);
+    }
+
+    @Test
     void approvesOnlyAnExactAmountAndPersistsTheNormalizedReference() {
         service.approve(proofId, new BigDecimal("264.00"), " ref-123 ", admin);
 

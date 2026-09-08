@@ -1,20 +1,20 @@
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { EMPTY, expand, finalize, forkJoin, reduce } from 'rxjs';
+import { finalize, forkJoin, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { CatalogService, Product } from '../catalog/catalog.service';
+import { CatalogService, ProductListItemResponse } from '../catalog/catalog.service';
 
 interface ProductShowcaseGroup {
   readonly eyebrow: string;
   readonly title: string;
   readonly description: string;
   readonly banner: BannerSlide;
-  readonly products: readonly Product[];
+  readonly products: readonly ProductListItemResponse[];
   readonly linkLabel: string;
   readonly queryParams: Record<string, number> | null;
 }
@@ -48,7 +48,7 @@ export class HomeComponent {
   private readonly injector = inject(Injector);
   protected readonly auth = inject(AuthService);
 
-  protected readonly featured = signal<Product[]>([]);
+  protected readonly featured = signal<ProductListItemResponse[]>([]);
   protected readonly peripheralCategoryId = signal<number | null>(null);
   protected readonly heroIndex = signal(0);
   protected readonly heroPointerPaused = signal(false);
@@ -91,7 +91,7 @@ export class HomeComponent {
         title: 'Completá tu setup',
         description: 'Teclados, mouse, auriculares y accesorios para jugar, trabajar y crear con comodidad.',
         banner: { src: '/pinatech-banner-perifericos.jpg', alt: 'Periféricos Pinatech: teclado, auriculares y mouse', width: 2000, height: 848 },
-        products: peripheralProducts,
+        products: peripheralProducts.slice(0, 12),
         linkLabel: 'Ver todos los periféricos',
         queryParams: peripheralCategoryId === null ? null : { category: peripheralCategoryId },
       },
@@ -100,7 +100,7 @@ export class HomeComponent {
         title: 'Potencia para tu equipo',
         description: 'Procesadores, placas de video, memorias y almacenamiento para tu próxima actualización.',
         banner: { src: '/pinatech-banner-hardware.jpg', alt: 'Hardware Pinatech: computadora de escritorio y periféricos', width: 2000, height: 848 },
-        products: hardwareProducts,
+        products: hardwareProducts.slice(0, 12),
         linkLabel: 'Ver catálogo de hardware',
         queryParams: null,
       },
@@ -115,11 +115,15 @@ export class HomeComponent {
     this.isLoading.set(true);
     this.error.set(false);
 
-    forkJoin({
-      categories: this.catalog.categories(),
-      products: this.loadAllProducts(),
-    })
+    this.catalog.categories()
       .pipe(
+        switchMap((categories) => {
+          const requests = categories.map((category) => this.catalog.getProductCards(
+            { search: '', categoryId: category.id, brandId: null, minPrice: null, maxPrice: null }, 0, 'name,asc', 12));
+          return (requests.length ? forkJoin(requests) : of([])).pipe(
+            map((pages) => ({ categories, products: pages.flatMap((page) => page.content) })),
+          );
+        }),
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isLoading.set(false)),
       )
@@ -179,16 +183,6 @@ export class HomeComponent {
     for (const track of this.host.nativeElement.querySelectorAll<HTMLElement>('[data-product-track]')) {
       this.updateProductTrackPosition(Number(track.dataset['productTrack']), track);
     }
-  }
-
-  private loadAllProducts() {
-    const filters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
-    return this.catalog.getProducts(filters, 0, 'name,asc', 100).pipe(
-      expand((page) => page.number + 1 < page.totalPages
-        ? this.catalog.getProducts(filters, page.number + 1, 'name,asc', 100)
-        : EMPTY),
-      reduce((products, page) => [...products, ...page.content], [] as Product[]),
-    );
   }
 
   private reducedMotion(): boolean {

@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { BannerCarouselComponent } from '../../shared/ui/banner-carousel/banner-carousel.component';
-import { CatalogFilters, CatalogService, CatalogSort, Page, Product } from '../catalog/catalog.service';
+import { CatalogFilters, CatalogService, CatalogSort, Page, ProductListItemResponse as Product } from '../catalog/catalog.service';
 import { HomeComponent } from './home.component';
 
 describe('HomeComponent', () => {
@@ -13,27 +13,25 @@ describe('HomeComponent', () => {
     id,
     name,
     slug: name.toLowerCase().replaceAll(' ', '-'),
-    description: `${name} destacado`,
     price: 1000,
     categoryId,
     categoryName,
     brandId: 1,
     brandName: 'Pinatech',
     images: [],
-    specifications: [],
-    variants: [{ id: id * 10, colorName: 'Negro', colorHex: '#000000', imageId: null, inStock: true, availableQuantity: 4 }],
+    inStock: true,
   });
   const mouse = product(1, 'Mouse Pro', 5, 'Periféricos');
   const processor = product(2, 'Ryzen Pro', 1, 'Procesadores');
 
-  async function createHome(getProducts: GetProducts = vi.fn(() => of({ content: [mouse, processor], totalPages: 1, totalElements: 2, number: 0, size: 100 } as Page<Product>))) {
+  async function createHome(getProducts: GetProducts = vi.fn((filters) => of({ content: [mouse, processor].filter((item) => item.categoryId === filters.categoryId), totalPages: 1, totalElements: 1, number: 0, size: 12 } as Page<Product>))) {
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
         { provide: CatalogService, useValue: {
           categories: () => of([{ id: 1, name: 'Procesadores', slug: 'procesadores' }, { id: 5, name: 'Periféricos', slug: 'perifericos' }]),
-          getProducts,
+          getProductCards: getProducts,
         } },
         { provide: AuthService, useValue: { isAuthenticated: () => false } },
       ],
@@ -93,18 +91,19 @@ describe('HomeComponent', () => {
     expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).toBeNull();
   });
 
-  it('loads every product page in blocks of 100 and renders more than two products per group', async () => {
+  it('loads only a bounded first page per category even when more pages exist', async () => {
     const keyboard = product(3, 'Teclado Pro', 5, 'Periféricos');
     const headset = product(4, 'Auriculares Pro', 5, 'Periféricos');
-    const getProducts = vi.fn((_filters: CatalogFilters, page: number, _sort: CatalogSort = 'name,asc', size = 12) => of(page === 0
-      ? { content: [mouse, keyboard], totalPages: 2, totalElements: 4, number: 0, size }
-      : { content: [headset, processor], totalPages: 2, totalElements: 4, number: 1, size }));
+    const getProducts = vi.fn((filters: CatalogFilters, page: number, _sort: CatalogSort = 'name,asc', size = 12) => of({
+      content: filters.categoryId === 5 ? [mouse, keyboard, headset] : [processor],
+      totalPages: 200, totalElements: 2400, number: page, size,
+    }));
 
     const fixture = await createHome(getProducts);
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(getProducts.mock.calls.map((call) => [call[1], call[3]])).toEqual([[0, 100], [1, 100]]);
+    expect(getProducts.mock.calls.map((call) => [call[0].categoryId, call[1], call[3]])).toEqual([[1, 0, 12], [5, 0, 12]]);
     const peripheralCards = fixture.nativeElement.querySelectorAll('.product-showcase:first-child app-product-card');
     expect(peripheralCards).toHaveLength(3);
     expect(fixture.nativeElement.querySelector('.product-showcase:first-child').textContent).toContain('Auriculares Pro');
@@ -112,7 +111,7 @@ describe('HomeComponent', () => {
 
   it('updates control bounds and handles track-only navigation keys without wrapping', async () => {
     const keyboard = product(3, 'Teclado Pro', 5, 'Periféricos');
-    const fixture = await createHome(vi.fn(() => of({ content: [mouse, keyboard, processor], totalPages: 1, totalElements: 3, number: 0, size: 100 })));
+    const fixture = await createHome(vi.fn((filters) => of({ content: [mouse, keyboard, processor].filter((item) => item.categoryId === filters.categoryId), totalPages: 1, totalElements: 3, number: 0, size: 12 })));
     await fixture.whenStable();
     fixture.detectChanges();
     const showcase = fixture.nativeElement.querySelector('.product-showcase') as HTMLElement;
