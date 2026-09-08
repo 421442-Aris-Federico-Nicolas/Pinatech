@@ -1,23 +1,13 @@
 import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { CatalogService, ProductListItemResponse } from '../catalog/catalog.service';
-
-interface ProductShowcaseGroup {
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly description: string;
-  readonly banner: BannerSlide;
-  readonly products: readonly ProductListItemResponse[];
-  readonly linkLabel: string;
-  readonly queryParams: Record<string, number> | null;
-}
+import { HomeSection, HomeSectionsService, resolveHomeBannerUrl } from './home-sections.service';
 
 interface HeroPanel {
   readonly eyebrow: string;
@@ -42,14 +32,13 @@ interface ProductTrackPosition {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent {
-  private readonly catalog = inject(CatalogService);
+  private readonly sectionsService = inject(HomeSectionsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   protected readonly auth = inject(AuthService);
 
-  protected readonly featured = signal<ProductListItemResponse[]>([]);
-  protected readonly peripheralCategoryId = signal<number | null>(null);
+  protected readonly sections = signal<HomeSection[]>([]);
   protected readonly heroIndex = signal(0);
   protected readonly heroPointerPaused = signal(false);
   protected readonly heroFocusPaused = signal(false);
@@ -79,58 +68,24 @@ export class HomeComponent {
     },
   ];
   protected readonly activeHeroPanel = computed<HeroPanel>(() => this.heroPanels[this.heroIndex()] ?? this.heroPanels[0]!);
-  protected readonly productGroups = computed<readonly ProductShowcaseGroup[]>(() => {
-    const products = this.featured();
-    const peripheralCategoryId = this.peripheralCategoryId();
-    const peripheralProducts = peripheralCategoryId === null ? [] : products.filter((product) => product.categoryId === peripheralCategoryId);
-    const hardwareProducts = peripheralCategoryId === null ? products : products.filter((product) => product.categoryId !== peripheralCategoryId);
-
-    return [
-      {
-        eyebrow: 'Periféricos',
-        title: 'Completá tu setup',
-        description: 'Teclados, mouse, auriculares y accesorios para jugar, trabajar y crear con comodidad.',
-        banner: { src: '/pinatech-banner-perifericos.jpg', alt: 'Periféricos Pinatech: teclado, auriculares y mouse', width: 2000, height: 848 },
-        products: peripheralProducts.slice(0, 12),
-        linkLabel: 'Ver todos los periféricos',
-        queryParams: peripheralCategoryId === null ? null : { category: peripheralCategoryId },
-      },
-      {
-        eyebrow: 'Hardware',
-        title: 'Potencia para tu equipo',
-        description: 'Procesadores, placas de video, memorias y almacenamiento para tu próxima actualización.',
-        banner: { src: '/pinatech-banner-hardware.jpg', alt: 'Hardware Pinatech: computadora de escritorio y periféricos', width: 2000, height: 848 },
-        products: hardwareProducts.slice(0, 12),
-        linkLabel: 'Ver catálogo de hardware',
-        queryParams: null,
-      },
-    ];
-  });
+  protected readonly bannerUrl = resolveHomeBannerUrl;
 
   constructor() {
-    this.loadFeatured();
+    this.loadSections();
   }
 
-  protected loadFeatured(): void {
+  protected loadSections(): void {
     this.isLoading.set(true);
     this.error.set(false);
 
-    this.catalog.categories()
+    this.sectionsService.sections()
       .pipe(
-        switchMap((categories) => {
-          const requests = categories.map((category) => this.catalog.getProductCards(
-            { search: '', categoryId: category.id, brandId: null, minPrice: null, maxPrice: null }, 0, 'name,asc', 12));
-          return (requests.length ? forkJoin(requests) : of([])).pipe(
-            map((pages) => ({ categories, products: pages.flatMap((page) => page.content) })),
-          );
-        }),
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isLoading.set(false)),
       )
       .subscribe({
-        next: ({ categories, products }) => {
-          this.peripheralCategoryId.set(categories.find((category) => category.slug === 'perifericos')?.id ?? null);
-          this.featured.set(products);
+        next: (sections) => {
+          this.sections.set(sections);
           afterNextRender({ read: () => this.refreshProductTracks() }, { injector: this.injector });
         },
         error: () => this.error.set(true),
@@ -146,8 +101,8 @@ export class HomeComponent {
     if (!hero?.contains(event.relatedTarget as Node | null)) this.heroFocusPaused.set(false);
   }
 
-  protected productTrackPosition(index: number): ProductTrackPosition {
-    return this.productTrackPositions()[index] ?? { atStart: true, atEnd: true };
+  protected productTrackPosition(sectionId: number): ProductTrackPosition {
+    return this.productTrackPositions()[sectionId] ?? { atStart: true, atEnd: true };
   }
 
   protected scrollProductTrack(track: HTMLElement, direction: -1 | 1): void {
@@ -168,14 +123,14 @@ export class HomeComponent {
     }
   }
 
-  protected updateProductTrackPosition(index: number, track: HTMLElement): void {
+  protected updateProductTrackPosition(sectionId: number, track: HTMLElement): void {
     const next = {
       atStart: track.scrollLeft <= 1,
       atEnd: track.scrollWidth - track.clientWidth - track.scrollLeft <= 1,
     };
-    const current = this.productTrackPositions()[index];
+    const current = this.productTrackPositions()[sectionId];
     if (current?.atStart === next.atStart && current.atEnd === next.atEnd) return;
-    this.productTrackPositions.update((positions) => ({ ...positions, [index]: next }));
+    this.productTrackPositions.update((positions) => ({ ...positions, [sectionId]: next }));
   }
 
   @HostListener('window:resize')
@@ -183,6 +138,11 @@ export class HomeComponent {
     for (const track of this.host.nativeElement.querySelectorAll<HTMLElement>('[data-product-track]')) {
       this.updateProductTrackPosition(Number(track.dataset['productTrack']), track);
     }
+  }
+
+  protected catalogQuery(section: HomeSection): Record<string, string> | null {
+    const categoryIds = section.categories.map((category) => category.id);
+    return categoryIds.length ? { category: categoryIds.join(',') } : null;
   }
 
   private reducedMotion(): boolean {

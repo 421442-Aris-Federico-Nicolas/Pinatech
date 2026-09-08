@@ -33,6 +33,8 @@ import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.inventory.repository.InventoryRepository;
 import com.computerstore.inventory.domain.Inventory;
 import com.computerstore.order.repository.CustomerOrderRepository;
+import com.computerstore.home.repository.HomeSectionRepository;
+import com.computerstore.home.service.HomeConfigurationLockService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -46,6 +48,8 @@ class CatalogAdminControllerTest {
     private ProductVariantRepository variants;
     private InventoryRepository inventory;
     private CatalogAdminController controller;
+    private HomeConfigurationLockService homeConfigurationLock;
+    private HomeSectionRepository homeSections;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +59,8 @@ class CatalogAdminControllerTest {
         images = Mockito.mock(ProductImageRepository.class);
         variants = Mockito.mock(ProductVariantRepository.class);
         inventory = Mockito.mock(InventoryRepository.class);
+        homeConfigurationLock = Mockito.mock(HomeConfigurationLockService.class);
+        homeSections = Mockito.mock(HomeSectionRepository.class);
         controller = new CatalogAdminController(
                 products,
                 categories,
@@ -64,7 +70,9 @@ class CatalogAdminControllerTest {
                 images,
                 inventory,
                 Mockito.mock(CustomerOrderRepository.class),
-                Mockito.mock(ProductImageService.class));
+                Mockito.mock(ProductImageService.class),
+                homeSections,
+                homeConfigurationLock);
     }
 
     @Test
@@ -75,6 +83,25 @@ class CatalogAdminControllerTest {
 
         assertThrows(BusinessRuleException.class, () -> controller.deleteCategory(1L));
 
+        verify(homeConfigurationLock).lock();
+        verify(categories, never()).save(category);
+    }
+
+    @Test
+    void rejectsDeletingCategoryReferencedByAnInactiveHomeSection() {
+        Category category = new Category("Notebooks", "notebooks");
+        when(categories.findById(1L)).thenReturn(Optional.of(category));
+        when(homeSections.existsByCategories_Id(1L)).thenReturn(true);
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> controller.deleteCategory(1L));
+
+        assertEquals("Category cannot be deleted because it is referenced by a home section, including inactive sections.",
+                error.getMessage());
+        var order = Mockito.inOrder(homeConfigurationLock, categories, homeSections);
+        order.verify(homeConfigurationLock).lock();
+        order.verify(categories).findById(1L);
+        order.verify(homeSections).existsByCategories_Id(1L);
         verify(categories, never()).save(category);
     }
 

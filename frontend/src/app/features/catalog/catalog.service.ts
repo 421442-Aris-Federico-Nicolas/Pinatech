@@ -40,7 +40,7 @@ export interface Product {
 export interface Page<T> { content: T[]; totalPages: number; totalElements: number; number: number; size: number; }
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
-export interface CatalogFilters { search: string; categoryId: number | null; brandId: number | null; minPrice: number | null; maxPrice: number | null; }
+export interface CatalogFilters { search: string; categoryId: number | null; categoryIds?: number[]; brandId: number | null; minPrice: number | null; maxPrice: number | null; }
 export type CatalogSort = 'name,asc' | 'name,desc' | 'price,asc' | 'price,desc';
 
 @Injectable({ providedIn: 'root' })
@@ -60,6 +60,7 @@ export class CatalogService {
     let params = new HttpParams().set('page', page).set('size', size).set('sort', sort);
     if (filters.search.trim()) params = params.set('search', filters.search.trim());
     if (filters.categoryId !== null) params = params.set('categoryId', filters.categoryId);
+    else if (filters.categoryIds?.length) params = params.set('categoryIds', filters.categoryIds.join(','));
     if (filters.brandId !== null) params = params.set('brandId', filters.brandId);
     if (filters.minPrice !== null) params = params.set('minPrice', filters.minPrice);
     if (filters.maxPrice !== null) params = params.set('maxPrice', filters.maxPrice);

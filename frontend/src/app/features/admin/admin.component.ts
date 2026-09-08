@@ -1,5 +1,5 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -19,8 +19,9 @@ import { AppSelectComponent, AppSelectOption } from '../../shared/ui/select/app-
 import { AppTextareaComponent } from '../../shared/ui/textarea/app-textarea.component';
 import { Product, ProductImage } from '../catalog/catalog.service';
 import { AdminOrder, AdminService, Brand, CancellationScope, Category, Inventory, InventoryListItem, OrdersSummary, InventorySummary, ProductListItem, PendingBankTransferProof, ProductPayload, ProductVariantPayload } from './admin.service';
+import { HomeSectionsComponent } from './home-sections/home-sections.component';
 
-type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory';
+type AdminSection = 'overview' | 'sales' | 'catalog' | 'inventory' | 'home';
 type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'PREPARING' | 'READY' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 const ORDER_FILTERS = ['ALL', 'PENDING_PAYMENT', 'PAID', 'PREPARING', 'READY', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 interface ProductForm extends ProductPayload { hasColorVariants: boolean; }
@@ -29,7 +30,7 @@ interface OrderAction { label: string; status: OrderStatus; danger?: boolean; }
 
 @Component({
   selector: 'app-admin',
-  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, CurrencyPipe, DatePipe, DecimalPipe, FormsModule],
+  imports: [AppBadgeDirective, AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, HomeSectionsComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
@@ -61,6 +62,8 @@ export class AdminComponent {
   private refundTrigger: HTMLElement | null = null;
   readonly imageUrl = resolveApiContentUrl;
   readonly section = signal<AdminSection>('overview');
+  readonly homeDirty = signal(false);
+  private readonly homeEditor = viewChild(HomeSectionsComponent);
   readonly sidebarCollapsed = signal(false);
   readonly loading = signal(false);
   readonly products = signal<ProductListItem[]>([]);
@@ -166,7 +169,11 @@ export class AdminComponent {
       || this.proofReviewing() !== null || this.taxonomySaving() || this.deletingTaxonomy() || this.deletingImage() !== null
       || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null
       || this.ordersRefreshing() || this.shipmentDocumentLoading() !== null
-      || (!force && !this.confirmDiscardProductChanges())) return;
+      || (!force && !this.confirmDiscard())) return;
+    if (this.section() === 'home') {
+      this.loading.set(false);
+      return;
+    }
     if (!preserveMessages) this.clearMessages();
     this.cancelLoad.next();
     this.cancelDetail.next();
@@ -210,8 +217,9 @@ export class AdminComponent {
   navigate(section: AdminSection): boolean {
     if (section === this.section()) return true;
     if (this.saving() || this.adjustingStock() || this.taxonomySaving() || this.deletingTaxonomy() || this.deletingImage() !== null || this.deactivatingProduct() || this.proofReviewing() !== null || this.orderUpdating() !== null || this.shipmentUpdating() !== null || this.refundConfirming() !== null || this.ordersRefreshing()) return false;
-    if (section !== this.section() && !this.confirmDiscardProductChanges()) return false;
+    if (section !== this.section() && !this.confirmDiscard()) return false;
     this.cancelLoad.next();
+    if (this.section() === 'home') this.homeDirty.set(false);
     if (this.section() === 'catalog') {
       this.clearPendingImages();
       Object.assign(this.form, this.selected() ? this.productForm(this.selected()!) : this.emptyProduct());
@@ -225,13 +233,19 @@ export class AdminComponent {
     this.reload(true);
     return true;
   }
-  sectionTitle(): string { return { overview: 'Resumen del negocio', sales: 'Ventas y pedidos', catalog: 'Catálogo', inventory: 'Inventario' }[this.section()]; }
+  sectionTitle(): string { return { overview: 'Resumen del negocio', sales: 'Ventas y pedidos', catalog: 'Catálogo', inventory: 'Inventario', home: 'Inicio de la tienda' }[this.section()]; }
   sectionDescription(): string { return {
     overview: 'Indicadores comerciales y operativos en tiempo real.',
     sales: 'Seguimiento y actualización del ciclo de cada pedido.',
     catalog: 'Productos, categorías y marcas de la tienda.',
     inventory: 'Disponibilidad, reservas y ajustes de stock.',
+    home: 'Contenido y productos que se publican en la portada.',
   }[this.section()]; }
+
+  refreshSection(): void {
+    if (this.section() === 'home') this.homeEditor()?.reload();
+    else this.reload();
+  }
 
   openNewProduct(): void { if (this.navigate('catalog')) this.resetProduct(); }
 
@@ -1075,6 +1089,35 @@ export class AdminComponent {
     if (this.section() !== 'catalog' || (this.productState() === this.productSnapshot && !this.pendingImages().length)) return true;
     return confirm('Tenés cambios sin guardar en el producto. ¿Querés descartarlos?');
   }
+  hasUnsavedChanges(): boolean {
+    if (this.section() === 'home') return this.homeEditor()?.hasUnsavedChanges() ?? this.homeDirty();
+    return this.section() === 'catalog' && (this.productState() !== this.productSnapshot || this.pendingImages().length > 0);
+  }
+
+  hasPendingOperation(): boolean {
+    return this.saving() || this.deactivatingProduct() || this.adjustingStock()
+      || this.proofReviewing() !== null || this.taxonomySaving() || Boolean(this.deletingTaxonomy())
+      || this.deletingImage() !== null || this.orderUpdating() !== null || this.shipmentUpdating() !== null
+      || this.refundConfirming() !== null || this.ordersRefreshing() || this.shipmentDocumentLoading() !== null
+      || (this.section() === 'home' && (this.homeEditor()?.isBusy() ?? false));
+  }
+
+  confirmDiscard(): boolean {
+    if (this.hasPendingOperation()) return false;
+    if (!this.hasUnsavedChanges()) return true;
+    if (this.section() === 'home') {
+      return this.homeEditor()?.confirmDiscard()
+        ?? confirm('Tenés cambios sin guardar en la sección del inicio. ¿Querés descartarlos?');
+    }
+    return confirm('Tenés cambios sin guardar en el producto. ¿Querés descartarlos?');
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  protectUnsavedChanges(event: BeforeUnloadEvent): void {
+    if (!this.hasUnsavedChanges() && !this.hasPendingOperation()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  }
   private refreshOrdersAfterShipmentAction(): void {
     this.ordersRefreshing.set(true);
     forkJoin({ orders: this.service.ordersPage(this.page(), this.orderFilter()), summary: this.service.ordersSummary() }).pipe(takeUntil(this.cancelLoad), takeUntilDestroyed(this.destroyRef), finalize(() => this.ordersRefreshing.set(false))).subscribe({
@@ -1194,7 +1237,7 @@ export class AdminComponent {
       }
     });
   }
-  private isSection(value: string | null): value is AdminSection { return ['overview', 'sales', 'catalog', 'inventory'].includes(value ?? ''); }
+  private isSection(value: string | null): value is AdminSection { return ['overview', 'sales', 'catalog', 'inventory', 'home'].includes(value ?? ''); }
   private syncUrl(queryParams: Record<string, string | number | null | undefined>): void {
     if (!this.router || !this.route) return;
     void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });

@@ -108,6 +108,7 @@ describe('AdminComponent payments', () => {
     expect(component.form.brandId).toBe(8);
     component.section.set('catalog');
     component.form.name = 'Edición pendiente';
+    expect(component.hasUnsavedChanges()).toBe(true);
     const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
 
     component.reload();

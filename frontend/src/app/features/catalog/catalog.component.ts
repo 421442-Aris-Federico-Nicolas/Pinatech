@@ -31,7 +31,7 @@ export class CatalogComponent {
   private request?: Subscription;
   private invalidPriceParams = false;
 
-  readonly filters: CatalogFilters = { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null };
+  readonly filters: CatalogFilters = { search: '', categoryId: null, categoryIds: [], brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<ProductListItemResponse> | null>(null);
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
@@ -72,6 +72,7 @@ export class CatalogComponent {
     const search = this.filters.search.trim();
     if (search) queryParams['search'] = search;
     if (this.filters.categoryId !== null) queryParams['category'] = this.filters.categoryId;
+    else if (this.filters.categoryIds?.length) queryParams['category'] = this.filters.categoryIds.join(',');
     if (this.filters.brandId !== null) queryParams['brand'] = this.filters.brandId;
     if (this.filters.minPrice !== null && this.filters.minPrice >= 0) queryParams['minPrice'] = this.filters.minPrice;
     if (this.filters.maxPrice !== null && this.filters.maxPrice >= 0) queryParams['maxPrice'] = this.filters.maxPrice;
@@ -81,7 +82,7 @@ export class CatalogComponent {
   }
 
   clearFilters(): void {
-    Object.assign(this.filters, { search: '', categoryId: null, brandId: null, minPrice: null, maxPrice: null });
+    Object.assign(this.filters, { search: '', categoryId: null, categoryIds: [], brandId: null, minPrice: null, maxPrice: null });
     this.sort.set('name,asc');
     this.priceError.set('');
     this.applyFilters();
@@ -121,7 +122,9 @@ export class CatalogComponent {
   private readParams(params: ParamMap): void {
     this.invalidPriceParams = false;
     this.filters.search = params.get('search') ?? '';
-    this.filters.categoryId = this.positiveNumber(params.get('category'));
+    const categoryIds = this.positiveNumbers(params.get('category'));
+    this.filters.categoryId = categoryIds.length === 1 ? categoryIds[0] : null;
+    this.filters.categoryIds = categoryIds.length > 1 ? categoryIds : [];
     this.filters.brandId = this.positiveNumber(params.get('brand'));
     this.filters.minPrice = this.priceParam(params.get('minPrice'));
     this.filters.maxPrice = this.priceParam(params.get('maxPrice'));
@@ -137,6 +140,12 @@ export class CatalogComponent {
   private positiveNumber(value: string | null): number | null {
     const parsed = Number(value);
     return value !== null && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  private positiveNumbers(value: string | null): number[] {
+    if (!value) return [];
+    const values = value.split(',').map((item) => this.positiveNumber(item.trim()));
+    return values.every((item): item is number => item !== null) ? [...new Set(values)] : [];
   }
 
   private priceParam(value: string | null): number | null {

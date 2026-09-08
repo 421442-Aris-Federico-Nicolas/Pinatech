@@ -6,7 +6,12 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  const isApiRequest = request.url === environment.apiBaseUrl || request.url.startsWith(`${environment.apiBaseUrl}/`);
+  const origin = globalThis.location?.origin ?? 'http://localhost';
+  const apiUrl = new URL(environment.apiBaseUrl, origin);
+  const requestUrl = new URL(request.url, origin);
+  const apiPath = apiUrl.pathname.replace(/\/$/, '');
+  const isApiRequest = requestUrl.origin === apiUrl.origin
+    && (requestUrl.pathname === apiPath || requestUrl.pathname.startsWith(`${apiPath}/`));
   if (!isApiRequest) {
     return next(request);
   }
@@ -17,7 +22,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     headers: auth.getAccessToken() ? source.headers.set('Authorization', `Bearer ${auth.getAccessToken()}`) : source.headers,
     withCredentials: true,
   });
-  const requestPath = request.url.slice(environment.apiBaseUrl.length).split(/[?#]/, 1)[0];
+  const requestPath = requestUrl.pathname.slice(apiPath.length);
   const isRefreshable = !['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout']
     .includes(requestPath);
 
