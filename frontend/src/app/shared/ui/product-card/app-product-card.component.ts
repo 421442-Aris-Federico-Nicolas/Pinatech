@@ -11,23 +11,14 @@ export interface ProductCardImage {
   readonly altText: string;
 }
 
-export interface ProductCardVariant {
-  readonly id: number;
-  readonly colorName: string;
-  readonly colorHex: string | null;
-  readonly inStock: boolean;
-  readonly availableQuantity: number;
-}
-
 export interface ProductCardProduct {
   readonly id: number;
   readonly name: string;
-  readonly description: string;
   readonly price: number;
   readonly categoryName: string;
   readonly brandName: string;
   readonly images: readonly ProductCardImage[];
-  readonly variants: readonly ProductCardVariant[];
+  readonly inStock: boolean;
 }
 
 export type ProductCardMode = 'catalog' | 'featured';
@@ -48,6 +39,6 @@ export class AppProductCardComponent {
   readonly mode = input<ProductCardMode>('catalog');
   readonly imagePriority = input(false);
   protected readonly imageUrl = resolveApiContentUrl;
-  protected readonly hasStock = computed(() => this.product().variants.some((variant) => variant.inStock));
+  protected readonly hasStock = computed(() => this.product().inStock);
   protected readonly displayedPrice = computed(() => bankTransferPrice(this.product().price).total);
 }

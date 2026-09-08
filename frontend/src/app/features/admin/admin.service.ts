@@ -7,6 +7,15 @@ import { CancellationReasonCode, Order } from '../../core/orders/order.service';
 export interface Category { id: number; name: string; slug: string; }
 export interface Brand { id: number; name: string; }
 export interface Inventory { productId: number; variantId: number; colorName: string; colorHex: string | null; availableQuantity: number; reservedQuantity: number; }
+export type InventoryListItem = Inventory & { productName: string; brandName: string };
+export type ProductListItem = Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'categoryId' | 'categoryName' | 'brandId' | 'brandName' | 'images'>;
+export interface OrdersSummary {
+  soldOrders: number; revenue: number; averageTicket: number; activeOrders: number;
+  statusCounts: Record<string, number>;
+  salesChart: Array<{ label: string; total: number; height: number }>;
+  recentOrders: AdminOrder[];
+}
+export interface InventorySummary { lowStock: number; availableUnits: number; }
 export interface ProductSpecificationPayload { groupName: string; name: string; value: string; highlighted: boolean; }
 export interface ProductVariantPayload { id?: number; colorName: string; colorHex: string | null; imageId: number | null; }
 export interface ProductPayload {
@@ -54,11 +63,24 @@ export class AdminService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/admin/catalog`;
 
-  products(search = '') {
-    let params = new HttpParams().set('size', 100).set('sort', 'name');
+  products(search = '', page = 0) {
+    let params = new HttpParams().set('page', page).set('size', 20).set('sort', 'name,asc');
     if (search.trim()) params = params.set('search', search.trim());
-    return this.http.get<Page<Product>>(`${environment.apiBaseUrl}/products`, { params });
+    return this.http.get<Page<ProductListItem>>(`${environment.apiBaseUrl}/products/cards`, { params });
   }
+
+  product(id: number) { return this.http.get<Product>(`${environment.apiBaseUrl}/products/${id}`); }
+  ordersPage(page = 0, status = 'ALL') {
+    let params = new HttpParams().set('page', page).set('size', 20);
+    if (status !== 'ALL') params = params.set('status', status);
+    return this.http.get<Page<AdminOrder>>(`${environment.apiBaseUrl}/admin/orders/page`, { params });
+  }
+  ordersSummary() { return this.http.get<OrdersSummary>(`${environment.apiBaseUrl}/admin/orders/summary`); }
+  inventoryPage(search = '', page = 0) {
+    const params = new HttpParams().set('search', search.trim()).set('page', page).set('size', 20);
+    return this.http.get<Page<InventoryListItem>>(`${environment.apiBaseUrl}/inventory/page`, { params });
+  }
+  inventorySummary() { return this.http.get<InventorySummary>(`${environment.apiBaseUrl}/inventory/summary`); }
 
   categories() { return this.http.get<Category[]>(`${this.baseUrl}/categories`); }
   brands() { return this.http.get<Brand[]>(`${this.baseUrl}/brands`); }
@@ -83,7 +105,7 @@ export class AdminService {
   adjustInventory(variantId: number, quantity: number, reason: string) {
     return this.http.post<Inventory>(`${environment.apiBaseUrl}/inventory/adjustments`, { variantId, quantity, reason });
   }
-  orders() { return this.http.get<AdminOrder[]>(`${environment.apiBaseUrl}/admin/orders`); }
+  order(id: number) { return this.http.get<AdminOrder>(`${environment.apiBaseUrl}/admin/orders/${id}`); }
   updateOrderStatus(id: number, status: string) { return this.http.patch<AdminOrder>(`${environment.apiBaseUrl}/admin/orders/${id}/status`, { status }); }
   retryShipment(orderId: number) { return this.http.post<void>(`${environment.apiBaseUrl}/admin/shipping/orders/${orderId}/retry`, null); }
   cancelShipment(orderId: number, payload: CancelShipmentPayload) {

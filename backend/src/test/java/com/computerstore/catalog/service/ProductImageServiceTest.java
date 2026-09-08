@@ -52,6 +52,35 @@ class ProductImageServiceTest {
     }
 
     @Test
+    void thumbnailReturnsJpegMetadataWhileDetailKeepsOriginal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        ProductImage image = new ProductImage(product, "Notebook", 0, STORAGE_KEY,
+                "image.png", "image/png", 100);
+        ReflectionTestUtils.setField(image, "id", 5L);
+        when(images.findByIdAndProductActiveTrue(5L)).thenReturn(Optional.of(image));
+        var path = java.nio.file.Files.write(directory.resolve("thumbnail.jpg"), new byte[]{1, 2, 3});
+        when(storage.thumbnail(STORAGE_KEY)).thenReturn(path);
+
+        var thumbnail = service.thumbnail(5L);
+
+        assertEquals(path, thumbnail.path());
+        assertEquals("image/jpeg", thumbnail.contentType());
+        assertEquals("image-5.jpg", thumbnail.fileName());
+        assertEquals(3, thumbnail.sizeBytes());
+        assertEquals("/api/products/images/5/content", service.response(image).contentUrl());
+        verify(storage, never()).load(any());
+    }
+
+    @Test
+    void thumbnailRejectsInactiveMissingAndExternalImagesBeforeStorageAccess() {
+        when(images.findByIdAndProductActiveTrue(5L)).thenReturn(Optional.empty());
+        assertThrows(com.computerstore.common.exception.ResourceNotFoundException.class, () -> service.thumbnail(5L));
+        var external = new ProductImage(product, "External", 0, null, null, null, 0);
+        when(images.findByIdAndProductActiveTrue(6L)).thenReturn(Optional.of(external));
+        assertThrows(com.computerstore.common.exception.ResourceNotFoundException.class, () -> service.thumbnail(6L));
+        org.mockito.Mockito.verifyNoInteractions(storage);
+    }
+
+    @Test
     void rejectsUploadAtMaximumImageCountBeforeStoring() {
         when(products.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(images.countByProductId(1L)).thenReturn(6L);

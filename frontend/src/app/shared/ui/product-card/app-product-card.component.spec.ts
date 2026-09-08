@@ -6,15 +6,11 @@ describe('AppProductCardComponent', () => {
   const product: ProductCardProduct = {
     id: 1,
     name: 'Mouse Pro',
-    description: 'Mouse profesional',
     price: 100,
     categoryName: 'Periféricos',
     brandName: 'Pinatech',
     images: [],
-    variants: [
-      { id: 11, colorName: 'Blanco', colorHex: '#ffffff', inStock: false, availableQuantity: 0 },
-      { id: 12, colorName: 'Negro', colorHex: '#000000', inStock: true, availableQuantity: 8 },
-    ],
+    inStock: true,
   };
 
   it('keeps the catalog card compact and links to the product detail', async () => {
@@ -49,5 +45,13 @@ describe('AppProductCardComponent', () => {
 
     expect(fixture.nativeElement.querySelector('.product-card__header h4')?.textContent).toContain('Mouse Pro');
     expect(fixture.nativeElement.querySelector('.product-card__header h2')).toBeNull();
+  });
+
+  it('renders unavailable cards without variant data', async () => {
+    await TestBed.configureTestingModule({ imports: [AppProductCardComponent], providers: [provideRouter([])] }).compileComponents();
+    const fixture = TestBed.createComponent(AppProductCardComponent);
+    fixture.componentRef.setInput('product', { ...product, inStock: false });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Disponible');
   });
 });

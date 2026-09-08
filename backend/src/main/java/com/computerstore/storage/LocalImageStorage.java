@@ -10,12 +10,17 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
@@ -28,6 +33,11 @@ public class LocalImageStorage {
     static final int MAX_WIDTH = 6000;
     static final int MAX_HEIGHT = 6000;
     static final long MAX_PIXELS = 12_000_000L;
+    private static final int THUMBNAIL_SIZE = 640;
+    private static final String THUMBNAIL_SUFFIX = ".thumbnail-v1.jpg";
+    // Bounded locks also coordinate storage instances sharing a root in this JVM.
+    private static final Object[] IMAGE_LOCKS = java.util.stream.IntStream.range(0, 64)
+            .mapToObj(index -> new Object()).toArray();
 
     private final Path root;
 
@@ -91,22 +101,81 @@ public class LocalImageStorage {
         }
     }
 
+    public Path thumbnail(String storageKey) {
+        Path original = resolveKey(storageKey);
+        Path destination = root.resolve(storageKey + THUMBNAIL_SUFFIX);
+        synchronized (IMAGE_LOCKS[Math.floorMod(original.hashCode(), IMAGE_LOCKS.length)]) {
+            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) {
+                return destination;
+            }
+            Path temporary = null;
+            try {
+                Path source = load(storageKey);
+                if (Files.size(source) > MAX_FILE_SIZE) {
+                    throw new InvalidRequestException("Image files must not exceed 5 MiB.");
+                }
+                BufferedImage decoded = inspect(source).decoded();
+                double scale = Math.min(1.0, (double) THUMBNAIL_SIZE / Math.max(decoded.getWidth(), decoded.getHeight()));
+                int width = Math.max(1, (int) Math.round(decoded.getWidth() * scale));
+                int height = Math.max(1, (int) Math.round(decoded.getHeight() * scale));
+                BufferedImage thumbnail = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                Graphics2D graphics = thumbnail.createGraphics();
+                try {
+                    graphics.setColor(Color.WHITE);
+                    graphics.fillRect(0, 0, width, height);
+                    graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    graphics.drawImage(decoded, 0, 0, width, height, null);
+                } finally {
+                    graphics.dispose();
+                }
+                temporary = Files.createTempFile(root, ".thumbnail-", ".tmp");
+                if (!ImageIO.write(thumbnail, "jpeg", temporary.toFile())) {
+                    throw new IOException("JPEG encoder unavailable.");
+                }
+                // Never expose partial JPEGs, including to other processes sharing the filesystem.
+                // Fail safely if atomic publication is unsupported by the storage volume.
+                try {
+                    Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
+                    temporary = null;
+                } catch (FileAlreadyExistsException exception) {
+                    if (!Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) {
+                        throw exception;
+                    }
+                }
+                return destination;
+            } catch (IOException exception) {
+                throw new FileStorageException("Could not create image thumbnail.", exception);
+            } finally {
+                if (temporary != null) {
+                    try {
+                        Files.deleteIfExists(temporary);
+                    } catch (IOException ignored) {
+                        // Preserve the actionable storage failure.
+                    }
+                }
+            }
+        }
+    }
+
     public void delete(String storageKey) {
         Path path = resolveKey(storageKey);
-        try {
-            if (!Files.exists(path)) {
-                return;
+        synchronized (IMAGE_LOCKS[Math.floorMod(path.hashCode(), IMAGE_LOCKS.length)]) {
+            try {
+                Files.deleteIfExists(root.resolve(storageKey + THUMBNAIL_SUFFIX));
+                if (!Files.exists(path)) {
+                    return;
+                }
+                Path realRoot = root.toRealPath();
+                Path realFile = path.toRealPath();
+                if (!realFile.startsWith(realRoot)) {
+                    throw new InvalidRequestException("Invalid storage key.");
+                }
+                Files.delete(realFile);
+            } catch (InvalidRequestException exception) {
+                throw exception;
+            } catch (IOException exception) {
+                throw new FileStorageException("Could not delete image file.", exception);
             }
-            Path realRoot = root.toRealPath();
-            Path realFile = path.toRealPath();
-            if (!realFile.startsWith(realRoot)) {
-                throw new InvalidRequestException("Invalid storage key.");
-            }
-            Files.delete(realFile);
-        } catch (InvalidRequestException exception) {
-            throw exception;
-        } catch (IOException exception) {
-            throw new FileStorageException("Could not delete image file.", exception);
         }
     }
 
@@ -157,7 +226,7 @@ public class LocalImageStorage {
                 if (decoded == null) {
                     throw new InvalidRequestException("The uploaded image could not be decoded.");
                 }
-                return new ImageMetadata(contentType);
+                return new ImageMetadata(contentType, decoded);
             } finally {
                 reader.dispose();
             }
@@ -211,7 +280,7 @@ public class LocalImageStorage {
         }
     }
 
-    private record ImageMetadata(String contentType) {}
+    private record ImageMetadata(String contentType, BufferedImage decoded) {}
 
     public record StoredImage(String storageKey, String originalFilename, String contentType, long sizeBytes) {}
 }

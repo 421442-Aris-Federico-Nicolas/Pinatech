@@ -21,6 +21,48 @@ import org.junit.jupiter.api.Test;
 class ProductControllerTest {
 
     @Test
+    void imageRoutesServeCorrectBytesAndImmutableCacheHeaders(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        var images = mock(ProductImageService.class);
+        var path = java.nio.file.Files.write(directory.resolve("image"), new byte[]{1, 2, 3});
+        when(images.thumbnail(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/jpeg", "image-5.jpg", 3));
+        when(images.content(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/png", "original.png", 3));
+        var controller = new ProductController(mock(ProductRepository.class), mock(ProductSpecificationRepository.class),
+                mock(ProductVariantRepository.class), mock(InventoryRepository.class), images);
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        for (String route : List.of("thumbnail", "content")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/products/images/5/" + route))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType(
+                            route.equals("thumbnail") ? "image/jpeg" : "image/png"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(new byte[]{1, 2, 3}))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Length", "3"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "max-age=604800, public, immutable"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition",
+                            org.hamcrest.Matchers.startsWith("inline;")));
+        }
+    }
+
+    @Test
+    void cardsNormalizesSearchBoundsPageAndDoesNotLoadDetailCollections() {
+        var products = mock(ProductRepository.class);
+        var specifications = mock(ProductSpecificationRepository.class);
+        var variants = mock(ProductVariantRepository.class);
+        var inventory = mock(InventoryRepository.class);
+        var images = mock(ProductImageService.class);
+        var controller = new ProductController(products, specifications, variants, inventory, images);
+        var pageable = org.springframework.data.domain.PageRequest.of(2, 500,
+                org.springframework.data.domain.Sort.by("price").descending());
+        controller.cards(" ALPHA ", 2L, 3L, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, pageable);
+        org.mockito.Mockito.verify(products).findCards("%alpha%", 2L, 3L, java.math.BigDecimal.ONE,
+                java.math.BigDecimal.TEN, org.springframework.data.domain.PageRequest.of(2, 100,
+                        pageable.getSort().and(org.springframework.data.domain.Sort.by("id"))));
+        controller.cards("  ", null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 12));
+        org.mockito.Mockito.verify(products).findCards(null, null, null, null, null,
+                org.springframework.data.domain.PageRequest.of(0, 12, org.springframework.data.domain.Sort.by("id")));
+        org.mockito.Mockito.verifyNoInteractions(specifications, variants, inventory, images);
+    }
+
+    @Test
     void publicDetailExposesVariantImageId() {
         ProductRepository products = mock(ProductRepository.class);
         ProductSpecificationRepository specifications = mock(ProductSpecificationRepository.class);
@@ -31,7 +73,7 @@ class ProductControllerTest {
         ProductVariant variant = mock(ProductVariant.class);
         Category category = mock(Category.class);
         Brand brand = mock(Brand.class);
-        when(products.findById(1L)).thenReturn(Optional.of(product));
+        when(products.findDetailById(1L)).thenReturn(Optional.of(product));
         when(product.isActive()).thenReturn(true);
         when(product.getId()).thenReturn(1L);
         when(product.getCategory()).thenReturn(category);

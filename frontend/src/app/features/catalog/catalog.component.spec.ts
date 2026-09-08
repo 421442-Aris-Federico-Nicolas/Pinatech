@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { CatalogComponent } from './catalog.component';
-import { CatalogService, Page, Product } from './catalog.service';
+import { CatalogService, Page, ProductListItemResponse as Product } from './catalog.service';
 
 describe('CatalogComponent', () => {
   it('renders the mascot as the only zero-result status and keeps clear filters usable', async () => {
@@ -13,7 +13,7 @@ describe('CatalogComponent', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ search: 'inexistente', category: '3' })) } },
         { provide: Router, useValue: { navigate, navigateByUrl: vi.fn() } },
-        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts: () => of(emptyPage) } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: () => of(emptyPage) } },
       ],
     }).compileComponents();
 
@@ -44,7 +44,7 @@ describe('CatalogComponent', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ minPrice: '36.13', maxPrice: '36.13', sort: 'price,desc' })) } },
         { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
-        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: getProducts } },
       ],
     }).compileComponents();
 
@@ -60,7 +60,7 @@ describe('CatalogComponent', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ minPrice: '100.001', maxPrice: '50' })) } },
         { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
-        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProducts } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: getProducts } },
       ],
     }).compileComponents();
 
