@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AdminComponent } from './admin.component';
 import { AdminOrder, PendingBankTransferProof } from './admin.service';
+import { HomeSectionsComponent } from './home-sections/home-sections.component';
 
 describe('Admin section HTTP budgets', () => {
   const base = environment.apiBaseUrl;
@@ -170,6 +172,65 @@ describe('Admin section HTTP budgets', () => {
     expect(component.availableUnits()).toBe(1500);
     expect(component.statusCount('ALL')).toBe(50);
     expect(component.orders()).toEqual([]);
+  });
+
+  it('mounts Home requests only in its section and does not load other admin resources', () => {
+    const { fixture, component, http } = setup('home');
+    fixture.detectChanges();
+    const requests = http.match(() => true);
+    expect(requests.map((request) => request.request.url).sort()).toEqual([
+      `${base}/admin/catalog/categories`, `${base}/admin/home/sections`,
+    ]);
+    requests.find((request) => request.request.url.endsWith('/home/sections'))!.flush([]);
+    requests.find((request) => request.request.url.endsWith('/categories'))!.flush([]);
+    fixture.detectChanges();
+    expect(component.section()).toBe('home');
+    http.expectNone((request) => request.url.includes('/products/cards'));
+
+    const homeEditor = fixture.debugElement.query(By.directive(HomeSectionsComponent)).componentInstance as HomeSectionsComponent;
+    homeEditor.setMode('AUTOMATIC');
+    expect(component.homeDirty()).toBe(true);
+    expect(component.hasUnsavedChanges()).toBe(true);
+    const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+    expect(component.navigate('overview')).toBe(false);
+    expect(confirmation).toHaveBeenCalledOnce();
+    expect(component.section()).toBe('home');
+    http.expectNone(() => true);
+    confirmation.mockReturnValue(true);
+    component.navigate('overview');
+    expect(confirmation).toHaveBeenCalledTimes(2);
+    expect(component.homeDirty()).toBe(false);
+    const overview = http.match(() => true);
+    expect(overview.map((request) => request.request.url).sort()).toEqual([
+      `${base}/admin/orders/summary`, `${base}/inventory/summary`,
+    ]);
+    overview.forEach((request) => request.flush(request.request.url.endsWith('/orders/summary') ? summary : { lowStock: 0, availableUnits: 0 }));
+    confirmation.mockRestore();
+  });
+
+  it('blocks leaving Home during candidate loading without opening a confirmation', () => {
+    const { fixture, component, http } = setup('home');
+    fixture.detectChanges();
+    http.expectOne(`${base}/admin/home/sections`).flush([{
+      id: 1, displayOrder: 0, eyebrow: '', title: 'Hardware', description: '', buttonLabel: '', mode: 'MANUAL',
+      productLimit: 8, sort: 'NEWEST', categoryIds: [], productIds: [1], active: true,
+      bannerDesktopUrl: null, bannerMobileUrl: null,
+    }]);
+    http.expectOne(`${base}/admin/catalog/categories`).flush([]);
+    const candidates = http.expectOne((request) => request.url.endsWith('/products/cards'));
+    fixture.detectChanges();
+    const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+
+    expect(component.hasPendingOperation()).toBe(true);
+    expect(component.navigate('overview')).toBe(false);
+    expect(confirmation).not.toHaveBeenCalled();
+    const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    component.protectUnsavedChanges(event);
+    expect(event.defaultPrevented).toBe(true);
+
+    candidates.flush({ content: [], number: 0, size: 24, totalPages: 0, totalElements: 0 });
+    expect(component.hasPendingOperation()).toBe(false);
+    confirmation.mockRestore();
   });
 
   it('cancels the old section on navigation and outstanding requests on destroy', () => {

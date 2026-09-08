@@ -40,7 +40,11 @@ main {
 .section-heading h2 { font-size: clamp(2.25rem, 5vw, 4rem); letter-spacing: -.06em; margin: 0; }
 .section-heading > a { color: var(--color-cyan); flex: 0 0 auto; font-weight: var(--font-weight-bold); text-decoration: none; }
 .product-sections { display: grid; gap: var(--space-12); }
-.product-showcase { background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-bg-chrome) 96%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 70%, transparent) 42%, color-mix(in srgb, var(--color-bg-chrome) 38%, transparent) 100%), var(--product-banner); background-position: center; background-repeat: no-repeat; background-size: cover; border: 1px solid var(--color-border-strong); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: grid; gap: clamp(var(--space-5), 3vw, var(--space-8)); grid-template-columns: minmax(270px, .65fr) minmax(0, 1.6fr); min-height: 510px; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); position: relative; }
+.product-showcase { background: var(--color-bg-chrome); border: 1px solid var(--color-border-strong); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: grid; gap: clamp(var(--space-5), 3vw, var(--space-8)); grid-template-columns: minmax(270px, .65fr) minmax(0, 1.6fr); min-height: 510px; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); position: relative; }
+.product-banner { inset: 0; position: absolute; }
+.product-banner::after { background: linear-gradient(90deg, color-mix(in srgb, var(--color-bg-chrome) 96%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 70%, transparent) 42%, color-mix(in srgb, var(--color-bg-chrome) 38%, transparent) 100%); content: ""; inset: 0; position: absolute; }
+.product-banner img { height: 100%; object-fit: cover; width: 100%; }
+.product-showcase.no-banner { background: linear-gradient(135deg, var(--color-bg-chrome), var(--color-surface)); }
 .product-showcase::after { background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--color-bg-chrome) 35%, transparent)); content: ""; inset: 0; pointer-events: none; position: absolute; }
 .product-promo { align-items: end; display: flex; min-width: 0; position: relative; z-index: 1; }
 .product-promo__copy { backdrop-filter: blur(8px); background: color-mix(in srgb, var(--color-bg-deep) 86%, transparent); border: 1px solid color-mix(in srgb, var(--color-cyan) 18%, transparent); border-radius: var(--radius-lg); display: flex; flex-direction: column; padding: var(--space-6); width: 100%; }
@@ -80,7 +84,8 @@ main {
 @media (max-width: 850px) {
   .hero-stage { background: var(--color-bg-deep); }
   .hero-copy { align-items: start; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 4rem); grid-template-columns: 1fr; margin-top: clamp(-4rem, -8vw, -2.5rem); padding: clamp(5rem, 12vw, 7rem) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-8); position: relative; }
-  .product-showcase { background-image: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 88%, transparent) 34%, var(--color-bg-chrome) 100%), var(--product-banner); background-position: center top; grid-template-columns: 1fr; padding: var(--space-4); }
+  .product-showcase { grid-template-columns: 1fr; padding: var(--space-4); }
+  .product-banner::after { background: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 88%, transparent) 34%, var(--color-bg-chrome) 100%); }
   .product-promo { min-height: 250px; }
   .product-promo__copy { max-width: 420px; }
   .products > li { flex-basis: 86%; }

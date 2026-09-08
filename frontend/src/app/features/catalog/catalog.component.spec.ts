@@ -70,4 +70,20 @@ describe('CatalogComponent', () => {
     expect(getProducts).not.toHaveBeenCalled();
     expect(fixture.componentInstance.priceError()).toBe('Ingresá precios válidos, con hasta dos decimales.');
   });
+
+  it('coordinates CSV category links from Home with the cards request', async () => {
+    const getProducts = vi.fn(() => of({ content: [], totalPages: 0, totalElements: 0, number: 0, size: 12 }));
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ category: '5,8' })) } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: getProducts } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.filters.categoryIds).toEqual([5, 8]);
+    expect(getProducts).toHaveBeenCalledWith(expect.objectContaining({ categoryId: null, categoryIds: [5, 8] }), 0, 'name,asc');
+  });
 });

@@ -16,35 +16,42 @@
     <a routerLink="/tickets"><iconify-icon icon="line-md:cog" aria-hidden="true"></iconify-icon><span><b>Servicio técnico</b><small>Crear y consultar solicitudes</small></span></a>
   </section>
 
+  @if (isLoading() || error() || sections().length) {
   <section class="featured" aria-labelledby="products-title">
     <header class="section-heading"><div><p class="eyebrow">Catálogo activo</p><h2 id="products-title">Productos para cada objetivo</h2></div><a routerLink="/catalog">Ver catálogo completo <span aria-hidden="true">→</span></a></header>
     @if (isLoading()) {
       <div class="status" aria-live="polite"><span class="loader" aria-hidden="true"></span><p>Cargando productos…</p></div>
     } @else if (error()) {
-      <app-feedback class="status" tone="error" announce="assertive">No pudimos cargar los productos.<button feedback-actions appButton="text" type="button" (click)="loadFeatured()">Reintentar</button></app-feedback>
+       <app-feedback class="status" tone="error" announce="assertive">No pudimos cargar las secciones del inicio.<button feedback-actions appButton="text" type="button" (click)="loadSections()">Reintentar</button></app-feedback>
     } @else {
       <div class="product-sections">
-        @for (group of productGroups(); track group.eyebrow; let index = $index) {
-          <section class="product-showcase" [style.--product-banner]="'url(' + group.banner.src + ')'" [attr.aria-labelledby]="'product-group-' + index">
-            <article class="product-promo">
-              <div class="product-promo__copy">
-                <p class="eyebrow">{{ group.eyebrow }}</p>
-                <h3 [id]="'product-group-' + index">{{ group.title }}</h3>
-                <p>{{ group.description }}</p>
-                <a appButton="outlined" routerLink="/catalog" [queryParams]="group.queryParams">{{ group.linkLabel }}</a>
-              </div>
-            </article>
-            <div class="product-track-shell">
-              <div class="product-track-controls" role="group" [attr.aria-label]="'Controles de productos de ' + group.eyebrow">
-                <button appButton="text" type="button" [disabled]="productTrackPosition(index).atStart" [attr.aria-controls]="'product-track-' + index" [attr.aria-label]="'Ver productos anteriores de ' + group.eyebrow" (click)="scrollProductTrack(track, -1)">←</button>
-                <button appButton="text" type="button" [disabled]="productTrackPosition(index).atEnd" [attr.aria-controls]="'product-track-' + index" [attr.aria-label]="'Ver productos siguientes de ' + group.eyebrow" (click)="scrollProductTrack(track, 1)">→</button>
-              </div>
-              <ul #track class="products" tabindex="0" [id]="'product-track-' + index" [attr.data-product-track]="index" [attr.aria-label]="'Productos de ' + group.eyebrow + '. Usá las flechas izquierda y derecha, Inicio o Fin para recorrerlos.'" (scroll)="updateProductTrackPosition(index, track)" (keydown)="productTrackKeydown($event, track)">
-                @for (product of group.products; track product.id) {
-                  <li><app-product-card [product]="product" mode="featured" /></li>
-                } @empty {
-                  <li class="status"><p>No hay productos publicados en {{ group.eyebrow.toLowerCase() }} por el momento.</p><a appButton="text" routerLink="/catalog" [queryParams]="group.queryParams">Revisar catálogo</a></li>
-                }
+         @for (section of sections(); track section.id) {
+           <section class="product-showcase" [class.no-banner]="!section.bannerDesktopUrl && !section.bannerMobileUrl" [attr.aria-labelledby]="'product-group-' + section.id">
+             @if (section.bannerDesktopUrl || section.bannerMobileUrl) {
+               <picture class="product-banner" aria-hidden="true">
+                 <source media="(max-width: 850px)" [srcset]="bannerUrl(section.bannerMobileUrl || section.bannerDesktopUrl)">
+                 <img [src]="bannerUrl(section.bannerDesktopUrl || section.bannerMobileUrl)" alt="" width="2000" height="848" loading="lazy">
+               </picture>
+             }
+             <article class="product-promo">
+               <div class="product-promo__copy">
+                 @if (section.eyebrow?.trim()) { <p class="eyebrow">{{ section.eyebrow }}</p> }
+                 <h3 [id]="'product-group-' + section.id">{{ section.title }}</h3>
+                 @if (section.description?.trim()) { <p>{{ section.description }}</p> }
+                 @if (section.mode === 'AUTOMATIC' && section.buttonLabel?.trim()) { <a appButton="outlined" routerLink="/catalog" [queryParams]="catalogQuery(section)">{{ section.buttonLabel }}</a> }
+               </div>
+             </article>
+             <div class="product-track-shell">
+               <div class="product-track-controls" role="group" [attr.aria-label]="'Controles de productos de ' + section.title">
+                 <button appButton="text" type="button" [disabled]="productTrackPosition(section.id).atStart" [attr.aria-controls]="'product-track-' + section.id" [attr.aria-label]="'Ver productos anteriores de ' + section.title" (click)="scrollProductTrack(track, -1)">←</button>
+                 <button appButton="text" type="button" [disabled]="productTrackPosition(section.id).atEnd" [attr.aria-controls]="'product-track-' + section.id" [attr.aria-label]="'Ver productos siguientes de ' + section.title" (click)="scrollProductTrack(track, 1)">→</button>
+               </div>
+               <ul #track class="products" tabindex="0" [id]="'product-track-' + section.id" [attr.data-product-track]="section.id" [attr.aria-label]="'Productos de ' + section.title + '. Usá las flechas izquierda y derecha, Inicio o Fin para recorrerlos.'" (scroll)="updateProductTrackPosition(section.id, track)" (keydown)="productTrackKeydown($event, track)">
+                 @for (product of section.products; track product.id) {
+                   <li><app-product-card [product]="product" mode="featured" /></li>
+                 } @empty {
+                   <li class="status"><p>No hay productos publicados en esta sección por el momento.</p>@if (section.mode === 'AUTOMATIC' && section.buttonLabel?.trim()) { <a appButton="text" routerLink="/catalog" [queryParams]="catalogQuery(section)">Revisar catálogo</a> }</li>
+                 }
               </ul>
             </div>
           </section>
@@ -52,6 +59,7 @@
       </div>
     }
   </section>
+  }
 
   <section class="service" aria-labelledby="service-title">
     <div class="service-copy">

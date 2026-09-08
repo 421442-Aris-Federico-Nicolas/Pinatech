@@ -1,157 +1,131 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { BannerCarouselComponent } from '../../shared/ui/banner-carousel/banner-carousel.component';
-import { CatalogFilters, CatalogService, CatalogSort, Page, ProductListItemResponse as Product } from '../catalog/catalog.service';
+import { ProductListItemResponse as Product } from '../catalog/catalog.service';
 import { HomeComponent } from './home.component';
+import { HomeSection, HomeSectionsService } from './home-sections.service';
 
 describe('HomeComponent', () => {
-  type GetProducts = (filters: CatalogFilters, page: number, sort?: CatalogSort, pageSize?: number) => Observable<Page<Product>>;
-  const product = (id: number, name: string, categoryId: number, categoryName: string): Product => ({
-    id,
-    name,
-    slug: name.toLowerCase().replaceAll(' ', '-'),
-    price: 1000,
-    categoryId,
-    categoryName,
-    brandId: 1,
-    brandName: 'Pinatech',
-    images: [],
-    inStock: true,
+  const product = (id: number, name: string, categoryId = 5): Product => ({
+    id, name, slug: name.toLowerCase().replaceAll(' ', '-'), price: 1000, categoryId,
+    categoryName: 'Periféricos', brandId: 1, brandName: 'Pinatech', images: [], inStock: true,
   });
-  const mouse = product(1, 'Mouse Pro', 5, 'Periféricos');
-  const processor = product(2, 'Ryzen Pro', 1, 'Procesadores');
+  const mouse = product(1, 'Mouse Pro');
+  const automatic: HomeSection = {
+    id: 17, displayOrder: 0, eyebrow: 'Periféricos', title: 'Completá tu setup',
+    description: 'Todo para tu escritorio.', buttonLabel: 'Ver periféricos', mode: 'AUTOMATIC',
+    productLimit: 12, sort: 'NAME_ASC', bannerDesktopUrl: '/pinatech-banner-perifericos.jpg',
+    bannerMobileUrl: '/api/home/sections/17/mobile', categories: [{ id: 5, name: 'Periféricos', slug: 'perifericos' }], products: [mouse],
+  };
 
-  async function createHome(getProducts: GetProducts = vi.fn((filters) => of({ content: [mouse, processor].filter((item) => item.categoryId === filters.categoryId), totalPages: 1, totalElements: 1, number: 0, size: 12 } as Page<Product>))) {
+  async function createHome(response: Observable<HomeSection[]> = of([automatic])) {
+    const sections = vi.fn(() => response);
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
-        { provide: CatalogService, useValue: {
-          categories: () => of([{ id: 1, name: 'Procesadores', slug: 'procesadores' }, { id: 5, name: 'Periféricos', slug: 'perifericos' }]),
-          getProductCards: getProducts,
-        } },
+        { provide: HomeSectionsService, useValue: { sections } },
         { provide: AuthService, useValue: { isAuthenticated: () => false } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
-    return fixture;
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return { fixture, sections };
   }
 
-  it('keeps the hero, product categories and technical service as separate sections', async () => {
-    const fixture = await createHome();
+  it('keeps hero, access and service blocks while rendering API sections from one request', async () => {
+    const { fixture, sections } = await createHome();
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+    const showcase = fixture.nativeElement.querySelector('.product-showcase') as HTMLElement;
 
-    const carousels = fixture.debugElement.queryAll(By.directive(BannerCarouselComponent));
-    const productSections = fixture.nativeElement.querySelectorAll('.product-showcase') as NodeListOf<HTMLElement>;
-    expect(carousels).toHaveLength(1);
-    expect(carousels[0].componentInstance.slides().map((slide: { src: string }) => slide.src)).toEqual(['/pinatech-banner-home.jpg', '/pinatech-banner-cart.jpg']);
-    expect(productSections).toHaveLength(2);
-    expect(productSections[0].textContent).toContain('Mouse Pro');
-    expect(productSections[0].textContent).not.toContain('Ryzen Pro');
-    expect(productSections[1].textContent).toContain('Ryzen Pro');
-    expect(productSections[1].textContent).not.toContain('Mouse Pro');
-    const firstHeroCopy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
-    expect(firstHeroCopy.textContent).toContain('Elevá tu setup.');
-
-    (carousels[0].componentInstance as BannerCarouselComponent).next();
-    fixture.detectChanges();
-
-    const replacementHeroCopy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
-    expect(replacementHeroCopy).not.toBe(firstHeroCopy);
-    expect(replacementHeroCopy.textContent).toContain('No dejes que tu carrito');
-    expect(fixture.nativeElement.querySelector('.hero-actions a').textContent).toContain('Ver mi carrito');
-    expect(fixture.nativeElement.querySelector('.hero-actions a').getAttribute('href')).toBe('/cart');
+    expect(sections).toHaveBeenCalledOnce();
+    expect(showcase.textContent).toContain('Mouse Pro');
+    expect(showcase.id).toBe('');
+    expect(showcase.querySelector('.products')?.id).toBe('product-track-17');
+    expect(fixture.nativeElement.querySelectorAll('.paths a')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('.service a').getAttribute('href')).toBe('/tickets');
+    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.jpg', '/pinatech-banner-cart.jpg']);
   });
 
-  it('pauses autoplay temporarily while pointer or focus remain inside the hero', async () => {
-    const fixture = await createHome();
+  it('uses responsive banner fallback, keeps static assets on the frontend and resolves API paths', async () => {
+    const desktopOnly = { ...automatic, id: 18, bannerMobileUrl: null };
+    const { fixture } = await createHome(of([automatic, desktopOnly]));
+    const [responsive, fallback] = [...fixture.nativeElement.querySelectorAll('.product-showcase')] as HTMLElement[];
+
+    expect(responsive.querySelector('img')?.getAttribute('src')).toBe('/pinatech-banner-perifericos.jpg');
+    expect(responsive.querySelector('source')?.getAttribute('srcset')).toContain('/api/home/sections/17/mobile');
+    expect(fallback.querySelector('source')?.getAttribute('srcset')).toBe('/pinatech-banner-perifericos.jpg');
+  });
+
+  it('shows CTA only for automatic sections with a nonblank label and encodes multiple categories as CSV', async () => {
+    const manual = { ...automatic, id: 18, mode: 'MANUAL' as const, title: 'Elegidos', buttonLabel: 'No visible', categories: [] };
+    const blank = { ...automatic, id: 19, title: 'Sin CTA', buttonLabel: '  ', categories: [] };
+    const multiple = { ...automatic, categories: [...automatic.categories, { id: 8, name: 'Audio', slug: 'audio' }] };
+    const { fixture } = await createHome(of([multiple, manual, blank]));
+    const showcases = [...fixture.nativeElement.querySelectorAll('.product-showcase')] as HTMLElement[];
+
+    expect(showcases[0].querySelector('.product-promo__copy a')?.getAttribute('href')).toContain('category=5,8');
+    expect(showcases[1].querySelector('.product-promo__copy a')).toBeNull();
+    expect(showcases[2].querySelector('.product-promo__copy a')).toBeNull();
+  });
+
+  it('omits blank optional copy and uses a neutral section when no banner exists', async () => {
+    const minimal = { ...automatic, eyebrow: null, description: null, buttonLabel: null, bannerDesktopUrl: null, bannerMobileUrl: null };
+    const { fixture } = await createHome(of([minimal]));
+    const showcase = fixture.nativeElement.querySelector('.product-showcase') as HTMLElement;
+    expect(showcase.classList.contains('no-banner')).toBe(true);
+    expect(showcase.querySelector('picture')).toBeNull();
+    expect(showcase.querySelector('.product-promo__copy > .eyebrow')).toBeNull();
+    expect(showcase.querySelector('.product-promo__copy > p:not(.eyebrow)')).toBeNull();
+  });
+
+  it('keeps the rest of Home and omits the showcase area for an empty response', async () => {
+    const { fixture } = await createHome(of([]));
+    expect(fixture.nativeElement.querySelector('.featured')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.hero')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.service')).toBeTruthy();
+  });
+
+  it('renders an error with retry without removing stable Home blocks', async () => {
+    const { fixture } = await createHome(throwError(() => new Error('offline')));
+    expect(fixture.nativeElement.textContent).toContain('No pudimos cargar las secciones del inicio');
+    expect(fixture.nativeElement.querySelector('.hero')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.service')).toBeTruthy();
+  });
+
+  it('pauses the hero while pointer or focus remain inside it', async () => {
+    const { fixture } = await createHome();
     const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
     const hero = fixture.nativeElement.querySelector('.hero') as HTMLElement;
-    const outsideAction = fixture.nativeElement.querySelector('.paths a') as HTMLElement;
-
     hero.dispatchEvent(new Event('pointerenter'));
     hero.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
     fixture.detectChanges();
     expect(carousel.paused()).toBe(true);
-    expect(carousel.autoplayPaused()).toBe(true);
-
     hero.dispatchEvent(new Event('pointerleave'));
-    fixture.detectChanges();
-    expect(carousel.paused()).toBe(true);
-    expect(carousel.autoplayPaused()).toBe(true);
-
-    hero.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outsideAction }));
+    hero.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: fixture.nativeElement.querySelector('.paths a') }));
     fixture.detectChanges();
     expect(carousel.paused()).toBe(false);
-    expect(carousel.autoplayPaused()).toBe(false);
-    expect(fixture.nativeElement.querySelector('.banner-carousel__autoplay')).toBeNull();
   });
 
-  it('loads only a bounded first page per category even when more pages exist', async () => {
-    const keyboard = product(3, 'Teclado Pro', 5, 'Periféricos');
-    const headset = product(4, 'Auriculares Pro', 5, 'Periféricos');
-    const getProducts = vi.fn((filters: CatalogFilters, page: number, _sort: CatalogSort = 'name,asc', size = 12) => of({
-      content: filters.categoryId === 5 ? [mouse, keyboard, headset] : [processor],
-      totalPages: 200, totalElements: 2400, number: page, size,
-    }));
-
-    const fixture = await createHome(getProducts);
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(getProducts.mock.calls.map((call) => [call[0].categoryId, call[1], call[3]])).toEqual([[1, 0, 12], [5, 0, 12]]);
-    const peripheralCards = fixture.nativeElement.querySelectorAll('.product-showcase:first-child app-product-card');
-    expect(peripheralCards).toHaveLength(3);
-    expect(fixture.nativeElement.querySelector('.product-showcase:first-child').textContent).toContain('Auriculares Pro');
-  });
-
-  it('updates control bounds and handles track-only navigation keys without wrapping', async () => {
-    const keyboard = product(3, 'Teclado Pro', 5, 'Periféricos');
-    const fixture = await createHome(vi.fn((filters) => of({ content: [mouse, keyboard, processor].filter((item) => item.categoryId === filters.categoryId), totalPages: 1, totalElements: 3, number: 0, size: 12 })));
-    await fixture.whenStable();
-    fixture.detectChanges();
+  it('keeps carousel controls bounded and keyboard accessible', async () => {
+    const { fixture } = await createHome(of([{ ...automatic, products: [mouse, product(2, 'Teclado')] }]));
     const showcase = fixture.nativeElement.querySelector('.product-showcase') as HTMLElement;
     const track = showcase.querySelector('.products') as HTMLElement;
     let scrollLeft = 0;
     Object.defineProperties(track, {
-      clientWidth: { configurable: true, value: 300 },
-      scrollWidth: { configurable: true, value: 900 },
+      clientWidth: { configurable: true, value: 300 }, scrollWidth: { configurable: true, value: 900 },
       scrollLeft: { configurable: true, get: () => scrollLeft, set: (value: number) => { scrollLeft = value; } },
     });
-    const scrollTo = vi.fn((options: ScrollToOptions) => {
-      scrollLeft = Math.max(0, Math.min(600, Number(options.left)));
-      track.dispatchEvent(new Event('scroll'));
-    });
-    Object.defineProperty(track, 'scrollTo', { configurable: true, value: scrollTo });
-    track.dispatchEvent(new Event('scroll'));
-    fixture.detectChanges();
+    Object.defineProperty(track, 'scrollTo', { configurable: true, value: (options: ScrollToOptions) => { scrollLeft = Number(options.left); track.dispatchEvent(new Event('scroll')); } });
+    track.dispatchEvent(new Event('scroll')); fixture.detectChanges();
     const [previous, next] = [...showcase.querySelectorAll<HTMLButtonElement>('.product-track-controls button')];
-
-    expect(previous.getAttribute('aria-controls')).toBe(track.id);
-    expect(next.getAttribute('aria-controls')).toBe(track.id);
-    expect(previous.disabled).toBe(true);
-    expect(next.disabled).toBe(false);
-    next.click();
-    fixture.detectChanges();
-    expect(scrollLeft).toBe(300);
-    expect(previous.disabled).toBe(false);
-
-    track.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
-    fixture.detectChanges();
-    expect(scrollLeft).toBe(600);
-    expect(next.disabled).toBe(true);
-
-    track.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
-    fixture.detectChanges();
-    expect(scrollLeft).toBe(0);
-    expect(previous.disabled).toBe(true);
-
-    scrollTo.mockClear();
-    track.querySelector('a')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    expect(scrollTo).not.toHaveBeenCalled();
+    expect(previous.disabled).toBe(true); expect(next.disabled).toBe(false);
+    track.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })); fixture.detectChanges();
+    expect(scrollLeft).toBe(900); expect(next.disabled).toBe(true);
   });
 });

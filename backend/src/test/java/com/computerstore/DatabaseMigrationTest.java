@@ -237,7 +237,33 @@ class DatabaseMigrationTest {
                 WHERE conrelid = 'provider_payments'::regclass
                   AND conname = 'chk_provider_payments_refund_status'
                 """, String.class).contains("AMOUNT_MISMATCH"));
-        assertEquals("29", jdbc.queryForObject(
+        assertEquals(4, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('home_sections', 'home_section_categories',
+                    'home_section_products', 'home_section_banners')
+                """, Integer.class));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conrelid = 'home_section_products'::regclass
+                  AND conname IN ('pk_home_section_products', 'uq_home_section_products_order')
+                  AND condeferrable AND condeferred
+                """, Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM home_sections", Integer.class));
+        assertEquals(List.of("Completá tu setup", "Potencia para tu equipo"), jdbc.queryForList(
+                "SELECT title FROM home_sections ORDER BY display_order", String.class));
+        assertEquals("/pinatech-banner-perifericos.jpg", jdbc.queryForObject("""
+                SELECT banner.external_url FROM home_section_banners banner
+                JOIN home_sections section ON section.id = banner.section_id
+                WHERE section.title = 'Completá tu setup' AND banner.device = 'DESKTOP'
+                """, String.class));
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM home_section_categories selected
+                JOIN home_sections section ON section.id = selected.section_id
+                JOIN categories category ON category.id = selected.category_id
+                WHERE section.title = 'Potencia para tu equipo' AND category.slug = 'perifericos'
+                """, Integer.class));
+        assertEquals("30", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
     }
@@ -273,6 +299,21 @@ class DatabaseMigrationTest {
             jdbc.update("UPDATE product_variants SET image_id = NULL WHERE image_id = ?", imageId);
             jdbc.update("DELETE FROM product_images WHERE id = ?", imageId);
         }
+    }
+
+    @Test
+    void homeSectionChecksRejectIncompleteAutomaticSortAndStoredBannerMetadata() {
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO home_sections (display_order, title, mode, product_limit, sort)
+                VALUES ((SELECT MAX(display_order) + 1 FROM home_sections), 'Invalid automatic',
+                        'AUTOMATIC', 12, NULL)
+                """));
+
+        Long sectionId = jdbc.queryForObject("SELECT id FROM home_sections ORDER BY id LIMIT 1", Long.class);
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO home_section_banners (section_id, device, storage_key)
+                VALUES (?, 'MOBILE', ?)
+                """, sectionId, UUID.randomUUID().toString()));
     }
 
     @Test

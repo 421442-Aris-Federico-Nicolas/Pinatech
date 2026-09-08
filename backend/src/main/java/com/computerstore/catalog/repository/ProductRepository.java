@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
@@ -27,6 +29,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             where p.active = true
                 and (:search is null or lower(p.name) like :search)
                 and (:categoryId is null or c.id = :categoryId)
+                and (:filterByCategoryIds = false or c.id in :categoryIds)
                 and (:brandId is null or b.id = :brandId)
                 and (:minPrice is null or p.price >= :minPrice)
                 and (:maxPrice is null or p.price <= :maxPrice)
@@ -34,12 +37,13 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             select count(p) from Product p where p.active = true
                 and (:search is null or lower(p.name) like :search)
                 and (:categoryId is null or p.category.id = :categoryId)
+                and (:filterByCategoryIds = false or p.category.id in :categoryIds)
                 and (:brandId is null or p.brand.id = :brandId)
                 and (:minPrice is null or p.price >= :minPrice)
                 and (:maxPrice is null or p.price <= :maxPrice)
             """)
-    Page<ProductListItemResponse> findCards(String search, Long categoryId, Long brandId,
-            BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
+    Page<ProductListItemResponse> findCards(String search, Long categoryId, List<Long> categoryIds,
+            boolean filterByCategoryIds, Long brandId, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
 
     @Query("select p from Product p join fetch p.category join fetch p.brand where p.id = :id")
     Optional<Product> findDetailById(Long id);
@@ -50,4 +54,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id")
     Optional<Product> findByIdForUpdate(Long id);
+
+    @Query("select p from Product p join fetch p.category join fetch p.brand where p.id in :ids")
+    List<Product> findConfigurationCandidates(Collection<Long> ids);
 }

@@ -103,7 +103,8 @@ class ProductCardsRepositoryTest {
 
         var statistics = em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
-        var page = products.findCards(null, null, null, null, null, PageRequest.of(0, 2, Sort.by("name")));
+        var page = products.findCards(null, null, java.util.List.of(-1L), false, null, null, null,
+                PageRequest.of(0, 2, Sort.by("name")));
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(page.getContent()).extracting(item -> item.name()).containsExactly("Alpha", "Beta");
         assertThat(page.getContent().getFirst().images()).hasSize(1);
@@ -117,22 +118,53 @@ class ProductCardsRepositoryTest {
         assertThat(statistics.getEntityLoadCount()).isZero();
 
         statistics.clear();
-        var all = products.findCards(null, null, null, null, null, PageRequest.of(0, 3, Sort.by("price").descending()));
+        var all = products.findCards(null, null, java.util.List.of(-1L), false, null, null, null,
+                PageRequest.of(0, 3, Sort.by("price").descending()));
         assertThat(all.getContent().getFirst().images()).isEmpty();
         assertThat(all.getContent().getFirst().inStock()).isFalse();
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
         assertThat(statistics.getEntityLoadCount()).isZero();
 
-        var filtered = products.findCards("%alp%", category.getId(), brand.getId(), new BigDecimal("100"),
+        var filtered = products.findCards("%alp%", category.getId(), java.util.List.of(-1L), false, brand.getId(), new BigDecimal("100"),
                 new BigDecimal("100"), PageRequest.of(0, 1));
         assertThat(filtered.getTotalElements()).isEqualTo(1);
         assertThat(filtered.getContent().getFirst().id()).isEqualTo(first.getId());
-        assertThat(products.findCards(null, -1L, null, null, null, PageRequest.of(0, 12))).isEmpty();
-        assertThat(products.findCards(null, null, -1L, null, null, PageRequest.of(0, 12))).isEmpty();
-        assertThat(products.findCards(null, null, null, new BigDecimal("301"), null, PageRequest.of(0, 12))).isEmpty();
-        assertThat(products.findCards(null, null, null, null, new BigDecimal("99"), PageRequest.of(0, 12))).isEmpty();
-        assertThat(products.findCards("%missing%", null, null, null, null, PageRequest.of(0, 12))).isEmpty();
-        assertThat(products.findCards(null, null, null, null, null, PageRequest.of(2, 2)).getTotalElements()).isEqualTo(3);
+        assertThat(products.findCards(null, -1L, java.util.List.of(-1L), false, null, null, null, PageRequest.of(0, 12))).isEmpty();
+        assertThat(products.findCards(null, null, java.util.List.of(-1L), false, -1L, null, null, PageRequest.of(0, 12))).isEmpty();
+        assertThat(products.findCards(null, null, java.util.List.of(-1L), false, null, new BigDecimal("301"), null, PageRequest.of(0, 12))).isEmpty();
+        assertThat(products.findCards(null, null, java.util.List.of(-1L), false, null, null, new BigDecimal("99"), PageRequest.of(0, 12))).isEmpty();
+        assertThat(products.findCards("%missing%", null, java.util.List.of(-1L), false, null, null, null, PageRequest.of(0, 12))).isEmpty();
+        assertThat(products.findCards(null, null, java.util.List.of(-1L), false, null, null, null, PageRequest.of(2, 2)).getTotalElements()).isEqualTo(3);
+    }
+
+    @Test
+    void filtersCardsByAnyCategoryIdAndKeepsSingularCompatibility() {
+        var firstCategory = new Category("First", "first");
+        var secondCategory = new Category("Second", "second");
+        var excludedCategory = new Category("Excluded", "excluded");
+        var brand = new Brand("Brand");
+        em.persist(firstCategory);
+        em.persist(secondCategory);
+        em.persist(excludedCategory);
+        em.persist(brand);
+        var first = product("Alpha", "100", firstCategory, brand);
+        var second = product("Beta", "200", secondCategory, brand);
+        product("Gamma", "300", excludedCategory, brand);
+        em.flush();
+        em.clear();
+
+        var statistics = em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+        var multi = products.findCards(null, null, java.util.List.of(firstCategory.getId(), secondCategory.getId()),
+                true, null, null, null, PageRequest.of(0, 1, Sort.by("name")));
+        assertThat(multi.getTotalElements()).isEqualTo(2);
+        assertThat(multi.getContent()).extracting(item -> item.id()).containsExactly(first.getId());
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+
+        var singular = products.findCards(null, secondCategory.getId(), java.util.List.of(-1L), false,
+                null, null, null, PageRequest.of(0, 12, Sort.by("name")));
+        assertThat(singular.getTotalElements()).isEqualTo(1);
+        assertThat(singular.getContent()).extracting(item -> item.id()).containsExactly(second.getId());
     }
 
     private Product product(String name, String price, Category category, Brand brand) {

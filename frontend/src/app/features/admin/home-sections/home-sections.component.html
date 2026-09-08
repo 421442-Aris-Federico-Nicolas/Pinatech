@@ -1,0 +1,137 @@
+<section class="home-admin" aria-labelledby="home-sections-title" [attr.aria-busy]="loading() || saving() || ordering() || deleting()">
+  <header class="home-admin__head">
+    <div><p class="home-kicker">Portada de la tienda</p><h2 id="home-sections-title">Secciones publicadas</h2><p>Ordená y editá hasta seis carruseles. Los cambios guardados quedan publicados directamente.</p></div>
+    <div><span>{{ sections().length }} / 6</span><button appButton="filled" type="button" [disabled]="sections().length >= 6 || busy()" (click)="newSection()">Nueva sección</button></div>
+  </header>
+
+  @if (error()) { <app-feedback class="home-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
+  @if (message()) { <app-feedback class="home-message" tone="success" announce="polite">{{ message() }}</app-feedback> }
+
+  @if (loading()) {
+    <div class="home-loading" role="status"><span aria-hidden="true"></span><p>Cargando configuración del inicio...</p></div>
+  } @else {
+    <div class="home-workspace">
+      <aside appCard class="home-list" aria-label="Secciones del inicio">
+        <div class="home-list__items">
+          @for (section of sections(); track section.id; let index = $index) {
+            <article [class.selected]="selected()?.id === section.id">
+              <button class="home-list__select" type="button" [disabled]="mutationBusy()" [attr.aria-pressed]="selected()?.id === section.id" (click)="open(section)">
+                <span class="order-number">{{ index + 1 }}</span>
+                <span><strong>{{ section.title }}</strong><small>{{ section.mode === 'AUTOMATIC' ? 'Automática' : 'Manual' }} · {{ section.active ? 'Activa' : 'Inactiva' }}</small></span>
+              </button>
+              <div class="order-actions" aria-label="Cambiar orden">
+                <button type="button" [disabled]="index === 0 || busy()" [attr.aria-label]="'Subir ' + section.title" (click)="moveSection(index, -1)">↑</button>
+                <button type="button" [disabled]="index === sections().length - 1 || busy()" [attr.aria-label]="'Bajar ' + section.title" (click)="moveSection(index, 1)">↓</button>
+              </div>
+            </article>
+          } @empty {
+            <div class="home-empty"><h3>El inicio no tiene secciones</h3><p>Creá la primera para publicar productos destacados.</p></div>
+          }
+        </div>
+      </aside>
+
+      <form appCard class="home-editor" #sectionForm="ngForm" (ngSubmit)="save(sectionForm)" (input)="notifyFormChange()" (change)="notifyFormChange()" novalidate>
+        <header>
+          <div><p class="home-kicker">{{ selected() ? 'Sección #' + selected()!.id : 'Nueva sección' }}</p><h2>{{ selected() ? 'Editar contenido' : 'Configurar contenido' }}</h2></div>
+          @if (selected()) { <button appButton="text" tone="danger" type="button" [disabled]="deleting() || saving()" (click)="deleteSection()">{{ deleting() ? 'Eliminando...' : 'Eliminar' }}</button> }
+        </header>
+
+        <fieldset [disabled]="saving() || deleting()">
+          <section class="copy-fields" aria-labelledby="home-copy-title">
+            <h3 id="home-copy-title">Textos</h3>
+            <div class="form-grid">
+              <app-input label="Título" [(ngModel)]="form.title" name="homeTitle" [maxLength]="150" placeholder="Ej. Potencia para tu equipo" required />
+              <app-input label="Eyebrow (opcional)" [(ngModel)]="form.eyebrow" name="homeEyebrow" [maxLength]="100" placeholder="Ej. Hardware" />
+              <app-textarea class="wide" label="Descripción (opcional)" [rows]="3" [(ngModel)]="form.description" name="homeDescription" [maxLength]="1000" />
+              <app-input class="wide" label="Texto del botón (opcional)" [(ngModel)]="form.buttonLabel" name="homeButtonLabel" [maxLength]="100" hint="Solo se muestra en secciones automáticas." />
+            </div>
+          </section>
+
+          <section class="rules" aria-labelledby="home-rules-title">
+            <div class="section-title"><div><h3 id="home-rules-title">Selección de productos</h3><p>En automático, los productos nuevos que cumplan las categorías entran sin intervención.</p></div></div>
+            <div class="form-grid rules-grid">
+              <app-select label="Modo" [options]="modeOptions" [ngModel]="form.mode" (ngModelChange)="setMode($event)" name="homeMode" required />
+              <app-input label="Cantidad visible" type="number" [min]="1" [max]="12" step="1" [(ngModel)]="form.productLimit" name="homeProductLimit" inputMode="numeric" required />
+              @if (form.mode === 'AUTOMATIC') { <app-select label="Orden automático" [options]="sortOptions" [(ngModel)]="form.sort" name="homeSort" required /> }
+            </div>
+
+            @if (form.mode === 'AUTOMATIC') {
+              <fieldset class="category-picker">
+                <legend>Categorías incluidas</legend>
+                <p>{{ form.categoryIds.length }} / 20 seleccionadas. Elegí al menos una categoría.</p>
+                <div>
+                  @for (category of categories(); track category.id) {
+                    <label><input type="checkbox" [checked]="categorySelected(category.id)" (change)="toggleCategory(category.id, $any($event.target).checked)"><span>{{ category.name }}</span></label>
+                  } @empty { <p>No hay categorías disponibles.</p> }
+                </div>
+              </fieldset>
+            } @else {
+              <div class="manual-note" role="note"><strong>Selección manual</strong><span>El botón del carrusel no se muestra en este modo, aunque podés conservar su texto para usarlo al cambiar a automático.</span></div>
+              <section class="manual-products" aria-labelledby="selected-products-title">
+                <div class="section-title"><div><h3 id="selected-products-title">Productos seleccionados</h3><p>{{ selectedProducts().length }} de 24. El orden se publica tal como aparece aquí.</p></div></div>
+                <div class="selected-products">
+                  @for (product of selectedProducts(); track product.id; let index = $index) {
+                    <article>
+                      <span class="product-initial">{{ product.name.charAt(0) }}</span><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ product.categoryName }}</small></span>
+                      <div><button type="button" [disabled]="index === 0" [attr.aria-label]="'Subir ' + product.name" (click)="moveProduct(index, -1)">↑</button><button type="button" [disabled]="index === selectedProducts().length - 1" [attr.aria-label]="'Bajar ' + product.name" (click)="moveProduct(index, 1)">↓</button><button class="remove" type="button" [attr.aria-label]="'Quitar ' + product.name" (click)="removeProduct(index)">Quitar</button></div>
+                    </article>
+                  } @empty { <p class="inline-empty">Todavía no seleccionaste productos.</p> }
+                </div>
+
+                <div class="candidate-picker">
+                  <div class="candidate-search">
+                    <app-input label="Buscar productos para agregar" type="search" [(ngModel)]="candidateSearch" name="candidateSearch" />
+                    <button appButton="outlined" type="button" [disabled]="mutationBusy()" (click)="searchCandidates()">Buscar</button>
+                  </div>
+                  @if (candidatesLoading()) { <p class="candidate-status" role="status">Buscando productos...</p> }
+                  <div class="candidates">
+                    @for (product of candidates(); track product.id) {
+                      <button type="button" [disabled]="selectedProductIds().has(product.id) || selectedProducts().length >= 24" (click)="addProduct(product)"><span><strong>{{ product.name }}</strong><small>{{ product.brandName }} · {{ product.categoryName }}</small></span><b>{{ selectedProductIds().has(product.id) ? 'Agregado' : 'Agregar' }}</b></button>
+                    } @empty { @if (!candidatesLoading()) { <p class="inline-empty">No hay productos para esta búsqueda.</p> } }
+                  </div>
+                  @if (candidateTotalPages() > 1) {
+                    <nav class="candidate-pages" aria-label="Páginas de productos candidatos"><button type="button" [disabled]="candidatePage() === 0 || candidatesLoading()" (click)="changeCandidatePage(candidatePage() - 1)">Anterior</button><span>{{ candidatePage() + 1 }} / {{ candidateTotalPages() }}</span><button type="button" [disabled]="candidatePage() + 1 >= candidateTotalPages() || candidatesLoading()" (click)="changeCandidatePage(candidatePage() + 1)">Siguiente</button></nav>
+                  }
+                </div>
+              </section>
+            }
+          </section>
+
+          <section class="banners" aria-labelledby="home-banners-title">
+            <div class="section-title"><div><h3 id="home-banners-title">Banners</h3><p>Podés publicar versiones distintas para escritorio y mobile, usar una sola como fallback o dejar ambas vacías.</p></div></div>
+            <div class="banner-grid">
+              @for (device of ['DESKTOP', 'MOBILE']; track device) {
+                <article>
+                  <header><strong>{{ device === 'DESKTOP' ? 'Desktop' : 'Mobile' }}</strong><small>{{ device === 'DESKTOP' ? 'Formato horizontal (2000 × 848 px)' : 'Formato vertical o compacto (720 × 512 px)' }}</small></header>
+                  @if ((device === 'DESKTOP' ? pendingDesktop() : pendingMobile()); as pending) {
+                    <img [src]="pending.previewUrl" [alt]="'Vista previa del banner ' + device.toLowerCase()" width="800" height="400">
+                    <span class="file-name">{{ pending.file.name }}</span>
+                  } @else if (bannerPreview($any(device)); as savedPreview) {
+                    <img [src]="savedPreview" [alt]="'Banner ' + device.toLowerCase() + ' publicado'" width="800" height="400">
+                  } @else if (isBannerPreviewLoading($any(device))) {
+                    <div class="banner-empty" role="status">Cargando vista previa...</div>
+                  } @else if (selected() && (device === 'DESKTOP' ? selected()!.bannerDesktopUrl : selected()!.bannerMobileUrl)) {
+                    <div class="banner-empty">Vista previa no disponible</div>
+                  } @else { <div class="banner-empty">Sin banner</div> }
+                  <div class="banner-actions">
+                    <label [class.disabled]="bannerBusy() !== null">Seleccionar<input type="file" accept="image/*" [disabled]="bannerBusy() !== null" (change)="selectBanner($event, $any(device))"></label>
+                    @if (device === 'DESKTOP' ? pendingDesktop() : pendingMobile()) {
+                      <button appButton="outlined" type="button" [disabled]="!selected() || bannerBusy() !== null" (click)="uploadBanner($any(device))">{{ bannerBusy() === device ? 'Subiendo...' : 'Subir' }}</button>
+                      <button appButton="text" type="button" [disabled]="bannerBusy() !== null" (click)="discardPendingBanner($any(device))">Quitar selección</button>
+                    } @else if (selected() && (device === 'DESKTOP' ? selected()!.bannerDesktopUrl : selected()!.bannerMobileUrl)) {
+                      <button appButton="text" tone="danger" type="button" [disabled]="bannerBusy() !== null" (click)="deleteBanner($any(device))">{{ bannerBusy() === device ? 'Eliminando...' : 'Eliminar' }}</button>
+                    }
+                  </div>
+                  @if (!selected() && (device === 'DESKTOP' ? pendingDesktop() : pendingMobile())) { <small class="save-first">Guardá la sección antes de subir el banner.</small> }
+                </article>
+              }
+            </div>
+          </section>
+
+          <label class="active-option"><input type="checkbox" [(ngModel)]="form.active" name="homeActive"><span><strong>Sección activa</strong><small>Visible en el inicio cuando guardes los cambios.</small></span></label>
+        </fieldset>
+        <footer><span [class.visible]="dirty()">Cambios sin guardar</span><button appButton="filled" type="submit" [disabled]="saving() || deleting()">{{ saving() ? 'Publicando...' : selected() ? 'Guardar y publicar' : 'Crear y publicar' }}</button></footer>
+      </form>
+    </div>
+  }
+</section>

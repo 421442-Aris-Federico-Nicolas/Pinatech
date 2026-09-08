@@ -12,6 +12,7 @@
       <button type="button" [class.active]="section() === 'sales'" [attr.aria-current]="section() === 'sales' ? 'page' : null" (click)="navigate('sales')"><iconify-icon aria-hidden="true" icon="line-md:clipboard-list"></iconify-icon><span>Ventas</span><b>{{ activeOrders() }}</b></button>
       <button type="button" [class.active]="section() === 'catalog'" [attr.aria-current]="section() === 'catalog' ? 'page' : null" (click)="navigate('catalog')"><iconify-icon aria-hidden="true" icon="line-md:document-list"></iconify-icon><span>Catálogo</span></button>
       <button type="button" [class.active]="section() === 'inventory'" [attr.aria-current]="section() === 'inventory' ? 'page' : null" (click)="navigate('inventory')"><iconify-icon aria-hidden="true" icon="line-md:confirm-square"></iconify-icon><span>Inventario</span>@if(lowStock()){<b class="warning">{{ lowStock() }}</b>}</button>
+      <button type="button" [class.active]="section() === 'home'" [attr.aria-current]="section() === 'home' ? 'page' : null" (click)="navigate('home')"><iconify-icon aria-hidden="true" icon="line-md:home-simple"></iconify-icon><span>Inicio tienda</span></button>
     </nav>
     <div class="sidebar-foot"><i></i><span>Sistema operativo</span></div>
   </aside>
@@ -19,7 +20,7 @@
   <main [attr.aria-busy]="loading()">
     <header class="page-heading">
       <div><p class="eyebrow">Operación interna</p><h1>{{ sectionTitle() }}</h1><p>{{ sectionDescription() }}</p></div>
-      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock() || orderUpdating() !== null || shipmentUpdating() !== null || refundConfirming() !== null || ordersRefreshing() || shipmentDocumentLoading() !== null" (click)="reload()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
+      <div class="heading-actions"><button class="refresh" appButton="outlined" type="button" [disabled]="loading() || saving() || deactivatingProduct() || adjustingStock() || orderUpdating() !== null || shipmentUpdating() !== null || refundConfirming() !== null || ordersRefreshing() || shipmentDocumentLoading() !== null" (click)="refreshSection()"><iconify-icon aria-hidden="true" icon="line-md:rotate-270"></iconify-icon> {{ loading() ? 'Sincronizando…' : 'Actualizar' }}</button>@if(section() === 'catalog'){<button appButton="filled" type="button" [disabled]="loading() || saving()" (click)="openNewProduct()">Nuevo producto</button>}</div>
     </header>
 
     @if (error()) { <app-feedback class="page-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
@@ -240,8 +241,11 @@
         </aside>
       </section>
     }
+    @if (!loading() && section() === 'home') {
+      <app-home-sections-admin (dirtyChange)="homeDirty.set($event)" />
+    }
     @if (detailLoading()) { <p role="status">Cargando detalle...</p> }
-    @if (!loading() && section() !== 'overview') {
+    @if (!loading() && section() !== 'overview' && section() !== 'home') {
       <nav class="admin-pagination" aria-label="Paginacion de resultados">
         <button appButton="outlined" type="button" [disabled]="page() === 0" (click)="changePage(page() - 1)">Anterior</button>
         <span aria-live="polite">{{ totalElements() }} resultados · {{ totalPages() ? page() + 1 : 0 }} / {{ totalPages() }}</span>

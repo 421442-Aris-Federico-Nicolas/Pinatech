@@ -8,6 +8,7 @@ import com.computerstore.catalog.repository.ProductRepository;
 import com.computerstore.catalog.repository.ProductSpecificationRepository;
 import com.computerstore.catalog.repository.ProductVariantRepository;
 import com.computerstore.catalog.service.ProductImageService;
+import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.inventory.domain.Inventory;
 import com.computerstore.inventory.repository.InventoryRepository;
@@ -64,11 +65,20 @@ public class ProductController {
     }
     @GetMapping("/cards")
     public Page<ProductListItemResponse> cards(@RequestParam(required = false) String search,
-            @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) List<Long> categoryIds,
+            @RequestParam(required = false) Long brandId,
             @RequestParam(required = false) BigDecimal minPrice, @RequestParam(required = false) BigDecimal maxPrice,
             @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+        List<Long> requestedCategoryIds = categoryIds == null ? List.of() : categoryIds;
+        if (requestedCategoryIds.size() > 20 || requestedCategoryIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new InvalidRequestException("categoryIds must contain at most 20 positive IDs.");
+        }
+        boolean filterByCategoryIds = !requestedCategoryIds.isEmpty();
+        List<Long> queryCategoryIds = filterByCategoryIds ? requestedCategoryIds : List.of(-1L);
         String pattern = search == null || search.isBlank() ? null : "%" + search.trim().toLowerCase() + "%";
-        return repository.findCards(pattern, categoryId, brandId, minPrice, maxPrice,
+        return repository.findCards(pattern, filterByCategoryIds ? null : categoryId, queryCategoryIds,
+                filterByCategoryIds, brandId, minPrice, maxPrice,
                 PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100),
                         pageable.getSort().and(Sort.by("id"))));
     }

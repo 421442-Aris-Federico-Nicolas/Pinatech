@@ -54,4 +54,12 @@ describe('CatalogService', () => {
     expect(request.request.params.get('size')).toBe('100');
     request.flush({ content: [], totalPages: 0, totalElements: 0, number: 0, size: 100 });
   });
+
+  it('forwards CSV category IDs used by Home CTAs without replacing the single-category contract', () => {
+    service.getProductCards({ search: '', categoryId: null, categoryIds: [5, 8], brandId: null, minPrice: null, maxPrice: null }, 0).subscribe();
+    const request = httpTesting.expectOne((candidate) => candidate.url.endsWith('/products/cards'));
+    expect(request.request.params.get('categoryIds')).toBe('5,8');
+    expect(request.request.params.has('categoryId')).toBe(false);
+    request.flush({ content: [], totalPages: 0, totalElements: 0, number: 0, size: 12 });
+  });
 });
