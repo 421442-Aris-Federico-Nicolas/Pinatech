@@ -16,6 +16,9 @@ import com.computerstore.shipping.gateway.ZipnovaGateway;
 import com.computerstore.shipping.repository.ShippingQuoteRepository;
 import com.computerstore.user.domain.*;
 import com.computerstore.user.repository.*;
+import com.computerstore.guest.domain.GuestCheckoutSession;
+import com.computerstore.guest.dto.*;
+import com.computerstore.guest.service.GuestCheckoutEligibilityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -63,6 +66,24 @@ class ShippingQuoteServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> f.service.validateForOrder(quote.getId(), f.owner, f.inputs, f.variants));
     }
 
+    @Test
+    void rejectsRegisteredGuestEmailBeforeLoadingProductsOrCallingTheProvider() {
+        Fixtures f = fixtures(1L);
+        doThrow(new GuestCheckoutAccountRequiredException()).when(f.guestEligibility)
+                .requireUnregistered("ada@example.com");
+        var request = new GuestShippingQuoteRequest(
+                List.of(new ShippingQuoteRequest.Item(10L, 1)),
+                new GuestCustomerRequest("Ada", "Lovelace", " ADA@EXAMPLE.COM ", "3515550000", "12345678"),
+                new GuestDeliveryAddressRequest("San Martin", "10", null, "Cordoba", "X", "5000", null, "AR"));
+        var session = new GuestCheckoutSession("a".repeat(64), "b".repeat(64), NOW, NOW.plusSeconds(3600));
+
+        assertThrows(GuestCheckoutAccountRequiredException.class, () -> f.service.quoteGuest(session, request));
+
+        verify(f.variantsRepository, never()).findActiveForShippingQuote(anyLong());
+        verify(f.gateway, never()).quote(any());
+        verify(f.quotes, never()).saveAll(any());
+    }
+
     private Fixtures fixtures(long ownerId) {
         UserAccount owner = user(ownerId); UserAddress address = address();
         UserAddressRepository addresses = mock(UserAddressRepository.class); when(addresses.findById(ownerId)).thenReturn(Optional.of(address));
@@ -75,9 +96,11 @@ class ShippingQuoteServiceTest {
         ShippingQuoteRepository quotes = mock(ShippingQuoteRepository.class);
         ZipnovaGateway gateway = mock(ZipnovaGateway.class); UserAccountRepository users = mock(UserAccountRepository.class);
         ProductVariantRepository variantsRepository = mock(ProductVariantRepository.class);
+        GuestCheckoutEligibilityService guestEligibility = mock(GuestCheckoutEligibilityService.class);
         var service = new ShippingQuoteService(properties(), gateway, users, addresses, variantsRepository, quotes,
-                new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
-        return new Fixtures(owner, address, variants, inputs, quotes, gateway, users, variantsRepository, service);
+                new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC), guestEligibility);
+        return new Fixtures(owner, address, variants, inputs, quotes, gateway, users, variantsRepository,
+                guestEligibility, service);
     }
     private ShippingQuote quote(UserAccount user, List<ShippingHashes.ItemQuantity> inputs, List<ProductVariant> variants,
                                 UserAddress address, Instant created, Instant expires) {
@@ -100,5 +123,6 @@ class ShippingQuoteServiceTest {
             "012345678901234567890123", Duration.ofMinutes(10)); }
     private record Fixtures(UserAccount owner, UserAddress address, List<ProductVariant> variants,
             List<ShippingHashes.ItemQuantity> inputs, ShippingQuoteRepository quotes, ZipnovaGateway gateway,
-            UserAccountRepository users, ProductVariantRepository variantsRepository, ShippingQuoteService service) {}
+            UserAccountRepository users, ProductVariantRepository variantsRepository,
+            GuestCheckoutEligibilityService guestEligibility, ShippingQuoteService service) {}
 }

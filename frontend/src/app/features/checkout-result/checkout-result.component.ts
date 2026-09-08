@@ -10,9 +10,9 @@ import { AppCardDirective } from '../../shared/ui/app-card.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { PinatechSaleSuccessComponent } from '../../shared/ui/pinatech-sale-success/pinatech-sale-success.component';
 
-type PaymentResult = 'approved' | 'pending' | 'rejected' | 'refund-pending' | 'refunded';
+type PaymentResult = 'approved' | 'pending' | 'rejected' | 'refund-pending' | 'refunded' | 'mediation' | 'chargeback';
 
-const TERMINAL_PAYMENT_STATUSES = new Set(['APPROVED', 'REJECTED', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUNDED']);
+const TERMINAL_PAYMENT_STATUSES = new Set(['APPROVED', 'REJECTED', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUNDED', 'IN_MEDIATION', 'CHARGEBACK']);
 const MAX_POLL_ATTEMPTS = 6;
 const POLL_INTERVAL_MS = 2000;
 
@@ -64,6 +64,8 @@ export class CheckoutResultComponent {
     if (order.paymentStatus === 'APPROVED') return 'approved';
     if (order.paymentStatus === 'REFUND_PENDING') return 'refund-pending';
     if (order.paymentStatus === 'REFUNDED') return 'refunded';
+    if (order.paymentStatus === 'IN_MEDIATION') return 'mediation';
+    if (order.paymentStatus === 'CHARGEBACK') return 'chargeback';
     if (TERMINAL_PAYMENT_STATUSES.has(order.paymentStatus)) return 'rejected';
     return 'pending';
   }

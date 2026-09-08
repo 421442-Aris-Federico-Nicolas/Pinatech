@@ -36,7 +36,7 @@ export class RegisterComponent {
   readonly form = this.fb.group({
     firstName: ['', [Validators.required, Validators.maxLength(100)]],
     lastName: ['', [Validators.required, Validators.maxLength(100)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    email: [this.initialEmail(), [Validators.required, Validators.email, Validators.maxLength(254)]],
     phone: ['', [Validators.maxLength(30), Validators.pattern(/^[0-9+() .-]*$/)]],
     password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(72), Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/)]],
     confirmPassword: ['', [Validators.required, Validators.maxLength(72)]],
@@ -71,5 +71,10 @@ export class RegisterComponent {
 
   private destination(): string {
     return safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'));
+  }
+
+  private initialEmail(): string {
+    const email = this.route.snapshot.queryParamMap.get('email')?.trim() ?? '';
+    return email.length <= 254 ? email : '';
   }
 }

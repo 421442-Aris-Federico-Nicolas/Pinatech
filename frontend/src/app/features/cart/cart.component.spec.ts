@@ -120,7 +120,7 @@ describe('CartComponent', () => {
     expect(fixture.nativeElement.querySelector('.remove').getAttribute('aria-label')).toBe('Eliminar Teclado del carrito');
   });
 
-  it('preserves the bank-transfer checkout selection through login', async () => {
+  it('takes guests directly to checkout and keeps login as an optional alternative', async () => {
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000),
       stockLimit: (variant: CartItem['variant']) => variant.availableQuantity,
@@ -141,6 +141,9 @@ describe('CartComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.checkoutReturnUrl).toBe('/checkout?paymentMethod=BANK_TRANSFER');
+    expect((fixture.nativeElement.querySelector('.summary > a[href^="/checkout"]') as HTMLAnchorElement).getAttribute('href'))
+      .toBe('/checkout?paymentMethod=BANK_TRANSFER');
+    expect(fixture.nativeElement.textContent).toContain('Podés comprar como invitado');
     expect((fixture.nativeElement.querySelector('a[href^="/login"]') as HTMLAnchorElement).getAttribute('href'))
       .toContain('returnUrl=%2Fcheckout%3FpaymentMethod%3DBANK_TRANSFER');
   });

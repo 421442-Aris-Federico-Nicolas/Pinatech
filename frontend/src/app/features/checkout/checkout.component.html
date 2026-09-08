@@ -209,10 +209,10 @@
         <div class="total"><span>{{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Total por transferencia' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Total con Mercado Pago' : 'Total de lista' }}</span><strong>{{ selectedTotal() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         <p class="summary-note">La transferencia aplica el descuento una sola vez sobre los productos. El envío no tiene descuento.</p>
 
-        @if (checkoutStep() === 'PAYMENT' && !emailVerified()) {
+        @if (checkoutStep() === 'PAYMENT' && selectedPaymentMethod() === 'BANK_TRANSFER' && !emailVerified()) {
           <app-feedback class="verification-required" tone="warning">
             <strong>Verificá tu email para comprar</strong>
-            <p>Por seguridad, necesitás confirmar tu email antes de crear el pedido.</p>
+             <p>La transferencia bancaria requiere una cuenta con email confirmado. Mercado Pago no requiere esta verificación.</p>
             <div feedback-actions class="verification-actions">
               <button appButton="outlined" type="button" (click)="resendVerification()" [disabled]="resendingVerification()" [attr.aria-busy]="resendingVerification()">{{ resendingVerification() ? 'Reenviando…' : 'Reenviar verificación' }}</button>
               <a appButton="text" routerLink="/profile">Ir a Mi perfil</a>

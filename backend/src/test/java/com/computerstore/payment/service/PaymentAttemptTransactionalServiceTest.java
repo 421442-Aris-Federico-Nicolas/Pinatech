@@ -239,6 +239,36 @@ class PaymentAttemptTransactionalServiceTest {
         assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().amount());
         assertEquals(1, preparation.preferenceRequest().items().size());
         assertEquals(new BigDecimal("100.00"), preparation.preferenceRequest().items().getFirst().unitPrice());
+        assertEquals(null, preparation.preferenceRequest().guestOrderPublicId());
+    }
+
+    @Test
+    void guestPreferenceCarriesOnlyTheOrdersPublicIdForItsReturnUrl() {
+        UUID guestPublicId = UUID.randomUUID();
+        CustomerOrder order = Mockito.mock(CustomerOrder.class);
+        when(order.isGuest()).thenReturn(true);
+        when(order.getPublicId()).thenReturn(guestPublicId);
+        when(order.getId()).thenReturn(42L);
+        when(order.getPaymentMethod()).thenReturn(PaymentMethod.MERCADO_PAGO);
+        when(order.getFulfillmentMethod()).thenReturn(FulfillmentMethod.PICKUP);
+        when(order.getPickupLocation()).thenReturn(new PickupLocationSnapshot(
+                "CORDOBA-CENTRO", "Current pickup name", List.of("Current address", "Local 4"),
+                "Cordoba", "X", "5000", "Current instructions", "Current hours"));
+        when(order.getStatus()).thenReturn(OrderStatus.PENDING_PAYMENT);
+        when(order.getCurrency()).thenReturn("ARS");
+        when(order.getTotal()).thenReturn(new BigDecimal("100.00"));
+        when(order.getReservationExpiresAt()).thenReturn(NOW.plusSeconds(300));
+        when(order.getItems()).thenReturn(List.of());
+        when(order.getPaymentSurcharge()).thenReturn(BigDecimal.ZERO);
+        when(order.getShippingCost()).thenReturn(BigDecimal.ZERO);
+        when(orders.findByIdForUpdate(42L)).thenReturn(Optional.of(order));
+        when(attempts.findActiveByOrderId(any(), any())).thenReturn(List.of());
+        when(attempts.save(any(PaymentAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentPreparation preparation = service.prepareGuest(42L, "guest-payment-key");
+
+        assertEquals(guestPublicId, preparation.preferenceRequest().guestOrderPublicId());
+        assertEquals(42L, preparation.preferenceRequest().orderId());
     }
 
     @Test
@@ -302,14 +332,16 @@ class PaymentAttemptTransactionalServiceTest {
     }
 
     @Test
-    void requiresEmailToRemainVerifiedBeforeReusingOrCreatingAPreference() {
+    void allowsMercadoPagoWhenAccountEmailIsNotVerified() {
         CustomerOrder order = order(NOW.plusSeconds(300), false, true);
+        PaymentAttempt attempt = readyAttempt(order, "pref-1");
         when(orders.findByIdAndUserIdForUpdate(42L, 7L)).thenReturn(Optional.of(order));
+        when(attempts.findActiveByOrderId(any(), any())).thenReturn(List.of(attempt));
 
-        assertThrows(EmailVerificationRequiredException.class,
-                () -> service.prepare(42L, 7L, "payment-key"));
+        PaymentPreparation preparation = service.prepare(42L, 7L, "payment-key");
 
-        verify(attempts, never()).findActiveByOrderId(any(), any());
+        assertFalse(preparation.created());
+        verify(attempts).findActiveByOrderId(any(), any());
         verify(attempts, never()).save(any());
     }
 

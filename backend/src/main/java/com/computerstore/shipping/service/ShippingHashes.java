@@ -12,6 +12,7 @@ import com.computerstore.order.dto.CreateOrderRequest;
 import com.computerstore.shipping.dto.ShippingQuoteRequest;
 import com.computerstore.user.domain.UserAccount;
 import com.computerstore.user.domain.UserAddress;
+import com.computerstore.guest.service.GuestCheckoutNormalizer;
 
 public final class ShippingHashes {
     private ShippingHashes() {}
@@ -33,6 +34,14 @@ public final class ShippingHashes {
                 user.getDocumentNumber(), address.getStreet(), address.getStreetNumber(), address.getFloorApartment(),
                 address.getLocality(), province, address.getProvinceCode(), address.getPostalCode(),
                 address.getCountryCode(), address.getReference()));
+    }
+
+    public static String profile(GuestCheckoutNormalizer.Customer customer,
+                                 GuestCheckoutNormalizer.Address address) {
+        return sha256(join(customer.firstName(), customer.lastName(), customer.email(), customer.phone(),
+                customer.documentNumber(), address.street(), address.streetNumber(), address.floorApartment(),
+                address.locality(), address.province(), address.provinceCode(), address.postalCode(),
+                address.countryCode(), address.reference()));
     }
 
     public static ItemQuantity item(ShippingQuoteRequest.Item item) {

@@ -107,14 +107,56 @@ public class ResendTransactionalEmailService implements TransactionalEmailServic
     }
 
     @Override
+    public void sendGuestCheckoutCode(String recipient, String firstName, String code, Duration ttl) {
+        EmailContent content = renderBrandedEmail(new EmailTemplate(
+                "Codigo para tu compra en Pinatech",
+                "Usa este codigo para verificar tu email y pagar por transferencia.",
+                "Verifica tu email",
+                greeting(firstName),
+                List.of("Ingresa este codigo en el checkout para habilitar el pago por transferencia."),
+                new EmailCallout("Codigo de verificacion", code),
+                null,
+                null,
+                "El codigo vence en " + ttl.toMinutes() + " minutos. Si no lo solicitaste, ignora este email."),
+                emailLogoUrl);
+        afterCommit("GUEST_CHECKOUT_EMAIL_VERIFICATION", () -> send(recipient, content));
+    }
+
+    @Override
+    public void sendGuestOrderCreated(String recipient, String firstName, UUID publicId, String rawAccessToken) {
+        EmailContent content = contentForGuestOrderCreated(firstName, publicId, rawAccessToken);
+        afterCommit("GUEST_ORDER_CREATED", () -> send(recipient, content));
+    }
+
+    EmailContent contentForGuestOrderCreated(String firstName, UUID publicId, String rawAccessToken) {
+        String orderUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl).path("/pedido/{publicId}")
+                .buildAndExpand(publicId).encode().toUriString()
+                + "#token=" + UriUtils.encodeQueryParam(rawAccessToken, StandardCharsets.UTF_8);
+        return renderBrandedEmail(new EmailTemplate(
+                "Recibimos tu pedido en Pinatech",
+                "Guarda este enlace seguro para consultar tu pedido.",
+                "Pedido recibido",
+                greeting(firstName),
+                List.of("Recibimos tu pedido. Este enlace privado te permite consultar su estado y continuar el pago."),
+                null,
+                "Ver mi pedido",
+                orderUrl,
+                "No compartas este enlace: contiene la credencial de acceso a tu pedido."), emailLogoUrl);
+    }
+
+    @Override
     public void sendOrderEvent(UUID idempotencyKey, String recipient, String customerName,
-                               OrderEmailEventType eventType, Long orderId, String rejectionReason) {
+                               OrderEmailEventType eventType, Long orderId, UUID publicId, boolean guestOrder,
+                               String rejectionReason) {
         if (!enabled) {
             LOGGER.info("Transactional email disabled; completed outbox event={}", eventType);
             return;
         }
-        String orderUrl = UriComponentsBuilder.fromUriString(storefrontBaseUrl)
-                .path("/orders").queryParam("order", orderId).build().encode().toUriString();
+        String orderUrl = guestOrder
+                ? UriComponentsBuilder.fromUriString(storefrontBaseUrl).path("/pedido/{publicId}")
+                    .buildAndExpand(publicId).encode().toUriString()
+                : UriComponentsBuilder.fromUriString(storefrontBaseUrl)
+                    .path("/orders").queryParam("order", orderId).build().encode().toUriString();
         send(recipient, contentForOrderEvent(customerName, eventType, orderId, rejectionReason, orderUrl),
                 idempotencyKey);
     }

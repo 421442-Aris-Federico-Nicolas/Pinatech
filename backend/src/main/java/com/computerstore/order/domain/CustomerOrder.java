@@ -5,8 +5,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import com.computerstore.common.exception.InvalidStateTransitionException;
+import com.computerstore.guest.domain.GuestCheckoutSession;
 import com.computerstore.user.domain.UserAccount;
 import com.computerstore.shipping.domain.OrderShipment;
 import com.computerstore.shipping.domain.ShippingQuote;
@@ -39,8 +41,21 @@ public class CustomerOrder {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private UserAccount user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "guest_session_id")
+    private GuestCheckoutSession guestSession;
+
+    @Column(name = "public_id", nullable = false, updatable = false)
+    private UUID publicId;
+
+    @Column(name = "guest_access_token_hash", length = 64)
+    private String guestAccessTokenHash;
+
+    @Embedded
+    private BuyerSnapshot buyer;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -176,12 +191,42 @@ public class CustomerOrder {
     }
 
     public CustomerOrder(UserAccount user, List<OrderItem> items, BigDecimal subtotal, BigDecimal paymentSurcharge,
+                          BigDecimal paymentDiscount, BigDecimal shippingCost, PaymentMethod paymentMethod,
+                          Instant reservationExpiresAt, Instant paymentDueAt, BankAccountSnapshot bankAccount,
+                          String idempotencyKey, String requestHash, FulfillmentMethod fulfillmentMethod,
+                          PickupLocationSnapshot pickupLocation, ShippingQuote shippingQuote,
+                          DeliveryAddressSnapshot deliveryAddress) {
+        this(user, null, BuyerSnapshot.from(Objects.requireNonNull(user)), null, items, subtotal, paymentSurcharge,
+                paymentDiscount, shippingCost, paymentMethod, reservationExpiresAt, paymentDueAt, bankAccount,
+                idempotencyKey, requestHash, fulfillmentMethod, pickupLocation, shippingQuote, deliveryAddress);
+    }
+
+    public CustomerOrder(GuestCheckoutSession guestSession, BuyerSnapshot buyer, String accessTokenHash,
+                         List<OrderItem> items, BigDecimal subtotal, BigDecimal paymentSurcharge,
                          BigDecimal paymentDiscount, BigDecimal shippingCost, PaymentMethod paymentMethod,
                          Instant reservationExpiresAt, Instant paymentDueAt, BankAccountSnapshot bankAccount,
                          String idempotencyKey, String requestHash, FulfillmentMethod fulfillmentMethod,
                          PickupLocationSnapshot pickupLocation, ShippingQuote shippingQuote,
                          DeliveryAddressSnapshot deliveryAddress) {
-        this.user = Objects.requireNonNull(user);
+        this(null, Objects.requireNonNull(guestSession), Objects.requireNonNull(buyer),
+                Objects.requireNonNull(accessTokenHash), items, subtotal, paymentSurcharge, paymentDiscount,
+                shippingCost, paymentMethod, reservationExpiresAt, paymentDueAt, bankAccount, idempotencyKey,
+                requestHash, fulfillmentMethod, pickupLocation, shippingQuote, deliveryAddress);
+    }
+
+    private CustomerOrder(UserAccount user, GuestCheckoutSession guestSession, BuyerSnapshot buyer,
+                          String accessTokenHash, List<OrderItem> items, BigDecimal subtotal,
+                          BigDecimal paymentSurcharge, BigDecimal paymentDiscount, BigDecimal shippingCost,
+                          PaymentMethod paymentMethod, Instant reservationExpiresAt, Instant paymentDueAt,
+                          BankAccountSnapshot bankAccount, String idempotencyKey, String requestHash,
+                          FulfillmentMethod fulfillmentMethod, PickupLocationSnapshot pickupLocation,
+                          ShippingQuote shippingQuote, DeliveryAddressSnapshot deliveryAddress) {
+        if ((user == null) == (guestSession == null)) throw new IllegalArgumentException("An order requires one owner.");
+        this.publicId = UUID.randomUUID();
+        this.user = user;
+        this.guestSession = guestSession;
+        this.buyer = buyer;
+        this.guestAccessTokenHash = accessTokenHash;
         this.status = OrderStatus.PENDING_PAYMENT;
         this.paymentStatus = PaymentStatus.PENDING;
         this.fulfillmentStatus = FulfillmentStatus.PENDING;
@@ -454,6 +499,7 @@ public class CustomerOrder {
     }
 
     public Long getId() { return id; }
+    public UUID getPublicId() { return publicId; }
     public OrderStatus getStatus() { return status; }
     public PaymentStatus getPaymentStatus() { return paymentStatus; }
     public FulfillmentStatus getFulfillmentStatus() { return fulfillmentStatus; }
@@ -490,6 +536,20 @@ public class CustomerOrder {
     public Instant getRefundConfirmedAt() { return refundConfirmedAt; }
     public List<OrderItem> getItems() { return List.copyOf(items); }
     public UserAccount getUser() { return user; }
+    public GuestCheckoutSession getGuestSession() { return guestSession; }
+    public String getGuestAccessTokenHash() { return guestAccessTokenHash; }
+    public BuyerSnapshot getBuyer() { return buyer; }
+    public boolean isGuest() { return guestSession != null; }
+
+    public void claim(UserAccount account) {
+        if (guestSession == null || user != null || !account.isActive() || !account.isEmailVerified()
+                || !buyer.getEmail().equalsIgnoreCase(account.getEmail())) {
+            throw new IllegalArgumentException("The guest order cannot be linked to this account.");
+        }
+        user = account;
+        guestSession = null;
+        guestAccessTokenHash = null;
+    }
 
     private String truncate(String value, int maxLength) {
         if (value == null || value.isBlank()) return null;

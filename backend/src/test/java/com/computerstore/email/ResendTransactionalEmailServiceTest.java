@@ -10,6 +10,7 @@ import com.computerstore.user.domain.AccountActionPurpose;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -58,6 +59,21 @@ class ResendTransactionalEmailServiceTest {
                 "user@example.com", "Ana", AccountActionPurpose.EMAIL_VERIFICATION, "raw-token"));
         assertDoesNotThrow(() -> service.sendEmailChangedNotice(
                 "old@example.com", "Ana", "new@example.com"));
+    }
+
+    @Test
+    void guestOrderEmailContainsOnlyTheFragmentAccessToken() {
+        ResendTransactionalEmailService service = new ResendTransactionalEmailService(
+                false, "", "", "https://store.example.com", "", new ObjectMapper());
+        UUID publicId = UUID.randomUUID();
+        String token = "a".repeat(43);
+
+        var content = service.contentForGuestOrderCreated("Ana", publicId, token);
+
+        String expected = "https://store.example.com/pedido/" + publicId + "#token=" + token;
+        assertTrue(content.text().contains(expected));
+        assertTrue(content.html().contains(expected));
+        assertFalse(content.text().contains("?token="));
     }
 
     @Test

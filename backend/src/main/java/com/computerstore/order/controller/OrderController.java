@@ -29,6 +29,7 @@ import com.computerstore.order.repository.CustomerOrderRepository;
 import com.computerstore.order.service.OrderStockService;
 import com.computerstore.order.service.FulfillmentPolicy;
 import com.computerstore.payment.config.BankTransferProperties;
+import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.email.OrderEmailEventType;
 import com.computerstore.email.OrderEmailOutboxService;
 import com.computerstore.security.AuthenticatedUser;
@@ -66,6 +67,7 @@ public class OrderController {
     private final BankTransferProperties bankTransfer;
     private final OrderEmailOutboxService outbox;
     private final ShippingQuoteService shippingQuotes;
+    private final MercadoPagoProperties mercadoPago;
 
     @Autowired
     public OrderController(
@@ -75,9 +77,10 @@ public class OrderController {
             OrderStockService stock,
             OrderProperties properties,
             FulfillmentPolicy fulfillment,
-            ObjectProvider<BankTransferProperties> bankTransfer,
-            ObjectProvider<OrderEmailOutboxService> outbox,
-            ObjectProvider<ShippingQuoteService> shippingQuotes
+             ObjectProvider<BankTransferProperties> bankTransfer,
+             ObjectProvider<OrderEmailOutboxService> outbox,
+             ObjectProvider<ShippingQuoteService> shippingQuotes,
+             ObjectProvider<MercadoPagoProperties> mercadoPago
     ) {
         this.orders = orders;
         this.variants = variants;
@@ -89,6 +92,7 @@ public class OrderController {
                 new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
         this.outbox = outbox.getIfAvailable();
         this.shippingQuotes = shippingQuotes.getIfAvailable();
+        this.mercadoPago = mercadoPago.getIfAvailable();
     }
 
     public OrderController(CustomerOrderRepository orders, ProductVariantRepository variants,
@@ -99,7 +103,7 @@ public class OrderController {
         this.properties = properties; this.fulfillment = fulfillment;
         this.bankTransfer = bankTransfer.getIfAvailable(() ->
                 new BankTransferProperties(false, "", "", "", "", "", "ARS", null));
-        this.outbox = outbox.getIfAvailable(); this.shippingQuotes = null;
+        this.outbox = outbox.getIfAvailable(); this.shippingQuotes = null; this.mercadoPago = null;
     }
 
     public OrderController(CustomerOrderRepository orders, ProductVariantRepository variants,
@@ -114,6 +118,7 @@ public class OrderController {
         this.bankTransfer = new BankTransferProperties(false, "", "", "", "", "", "ARS", null);
         this.outbox = null;
         this.shippingQuotes = null;
+        this.mercadoPago = null;
     }
 
     @PostMapping
@@ -127,7 +132,7 @@ public class OrderController {
         var user = users.findByIdForUpdate(auth.id())
                 .filter(userCandidate -> userCandidate.isActive())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
-        if (!user.isEmailVerified()) {
+        if (request.paymentMethod() == PaymentMethod.BANK_TRANSFER && !user.isEmailVerified()) {
             throw new EmailVerificationRequiredException();
         }
         if (user.getDocumentNumber() == null || user.getDocumentNumber().isBlank()) {
@@ -152,6 +157,8 @@ public class OrderController {
                 return ResponseEntity.ok(OrderResponseMapper.toResponse(existing.get()));
             }
         }
+
+        if (paymentMethod == PaymentMethod.MERCADO_PAGO && mercadoPago != null) mercadoPago.requireEnabled();
 
         var pickupLocation = request.fulfillmentMethod() == com.computerstore.order.domain.FulfillmentMethod.PICKUP
                 ? fulfillment.select(request.fulfillmentMethod(), request.pickupLocationCode(), request.pickupLocationVersion())
@@ -235,7 +242,7 @@ public class OrderController {
     @Transactional(readOnly = true)
     public OrderResponse own(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser auth) {
         return orders.findById(id)
-                .filter(order -> order.getUser().getId().equals(auth.id()))
+                .filter(order -> order.getUser() != null && order.getUser().getId().equals(auth.id()))
                 .map(OrderResponseMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found."));
     }

@@ -18,6 +18,14 @@ public class PaymentCheckoutService {
 
     public CheckoutResult create(Long orderId, Long userId, String idempotencyKey) {
         PaymentPreparation preparation = transactions.prepare(orderId, userId, idempotencyKey);
+        return create(preparation);
+    }
+
+    public CheckoutResult createGuest(Long orderId, String idempotencyKey) {
+        return create(transactions.prepareGuest(orderId, idempotencyKey));
+    }
+
+    private CheckoutResult create(PaymentPreparation preparation) {
         if (preparation.response() != null) {
             return new CheckoutResult(false, preparation.response());
         }

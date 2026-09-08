@@ -27,8 +27,8 @@ public final class OrderResponseMapper {
                 order.getReservationExpiresAt(),
                 order.getCancellationReason() == null ? null : order.getCancellationReason().name(),
                 order.getCancelledAt(),
-                order.getUser().getFirstName() + " " + order.getUser().getLastName(),
-                order.getUser().getEmail(),
+                order.getBuyer().fullName(),
+                order.getBuyer().getEmail(),
                 order.getItems().stream()
                         .map(item -> new OrderResponse.Item(
                                 item.getVariant().getProduct().getId(),

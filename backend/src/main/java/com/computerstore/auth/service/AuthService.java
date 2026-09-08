@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,6 +28,7 @@ import com.computerstore.user.domain.RoleName;
 import com.computerstore.user.domain.UserAccount;
 import com.computerstore.user.repository.RoleRepository;
 import com.computerstore.user.repository.UserAccountRepository;
+import com.computerstore.user.service.AccountEmailLockService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +49,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AccountLifecycleService accountLifecycleService;
+    private final AccountEmailLockService emailLock;
     private final long refreshExpirationMs;
 
     public AuthService(
@@ -56,6 +59,7 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             AccountLifecycleService accountLifecycleService,
+            AccountEmailLockService emailLock,
             @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs
     ) {
         this.userAccountRepository = userAccountRepository;
@@ -64,12 +68,14 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.accountLifecycleService = accountLifecycleService;
+        this.emailLock = emailLock;
         this.refreshExpirationMs = refreshExpirationMs;
     }
 
     @Transactional
     public AuthSession register(RegisterRequest request) {
-        String email = request.email().trim().toLowerCase();
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        emailLock.lock(email);
         if (userAccountRepository.findByEmailIgnoreCase(email).isPresent()) {
             throw new DuplicateResourceException("An account already exists for this email.");
         }

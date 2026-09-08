@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import com.computerstore.order.domain.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
     // Explicit user subgraphs exclude eager roles; items is the only fetched bag.
@@ -60,7 +61,10 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     List<DailyTotal> summarizeDays(@Param("start") Instant start, @Param("end") Instant end);
 
     Optional<CustomerOrder> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+    Optional<CustomerOrder> findByGuestSessionIdAndIdempotencyKey(UUID guestSessionId, String idempotencyKey);
+    Optional<CustomerOrder> findByPublicId(UUID publicId);
     boolean existsByUserIdAndStatusAndPaymentMethod(Long userId, OrderStatus status, PaymentMethod paymentMethod);
+    boolean existsByGuestSessionIdAndStatus(UUID guestSessionId, OrderStatus status);
 
     @Query(value = "SELECT EXISTS (SELECT 1 FROM customer_orders customer_order JOIN order_items item ON item.order_id = customer_order.id WHERE item.variant_id = :variantId AND customer_order.status NOT IN ('DELIVERED', 'CANCELLED'))", nativeQuery = true)
     boolean existsActiveByVariantId(@Param("variantId") Long variantId);
@@ -68,6 +72,10 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id")
     Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.publicId = :publicId")
+    Optional<CustomerOrder> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select customerOrder from CustomerOrder customerOrder where customerOrder.id = :id and customerOrder.user.id = :userId")

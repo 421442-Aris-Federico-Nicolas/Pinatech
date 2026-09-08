@@ -11,6 +11,7 @@ const LABELS: Record<EstadoDominio, Readonly<Record<string, string>>> = {
     PENDING: 'Pago pendiente', UNDER_REVIEW: 'Comprobante en revisión', UNPAID: 'Sin pagar', PAID: 'Pago acreditado', APPROVED: 'Pago aprobado',
     FAILED: 'Pago rechazado', REJECTED: 'Pago rechazado', EXPIRED: 'Pago vencido',
     REFUND_PENDING: 'Reintegro en proceso', REFUNDED: 'Pago reintegrado', CANCELLED: 'Pago cancelado',
+    IN_MEDIATION: 'Pago en mediación', CHARGEBACK: 'Pago contracargado',
     NOT_REQUIRED: 'Pago no requerido',
   },
   entrega: {
@@ -49,6 +50,7 @@ const TONES: Partial<Record<EstadoDominio, Readonly<Record<string, EstadoTono>>>
   pago: {
     PENDING: 'warning', UNDER_REVIEW: 'info', UNPAID: 'warning', PAID: 'success', APPROVED: 'success', FAILED: 'danger',
     REJECTED: 'danger', EXPIRED: 'danger', REFUND_PENDING: 'warning', REFUNDED: 'accent', CANCELLED: 'danger',
+    IN_MEDIATION: 'warning', CHARGEBACK: 'danger',
   },
   entrega: {
     PENDING: 'neutral', UNFULFILLED: 'neutral', RESERVED: 'warning', PREPARING: 'accent', READY: 'success',

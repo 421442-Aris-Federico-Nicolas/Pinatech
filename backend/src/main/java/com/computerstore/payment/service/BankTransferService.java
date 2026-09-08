@@ -57,7 +57,14 @@ public class BankTransferService {
     @Transactional(readOnly = true)
     public BankTransferDetailResponse detail(Long orderId, AuthenticatedUser auth) {
         var order = transferOrder(orderId);
-        authorizeOwnerOrAdmin(order.getUser().getId(), auth);
+        authorizeOwnerOrAdmin(order.getUser() == null ? null : order.getUser().getId(), auth);
+        return detail(order, proofs.findByOrderId(orderId).orElse(null));
+    }
+
+    @Transactional(readOnly = true)
+    public BankTransferDetailResponse detailGuest(Long orderId) {
+        var order = transferOrder(orderId);
+        if (!order.isGuest()) throw new ResourceNotFoundException("Bank transfer order not found.");
         return detail(order, proofs.findByOrderId(orderId).orElse(null));
     }
 
@@ -68,7 +75,22 @@ public class BankTransferService {
         var order = orders.findByIdForUpdate(orderId)
                 .filter(candidate -> candidate.getPaymentMethod() == PaymentMethod.BANK_TRANSFER)
                 .orElseThrow(() -> new ResourceNotFoundException("Bank transfer order not found."));
-        authorizeOwnerOrAdmin(order.getUser().getId(), auth);
+        authorizeOwnerOrAdmin(order.getUser() == null ? null : order.getUser().getId(), auth);
+        return uploadAuthorized(order, sanitized, suppliedKey);
+    }
+
+    @Transactional(noRollbackFor = ReservationExpiredException.class)
+    public BankTransferDetailResponse uploadGuest(Long orderId, BankTransferProofSanitizer.SanitizedProof sanitized,
+                                                   String suppliedKey) {
+        var order = orders.findByIdForUpdate(orderId)
+                .filter(candidate -> candidate.isGuest() && candidate.getPaymentMethod() == PaymentMethod.BANK_TRANSFER)
+                .orElseThrow(() -> new ResourceNotFoundException("Bank transfer order not found."));
+        return uploadAuthorized(order, sanitized, suppliedKey);
+    }
+
+    private BankTransferDetailResponse uploadAuthorized(com.computerstore.order.domain.CustomerOrder order,
+            BankTransferProofSanitizer.SanitizedProof sanitized, String suppliedKey) {
+        Long orderId = order.getId();
         String key = normalizeIdempotencyKey(suppliedKey);
         Optional<BankTransferProof> existing = proofs.findByOrderId(orderId);
         if (existing.isPresent()) {
@@ -113,7 +135,18 @@ public class BankTransferService {
     @Transactional(readOnly = true)
     public BankTransferDetailResponse preflightUpload(Long orderId, String suppliedKey, AuthenticatedUser auth) {
         var order = transferOrder(orderId);
-        authorizeOwnerOrAdmin(order.getUser().getId(), auth);
+        authorizeOwnerOrAdmin(order.getUser() == null ? null : order.getUser().getId(), auth);
+        String key = normalizeIdempotencyKey(suppliedKey);
+        Optional<BankTransferProof> existing = proofs.findByOrderId(orderId);
+        if (existing.isEmpty()) return null;
+        if (key != null && key.equals(existing.get().getIdempotencyKey())) return detail(order, existing.get());
+        throw new DuplicateResourceException("This order already has a transfer proof.");
+    }
+
+    @Transactional(readOnly = true)
+    public BankTransferDetailResponse preflightUploadGuest(Long orderId, String suppliedKey) {
+        var order = transferOrder(orderId);
+        if (!order.isGuest()) throw new ResourceNotFoundException("Bank transfer order not found.");
         String key = normalizeIdempotencyKey(suppliedKey);
         Optional<BankTransferProof> existing = proofs.findByOrderId(orderId);
         if (existing.isEmpty()) return null;
@@ -209,7 +242,7 @@ public class BankTransferService {
     private void authorizeOwnerOrAdmin(Long ownerId, AuthenticatedUser auth) {
         boolean admin = auth != null && auth.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-        if (!admin && (auth == null || !ownerId.equals(auth.id()))) {
+        if (!admin && (auth == null || ownerId == null || !ownerId.equals(auth.id()))) {
             throw new ResourceNotFoundException("Bank transfer order not found.");
         }
     }

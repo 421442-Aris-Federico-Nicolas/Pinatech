@@ -16,6 +16,10 @@ import com.computerstore.shipping.gateway.ZipnovaGateway;
 import com.computerstore.shipping.repository.ShippingQuoteRepository;
 import com.computerstore.user.domain.*;
 import com.computerstore.user.repository.*;
+import com.computerstore.guest.domain.GuestCheckoutSession;
+import com.computerstore.guest.dto.GuestShippingQuoteRequest;
+import com.computerstore.guest.service.GuestCheckoutNormalizer;
+import com.computerstore.guest.service.GuestCheckoutEligibilityService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -29,17 +33,19 @@ public class ShippingQuoteService {
     private final UserAccountRepository users; private final UserAddressRepository addresses;
     private final ProductVariantRepository variants; private final ShippingQuoteRepository quotes;
     private final ObjectMapper json; private final Clock clock;
+    private final GuestCheckoutEligibilityService guestEligibility;
 
     public ShippingQuoteService(ZipnovaProperties properties, ZipnovaGateway gateway, UserAccountRepository users,
             UserAddressRepository addresses, ProductVariantRepository variants, ShippingQuoteRepository quotes,
-            ObjectMapper json, Clock clock) {
+            ObjectMapper json, Clock clock, GuestCheckoutEligibilityService guestEligibility) {
         this.properties = properties; this.gateway = gateway; this.users = users; this.addresses = addresses;
         this.variants = variants; this.quotes = quotes; this.json = json; this.clock = clock;
+        this.guestEligibility = guestEligibility;
     }
 
     public ShippingQuoteResponse quote(Long userId, ShippingQuoteRequest request) {
         properties.requireAvailable();
-        UserAccount user = activeVerifiedUser(userId);
+        UserAccount user = activeUser(userId);
         UserAddress address = address(userId);
         Profile profile = profile(user, address);
         List<ShippingHashes.ItemQuantity> inputs = request.items().stream().map(ShippingHashes::item).toList();
@@ -63,6 +69,29 @@ public class ShippingQuoteService {
         return new ShippingQuoteResponse(List.copyOf(response));
     }
 
+    public ShippingQuoteResponse quoteGuest(GuestCheckoutSession session, GuestShippingQuoteRequest request) {
+        properties.requireAvailable();
+        var customer = GuestCheckoutNormalizer.customer(request.customer());
+        guestEligibility.requireUnregistered(customer.email());
+        var address = GuestCheckoutNormalizer.address(request.deliveryAddress(), customer);
+        List<ShippingHashes.ItemQuantity> inputs = request.items().stream().map(ShippingHashes::item).toList();
+        List<ProductVariant> products = loadVariants(inputs);
+        String cartHash = ShippingHashes.cart(inputs, products);
+        String profileHash = ShippingHashes.profile(customer, address);
+        var options = gateway.quote(new ZipnovaGateway.QuoteCommand(address.snapshot().toDestination(),
+                declaredValue(products, inputs), expandedItems(products, inputs)));
+        Instant now = Instant.now(clock); Instant expires = now.plus(properties.quoteTtl());
+        List<ShippingQuote> pending = new ArrayList<>();
+        for (var option : options) pending.add(new ShippingQuote(session, cartHash, profileHash, option,
+                encode(option.tags()), now, expires));
+        List<ShippingQuoteResponse.Option> response = new ArrayList<>();
+        for (ShippingQuote quote : quotes.saveAll(pending)) response.add(new ShippingQuoteResponse.Option(
+                quote.getId(), quote.getCarrierName(), quote.getServiceCode(), quote.getServiceName(),
+                quote.getLogisticType(), quote.getAmount(), quote.getCurrency(), quote.getEstimatedDeliveryAt(),
+                expires, decodeTags(quote.getTags())));
+        return new ShippingQuoteResponse(List.copyOf(response));
+    }
+
     public ValidatedQuote validateForOrder(UUID id, UserAccount user, List<ShippingHashes.ItemQuantity> inputs,
                                            List<ProductVariant> products) {
         properties.requireAvailable();
@@ -80,9 +109,27 @@ public class ShippingQuoteService {
         return new ValidatedQuote(quote, profile.snapshot());
     }
 
-    private UserAccount activeVerifiedUser(Long id) {
+    public ValidatedQuote validateForGuestOrder(UUID id, GuestCheckoutSession session,
+            GuestCheckoutNormalizer.Customer customer, GuestCheckoutNormalizer.Address address,
+            List<ShippingHashes.ItemQuantity> inputs, List<ProductVariant> products) {
+        properties.requireAvailable();
+        if (id == null) throw new InvalidRequestException("A shipping quote is required for delivery.");
+        ShippingQuote quote = quotes.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Shipping quote not found."));
+        if (quote.getGuestSession() == null || !quote.getGuestSession().getId().equals(session.getId())) {
+            throw new ResourceNotFoundException("Shipping quote not found.");
+        }
+        if (!quote.getExpiresAt().isAfter(Instant.now(clock))) throw new InvalidRequestException("The shipping quote has expired.");
+        if (quote.getConsumedOrder() != null) throw new DuplicateResourceException("The shipping quote was already consumed.");
+        if (!quote.getCartHash().equals(ShippingHashes.cart(inputs, products))
+                || !quote.getProfileHash().equals(ShippingHashes.profile(customer, address))) {
+            throw new InvalidRequestException("The cart or delivery profile changed after the shipping quote.");
+        }
+        return new ValidatedQuote(quote, address.snapshot());
+    }
+
+    private UserAccount activeUser(Long id) {
         UserAccount user = users.findByIdAndActiveTrue(id).orElseThrow(() -> new ResourceNotFoundException("User not found."));
-        if (!user.isEmailVerified()) throw new EmailVerificationRequiredException();
         return user;
     }
     private UserAddress address(Long id) { return addresses.findById(id)

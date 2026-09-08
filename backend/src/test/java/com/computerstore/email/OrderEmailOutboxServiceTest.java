@@ -25,6 +25,7 @@ import com.computerstore.order.domain.OrderStatus;
 import com.computerstore.order.domain.PaymentMethod;
 import com.computerstore.order.domain.PaymentStatus;
 import com.computerstore.order.domain.PickupLocationSnapshot;
+import com.computerstore.order.domain.BuyerSnapshot;
 import com.computerstore.user.domain.UserAccount;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -43,12 +44,14 @@ class OrderEmailOutboxServiceTest {
                 entries, email, completion, Clock.fixed(NOW, ZoneOffset.UTC), JSON, "");
         UUID id = UUID.randomUUID();
         UUID leaseToken = UUID.randomUUID();
+        UUID publicId = UUID.randomUUID();
         var instruction = new OrderEmailOutboxService.Instruction(
-                id, leaseToken, OrderEmailEventType.ORDER_CREATED, 41L,
+                id, leaseToken, OrderEmailEventType.ORDER_CREATED, 41L, publicId, false,
                 "customer@example.com", "Ada", null, null);
         RuntimeException providerFailure = new RuntimeException();
         org.mockito.Mockito.doThrow(providerFailure).when(email).sendOrderEvent(
-                id, "customer@example.com", "Ada", OrderEmailEventType.ORDER_CREATED, 41L, null);
+                id, "customer@example.com", "Ada", OrderEmailEventType.ORDER_CREATED, 41L,
+                publicId, false, null);
 
         service.deliver(instruction);
 
@@ -165,7 +168,7 @@ class OrderEmailOutboxServiceTest {
         UUID leaseToken = UUID.randomUUID();
         SellerOrderSnapshot snapshot = SellerOrderSnapshot.from(order(), NOW);
         var instruction = new OrderEmailOutboxService.Instruction(
-                id, leaseToken, OrderEmailEventType.SELLER_PAYMENT_APPROVED, 41L,
+                id, leaseToken, OrderEmailEventType.SELLER_PAYMENT_APPROVED, 41L, UUID.randomUUID(), false,
                 "sales@example.com", "Ada", null, JSON.writeValueAsString(snapshot));
 
         service.deliver(instruction);
@@ -185,7 +188,7 @@ class OrderEmailOutboxServiceTest {
         UUID id = UUID.randomUUID();
         UUID leaseToken = UUID.randomUUID();
         var instruction = new OrderEmailOutboxService.Instruction(
-                id, leaseToken, OrderEmailEventType.SELLER_ORDER_CREATED, 41L,
+                id, leaseToken, OrderEmailEventType.SELLER_ORDER_CREATED, 41L, UUID.randomUUID(), false,
                 "sales@example.com", "Ada", null, null);
 
         service.deliver(instruction);
@@ -193,7 +196,8 @@ class OrderEmailOutboxServiceTest {
         verify(completion).failure(org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.eq(leaseToken),
                 org.mockito.ArgumentMatchers.argThat(error -> error instanceof IllegalStateException
                         && "Seller order email snapshot is missing.".equals(error.getMessage())));
-        verify(email, org.mockito.Mockito.never()).sendOrderEvent(any(), any(), any(), any(), any(), any());
+        verify(email, org.mockito.Mockito.never()).sendOrderEvent(
+                any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
         verify(email, org.mockito.Mockito.never()).sendSellerOrderEvent(any(), any(), any(), any());
     }
 
@@ -215,14 +219,11 @@ class OrderEmailOutboxServiceTest {
 
     private static CustomerOrder order() {
         CustomerOrder order = mock(CustomerOrder.class);
-        UserAccount user = mock(UserAccount.class);
         when(order.getId()).thenReturn(41L);
+        when(order.getPublicId()).thenReturn(UUID.randomUUID());
         when(order.getCreatedAt()).thenReturn(NOW);
-        when(order.getUser()).thenReturn(user);
-        when(user.getFirstName()).thenReturn("Ada");
-        when(user.getLastName()).thenReturn("Lovelace");
-        when(user.getEmail()).thenReturn("ada@example.com");
-        when(user.getPhone()).thenReturn("3515550101");
+        when(order.getBuyer()).thenReturn(new BuyerSnapshot(
+                "Ada", "Lovelace", "ada@example.com", "3515550101", "12345678"));
         when(order.getPaymentMethod()).thenReturn(PaymentMethod.MERCADO_PAGO);
         when(order.getStatus()).thenReturn(OrderStatus.PENDING_PAYMENT);
         when(order.getPaymentStatus()).thenReturn(PaymentStatus.PENDING);

@@ -1,9 +1,11 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+
+export const GUEST_REQUEST = new HttpContextToken<boolean>(() => false);
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const origin = globalThis.location?.origin ?? 'http://localhost';
@@ -23,8 +25,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     withCredentials: true,
   });
   const requestPath = requestUrl.pathname.slice(apiPath.length);
-  const isRefreshable = !['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout']
-    .includes(requestPath);
+  const isRefreshable = !request.context.get(GUEST_REQUEST)
+    && !['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].includes(requestPath);
 
   return next(authenticate(request)).pipe(catchError((error: unknown) => {
     if (!(error instanceof HttpErrorResponse) || error.status !== 401 || !isRefreshable) {

@@ -255,14 +255,16 @@ class OrderControllerTest {
     }
 
     @Test
-    void requiresVerifiedEmailBeforeReadingProductsOrReservingStock() {
+    void allowsUnverifiedAccountsToCreateMercadoPagoOrders() {
         when(user.isEmailVerified()).thenReturn(false);
+        ProductVariant variant = variant(7L, product(7L, "Keyboard", "125.50"));
+        when(variants.findByIdAndActiveTrueAndProduct_ActiveTrue(7L)).thenReturn(Optional.of(variant));
+        when(orders.save(any(CustomerOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThrows(EmailVerificationRequiredException.class,
-                () -> controller.create(request(1, "CORDOBA-CENTRO"), null, authenticatedUser));
+        controller.create(request(1, "CORDOBA-CENTRO"), null, authenticatedUser);
 
-        verify(variants, never()).findByIdAndActiveTrueAndProduct_ActiveTrue(any());
-        verify(stock, never()).reserve(any());
+        verify(variants).findByIdAndActiveTrueAndProduct_ActiveTrue(7L);
+        verify(stock).reserve(any());
     }
 
     private CreateOrderRequest request(int quantity, String pickupCode) {

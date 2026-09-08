@@ -23,11 +23,11 @@ public record AdminBankTransferProofResponse(
 ) {
     public static AdminBankTransferProofResponse from(BankTransferProof proof) {
         var order = proof.getOrder();
-        var user = order.getUser();
+        var buyer = order.getBuyer();
         return new AdminBankTransferProofResponse(proof.getId(), proof.getStatus().name(),
                 proof.getOriginalFilename(), proof.getContentType(), proof.getSizeBytes(), proof.getSubmittedAt(),
                 proof.getReviewedAt(), proof.getRejectionReason(), proof.getPreviews().size(), order.getId(),
-                user.getFirstName() + " " + user.getLastName(), user.getEmail(), order.getTotal(),
+                buyer.fullName(), buyer.getEmail(), order.getTotal(),
                 order.getCurrency());
     }
 }

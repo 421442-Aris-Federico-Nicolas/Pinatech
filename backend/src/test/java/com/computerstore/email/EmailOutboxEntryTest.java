@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 
 import com.computerstore.order.domain.CustomerOrder;
-import com.computerstore.user.domain.UserAccount;
+import com.computerstore.order.domain.BuyerSnapshot;
 import org.junit.jupiter.api.Test;
 
 class EmailOutboxEntryTest {
@@ -15,10 +15,8 @@ class EmailOutboxEntryTest {
     @Test
     void movesPermanentlyFailedMessagesToTheTerminalQueue() {
         CustomerOrder order = mock(CustomerOrder.class);
-        UserAccount user = mock(UserAccount.class);
-        when(order.getUser()).thenReturn(user);
-        when(user.getEmail()).thenReturn("customer@example.com");
-        when(user.getFirstName()).thenReturn("Ada");
+        when(order.getBuyer()).thenReturn(new BuyerSnapshot(
+                "Ada", "Lovelace", "customer@example.com", "3515550101", "12345678"));
         EmailOutboxEntry entry = new EmailOutboxEntry(
                 order, OrderEmailEventType.ORDER_CREATED, null, Instant.parse("2026-08-29T10:00:00Z"));
 

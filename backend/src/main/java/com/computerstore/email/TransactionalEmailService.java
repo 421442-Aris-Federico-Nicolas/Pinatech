@@ -2,6 +2,7 @@ package com.computerstore.email;
 
 import com.computerstore.user.domain.AccountActionPurpose;
 import java.util.UUID;
+import java.time.Duration;
 
 public interface TransactionalEmailService {
 
@@ -11,8 +12,13 @@ public interface TransactionalEmailService {
 
     void sendEmailChangedNotice(String previousEmail, String firstName, String newEmail);
 
+    void sendGuestCheckoutCode(String recipient, String firstName, String code, Duration ttl);
+
+    void sendGuestOrderCreated(String recipient, String firstName, UUID publicId, String rawAccessToken);
+
     void sendOrderEvent(UUID idempotencyKey, String recipient, String customerName,
-                        OrderEmailEventType eventType, Long orderId, String rejectionReason);
+                        OrderEmailEventType eventType, Long orderId, UUID publicId, boolean guestOrder,
+                        String rejectionReason);
 
     void sendSellerOrderEvent(UUID idempotencyKey, String recipient, OrderEmailEventType eventType,
                               SellerOrderSnapshot snapshot);
