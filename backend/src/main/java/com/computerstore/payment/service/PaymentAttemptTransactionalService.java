@@ -395,7 +395,7 @@ public class PaymentAttemptTransactionalService {
     }
 
     private void validateAuthoritativePayment(PaymentAttempt attempt, ProviderPayment payment) {
-        boolean expectedLiveMode = properties.environment() == MercadoPagoEnvironment.PRODUCTION;
+        boolean expectedLiveMode = properties.environment().expectsLiveMode();
         if (!attempt.getPublicId().toString().equals(payment.externalReference())
                 || attempt.getPreferenceId() == null
                 || !attempt.getPreferenceId().equals(payment.preferenceId())

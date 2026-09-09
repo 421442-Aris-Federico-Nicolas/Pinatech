@@ -54,6 +54,11 @@ public record MercadoPagoProperties(
         if (enabled && environment == MercadoPagoEnvironment.SANDBOX && !accessToken.startsWith("TEST-")) {
             throw new IllegalArgumentException("Mercado Pago sandbox requires a TEST- access token.");
         }
+        if (enabled && environment == MercadoPagoEnvironment.TEST_ACCOUNT
+                && !accessToken.startsWith("APP_USR-")) {
+            throw new IllegalArgumentException(
+                    "Mercado Pago test accounts require APP_USR- credentials.");
+        }
         if (enabled && environment == MercadoPagoEnvironment.PRODUCTION
                 && (!accessToken.startsWith("APP_USR-") || !productionConfirmation)) {
             throw new IllegalArgumentException(

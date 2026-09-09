@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.LinkedHashSet;
 
-import com.computerstore.payment.config.MercadoPagoEnvironment;
 import com.computerstore.payment.config.MercadoPagoProperties;
 import com.computerstore.payment.exception.PaymentNotFoundException;
 import com.computerstore.payment.exception.PaymentProviderException;
@@ -82,7 +81,7 @@ public class RestClientMercadoPagoGateway implements MercadoPagoGateway {
                 throw new PaymentProviderException("Mercado Pago returned an empty preference response.");
             }
             String preferenceId = requiredText(response, "id");
-            String checkoutField = properties.environment() == MercadoPagoEnvironment.SANDBOX
+            String checkoutField = properties.environment().usesSandboxCheckout()
                     ? "sandbox_init_point" : "init_point";
             return new PaymentPreference(preferenceId, requiredText(response, checkoutField));
         } catch (RestClientResponseException | ResourceAccessException exception) {
