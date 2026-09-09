@@ -438,6 +438,23 @@ class PaymentAttemptTransactionalServiceTest {
     }
 
     @Test
+    void acceptsLiveModePaymentFromTestAccount() {
+        PaymentAttemptTransactionalService testAccountService = new PaymentAttemptTransactionalService(
+                attempts, providerPayments, events, orders, stock,
+                properties(MercadoPagoEnvironment.TEST_ACCOUNT, "APP_USR-test-token"), fulfillment,
+                Clock.fixed(NOW, ZoneOffset.UTC), outbox);
+        CustomerOrder order = order(NOW.plusSeconds(300));
+        PaymentAttempt attempt = readyAttempt(order, "pref-1");
+        lock(attempt, order);
+
+        testAccountService.processWebhook(
+                payment(attempt, "pref-1", "123", "approved", NOW, true),
+                "123", "request-1", "{}");
+
+        assertEquals(PaymentStatus.APPROVED, order.getPaymentStatus());
+    }
+
+    @Test
     void mediationBlocksFulfillmentWithoutBeingReportedAsRefund() {
         CustomerOrder order = order(NOW.plusSeconds(300));
         PaymentAttempt attempt = readyAttempt(order, "pref-1");
@@ -535,8 +552,12 @@ class PaymentAttemptTransactionalServiceTest {
     }
 
     private MercadoPagoProperties properties() {
+        return properties(MercadoPagoEnvironment.SANDBOX, "TEST-access-token");
+    }
+
+    private MercadoPagoProperties properties(MercadoPagoEnvironment environment, String accessToken) {
         return new MercadoPagoProperties(
-                true, MercadoPagoEnvironment.SANDBOX, "TEST-access-token", "webhook-secret", "99",
+                true, environment, accessToken, "webhook-secret", "99",
                 URI.create("https://store.example"), URI.create("https://api.example"),
                 Duration.ofSeconds(1), Duration.ofSeconds(2),
                 false, Duration.ofMinutes(5), Duration.ofDays(30));

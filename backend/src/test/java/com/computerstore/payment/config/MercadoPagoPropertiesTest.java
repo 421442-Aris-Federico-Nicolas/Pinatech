@@ -1,5 +1,6 @@
 package com.computerstore.payment.config;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.URI;
@@ -47,6 +48,15 @@ class MercadoPagoPropertiesTest {
     void productionRequiresExplicitConfirmationAndProductionCredentials() {
         assertThrows(IllegalArgumentException.class, () -> new MercadoPagoProperties(
                 true, MercadoPagoEnvironment.PRODUCTION, "TEST-token", "secret", "99",
+                URI.create("https://store.example"), URI.create("https://api.example"),
+                Duration.ofSeconds(1), Duration.ofSeconds(2),
+                false, Duration.ofMinutes(5), Duration.ofDays(30)));
+    }
+
+    @Test
+    void testAccountAcceptsAppUsrCredentialsWithoutProductionConfirmation() {
+        assertDoesNotThrow(() -> new MercadoPagoProperties(
+                true, MercadoPagoEnvironment.TEST_ACCOUNT, "APP_USR-test-token", "secret", "99",
                 URI.create("https://store.example"), URI.create("https://api.example"),
                 Duration.ofSeconds(1), Duration.ofSeconds(2),
                 false, Duration.ofMinutes(5), Duration.ofDays(30)));

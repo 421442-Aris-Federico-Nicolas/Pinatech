@@ -82,6 +82,28 @@ class RestClientMercadoPagoGatewayTest {
     }
 
     @Test
+    void testAccountUsesSandboxCheckoutUrl() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        MercadoPagoProperties properties = properties(
+                MercadoPagoEnvironment.TEST_ACCOUNT, "APP_USR-test-token");
+        RestClientMercadoPagoGateway gateway = new RestClientMercadoPagoGateway(builder.build(), properties);
+        server.expect(requestTo("https://api.mercadopago.com/checkout/preferences"))
+                .andRespond(withSuccess(
+                        "{\"id\":\"pref-test-account\",\"sandbox_init_point\":\"https://sandbox\"}",
+                        MediaType.APPLICATION_JSON));
+
+        PaymentPreference preference = gateway.createPreference(new PaymentPreferenceRequest(
+                UUID.randomUUID(), 42L, new BigDecimal("100.00"), "ARS",
+                Instant.parse("2026-08-17T20:00:00Z"),
+                List.of(new PaymentPreferenceRequest.Item(
+                        "7", "Keyboard", 1, new BigDecimal("100.00")))));
+
+        assertEquals("https://sandbox", preference.checkoutUrl());
+        server.verify();
+    }
+
+    @Test
     void addsOnlyTheGuestPublicIdToGuestPreferenceBackUrls() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://api.mercadopago.com");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -256,10 +278,14 @@ class RestClientMercadoPagoGatewayTest {
     }
 
     private MercadoPagoProperties properties() {
+        return properties(MercadoPagoEnvironment.SANDBOX, "TEST-access-token");
+    }
+
+    private MercadoPagoProperties properties(MercadoPagoEnvironment environment, String accessToken) {
         return new MercadoPagoProperties(
                 true,
-                MercadoPagoEnvironment.SANDBOX,
-                "TEST-access-token",
+                environment,
+                accessToken,
                 "webhook-secret",
                 "99",
                 URI.create("https://store.example/"),
