@@ -247,7 +247,7 @@ export class TechnicalComponent {
     const file = files[0] ?? null;
     if (this.editingBusy()) return;
     this.attachmentFile.set(null);
-    if (!file) return;
+    if (!file || ticket.status === 'CANCELLED') return;
     if (!this.canEdit(ticket)) return this.fail('No tenés permisos para agregar imágenes a este ticket.');
     if (ticket.attachments.length >= 10) return this.fail('El ticket ya alcanzó el máximo de 10 imágenes.');
     this.clearMessages();
@@ -264,7 +264,7 @@ export class TechnicalComponent {
   uploadAttachment(): void {
     const ticket = this.selected();
     const file = this.attachmentFile();
-    if (!ticket || !file || !this.canEdit(ticket) || this.editingBusy()) return;
+    if (!ticket || ticket.status === 'CANCELLED' || !file || !this.canEdit(ticket) || this.editingBusy()) return;
     this.clearMessages();
     this.uploadingAttachment.set(true);
     this.attachments.upload(ticket.id, file).pipe(finalize(() => this.uploadingAttachment.set(false))).subscribe({

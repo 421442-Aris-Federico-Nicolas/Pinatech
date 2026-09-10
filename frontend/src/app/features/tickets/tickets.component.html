@@ -34,14 +34,16 @@
             <button appButton="text" type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" [attr.aria-controls]="'ticket-images-' + ticket.id" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
             @if (imagesExpanded(ticket.id)) { <div [id]="'ticket-images-' + ticket.id"><app-ticket-attachment-gallery [attachments]="ticket.attachments" /></div> }
           }
-          <section class="ticket-upload">
-            <div><strong>Agregar imágenes</strong><small>{{ attachmentLimitReached(ticket) ? 'Límite de 10 adjuntos alcanzado' : 'Opcional, hasta completar 10 adjuntos.' }}</small></div>
-             <app-ticket-image-picker label="Agregar imágenes" [inputName]="'ticketImages' + ticket.id" [multiple]="true" [disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)" (filesSelected)="selectTicketImages(ticket, $event)" />
-            @if (pendingFor(ticket.id).length) {
-              <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" [disabled]="uploadingTicket() === ticket.id" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
-               <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null || processingImages()" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ processingImages() ? 'Optimizando…' : uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
-            }
-           </section>
+           @if (ticket.status !== 'CANCELLED') {
+             <section class="ticket-upload">
+               <div><strong>Agregar imágenes</strong><small>{{ attachmentLimitReached(ticket) ? 'Límite de 10 adjuntos alcanzado' : 'Opcional, hasta completar 10 adjuntos.' }}</small></div>
+                <app-ticket-image-picker label="Agregar imágenes" [inputName]="'ticketImages' + ticket.id" [multiple]="true" [disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)" (filesSelected)="selectTicketImages(ticket, $event)" />
+               @if (pendingFor(ticket.id).length) {
+                 <div class="selected-files">@for (image of pendingFor(ticket.id); track image.previewUrl; let index = $index) {<span>{{ image.file.name }} <button type="button" [disabled]="uploadingTicket() === ticket.id" (click)="removeTicketImage(ticket.id, index)">Quitar</button></span>}</div>
+                  <button appButton="outlined" type="button" [disabled]="uploadingTicket() !== null || processingImages()" [attr.aria-busy]="uploadingTicket() === ticket.id" (click)="uploadToTicket(ticket)">{{ processingImages() ? 'Optimizando…' : uploadingTicket() === ticket.id ? 'Subiendo…' : 'Subir imágenes' }}</button>
+               }
+              </section>
+           }
             @if(ticketMessages()[ticket.id]; as message){<app-feedback class="ticket-message" [tone]="message.tone" [announce]="message.tone === 'error' ? 'assertive' : 'polite'">{{ message.text }}</app-feedback>}
         </article>
       } @empty { <p class="empty">Aún no registraste solicitudes.</p> }
