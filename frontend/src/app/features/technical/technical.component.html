@@ -100,7 +100,7 @@
               <div class="section-title"><div><h3>Imágenes adjuntas</h3><p>Evidencia privada compartida por cliente y equipo técnico.</p></div></div>
               @if (ticket.attachments.length) { <app-ticket-attachment-gallery [attachments]="ticket.attachments" /> }
               @else { <p class="no-attachments">Este ticket todavía no tiene imágenes.</p> }
-              @if (canEdit(ticket)) {
+              @if (canEdit(ticket) && ticket.status !== 'CANCELLED') {
                 <div class="attachment-upload" [attr.aria-busy]="processingAttachment() || uploadingAttachment()">
                   <app-ticket-image-picker label="Agregar imagen" inputName="ticketAttachment" [disabled]="editingBusy() || ticket.attachments.length >= 10" (filesSelected)="selectAttachment($event, ticket)" />
                   <span>{{ ticket.attachments.length >= 10 ? 'Límite de 10 imágenes alcanzado' : processingAttachment() ? 'Optimizando imagen…' : attachmentFile()?.name || 'JPEG, PNG o HEIC · optimización automática' }}</span>
