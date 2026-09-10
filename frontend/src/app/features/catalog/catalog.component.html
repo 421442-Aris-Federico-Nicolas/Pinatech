@@ -28,7 +28,7 @@
        @if(priceError()){<p id="price-filter-error" class="filter-error">{{ priceError() }}</p>}
     </aside>
 
-    <div>
+    <div #catalogResults class="catalog-results">
       @if (loading()) {
          <section appCard class="state" aria-live="polite"><span class="loader" aria-hidden="true"></span><h2>Cargando productos…</h2></section>
        } @else if (error()) {

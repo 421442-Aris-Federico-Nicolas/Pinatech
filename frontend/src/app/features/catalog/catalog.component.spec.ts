@@ -1,10 +1,36 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { CatalogComponent } from './catalog.component';
 import { CatalogService, Page, ProductListItemResponse as Product } from './catalog.service';
 
 describe('CatalogComponent', () => {
+  it('scrolls smoothly to the results only after the catalog page changes', async () => {
+    const queryParams = new BehaviorSubject(convertToParamMap({}));
+    const getProducts = vi.fn((_: unknown, page: number) => of({ content: [], totalPages: 3, totalElements: 30, number: page, size: 12 }));
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: queryParams } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: getProducts } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+    const results = fixture.nativeElement.querySelector('.catalog-results') as HTMLElement;
+    results.scrollIntoView = vi.fn();
+
+    expect(results.scrollIntoView).not.toHaveBeenCalled();
+
+    queryParams.next(convertToParamMap({ page: '2' }));
+    await Promise.resolve();
+
+    expect(getProducts).toHaveBeenLastCalledWith(expect.anything(), 1, 'name,asc');
+    expect(results.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
   it('renders the mascot as the only zero-result status and keeps clear filters usable', async () => {
     const emptyPage: Page<Product> = { content: [], totalPages: 0, totalElements: 0, number: 0, size: 12 };
     const navigate = vi.fn();
