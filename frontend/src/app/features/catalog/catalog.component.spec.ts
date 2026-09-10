@@ -1,13 +1,15 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { ActivatedRoute, convertToParamMap, Router, RouterLink } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { CatalogComponent } from './catalog.component';
 import { CatalogService, Page, ProductListItemResponse as Product } from './catalog.service';
 
 describe('CatalogComponent', () => {
-  it('scrolls smoothly to the results only after the catalog page changes', async () => {
+  it('scrolls smoothly to the top only after the catalog page changes', async () => {
     const queryParams = new BehaviorSubject(convertToParamMap({}));
     const getProducts = vi.fn((_: unknown, page: number) => of({ content: [], totalPages: 3, totalElements: 30, number: page, size: 12 }));
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     await TestBed.configureTestingModule({
       imports: [CatalogComponent],
       providers: [
@@ -19,16 +21,40 @@ describe('CatalogComponent', () => {
 
     const fixture = TestBed.createComponent(CatalogComponent);
     fixture.detectChanges();
-    const results = fixture.nativeElement.querySelector('.catalog-results') as HTMLElement;
-    results.scrollIntoView = vi.fn();
 
-    expect(results.scrollIntoView).not.toHaveBeenCalled();
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.pageLinks()).toEqual([1, 2, 3]);
 
     queryParams.next(convertToParamMap({ page: '2' }));
     await Promise.resolve();
 
     expect(getProducts).toHaveBeenLastCalledWith(expect.anything(), 1, 'name,asc');
-    expect(results.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 0 });
+    scrollTo.mockRestore();
+  });
+
+  it('shows nearby, first and last page links while preserving the current query', async () => {
+    const getProducts = vi.fn((_: unknown, page: number) => of({ content: [], totalPages: 20, totalElements: 240, number: page, size: 12 }));
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ search: 'mouse', page: '10' })) } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: getProducts } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.pageLinks()).toEqual([1, 9, 10, 11, 20]);
+    expect(fixture.nativeElement.querySelectorAll('.ellipsis')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelector('.page-link.current')?.textContent?.trim()).toBe('10');
+    expect(fixture.nativeElement.querySelector('.page-link.current')?.getAttribute('aria-current')).toBe('page');
+    const pageEleven = fixture.debugElement.queryAll(By.directive(RouterLink))
+      .map((element) => element.injector.get(RouterLink))
+      .find((link) => link.queryParams?.['page'] === 11);
+    expect(pageEleven?.queryParamsHandling).toBe('merge');
   });
 
   it('renders the mascot as the only zero-result status and keeps clear filters usable', async () => {
