@@ -280,7 +280,7 @@ class DatabaseMigrationTest {
                 JOIN categories category ON category.id = selected.category_id
                 WHERE section.title = 'Potencia para tu equipo' AND category.slug = 'perifericos'
                 """, Integer.class));
-        assertEquals("31", jdbc.queryForObject(
+        assertEquals("32", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
         assertEquals(1, jdbc.queryForObject("""

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, CUSTOM_ELEMENTS_SCHEMA, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, CUSTOM_ELEMENTS_SCHEMA, computed, inject, output, signal, viewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, forkJoin, Subscription } from 'rxjs';
@@ -11,6 +11,7 @@ import { AppInputComponent } from '../../../shared/ui/input/app-input.component'
 import { AppSelectComponent, AppSelectOption } from '../../../shared/ui/select/app-select.component';
 import { AppTextareaComponent } from '../../../shared/ui/textarea/app-textarea.component';
 import { AdminHomeSection, HomeBannerDevice, HomeSectionPayload, HomeSectionsAdminService } from './home-sections-admin.service';
+import { HomeHeroComponent } from '../home-hero/home-hero.component';
 import { Category } from '../admin.service';
 
 interface HomeSectionForm extends HomeSectionPayload {}
@@ -18,7 +19,7 @@ interface PendingBanner { readonly file: File; readonly previewUrl: string; }
 
 @Component({
   selector: 'app-home-sections-admin',
-  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, FormsModule],
+  imports: [AppButtonDirective, AppCardDirective, AppFeedbackComponent, AppInputComponent, AppSelectComponent, AppTextareaComponent, FormsModule, HomeHeroComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './home-sections.component.html',
   styleUrl: './home-sections.component.scss',
@@ -28,6 +29,7 @@ export class HomeSectionsComponent {
   private readonly service = inject(HomeSectionsAdminService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly heroEditor = viewChild(HomeHeroComponent);
   private snapshot = '';
   private candidateRequest?: Subscription;
   private candidateGeneration = 0;
@@ -53,6 +55,7 @@ export class HomeSectionsComponent {
   readonly candidatePage = signal(0);
   readonly candidateTotalPages = signal(0);
   readonly candidateTotalElements = signal(0);
+  readonly editorTab = signal<'sections' | 'hero'>('sections');
   readonly pendingDesktop = signal<PendingBanner | null>(null);
   readonly pendingMobile = signal<PendingBanner | null>(null);
   readonly bannerPreviews = signal<Partial<Record<HomeBannerDevice, string>>>({});
@@ -88,6 +91,7 @@ export class HomeSectionsComponent {
   reload(force = false): void {
     if (this.busy()) return;
     if (!force && !this.confirmDiscard()) return;
+    this.heroEditor()?.reload(true);
     const selectedId = this.selected()?.id ?? null;
     this.loading.set(true);
     this.clearMessages();
@@ -322,13 +326,18 @@ export class HomeSectionsComponent {
 
   notifyFormChange(): void { queueMicrotask(() => this.updateDirty()); }
 
+  onHeroDirtyChange(): void { this.updateDirty(); }
+
   confirmDiscard(): boolean {
     if (this.isBusy()) return false;
+    if (this.heroEditor()?.hasUnsavedChanges() && !this.heroEditor()?.confirmDiscard()) return false;
     return this.confirmDirtyDiscard();
   }
 
-  hasUnsavedChanges(): boolean { return this.dirty(); }
-  isBusy(): boolean { return this.busy(); }
+  hasUnsavedChanges(): boolean { return this.dirty() || (this.heroEditor()?.hasUnsavedChanges() ?? false); }
+  isBusy(): boolean { return this.busy() || (this.heroEditor()?.isBusy() ?? false); }
+
+  selectEditorTab(tab: 'sections' | 'hero'): void { this.editorTab.set(tab); }
 
   bannerPreview(device: HomeBannerDevice): string { return this.bannerPreviews()[device] ?? ''; }
   isBannerPreviewLoading(device: HomeBannerDevice): boolean { return this.bannerPreviewLoading()[device] ?? false; }

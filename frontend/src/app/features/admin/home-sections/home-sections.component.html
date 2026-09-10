@@ -1,8 +1,12 @@
 <section class="home-admin" aria-labelledby="home-sections-title" [attr.aria-busy]="loading() || saving() || ordering() || deleting()">
   <header class="home-admin__head">
-    <div><p class="home-kicker">Portada de la tienda</p><h2 id="home-sections-title">Secciones publicadas</h2><p>Ordená y editá hasta seis carruseles. Los cambios guardados quedan publicados directamente.</p></div>
-    <div><span>{{ sections().length }} / 6</span><button appButton="filled" type="button" [disabled]="sections().length >= 6 || busy()" (click)="newSection()">Nueva sección</button></div>
+    <div><p class="home-kicker">Portada de la tienda</p><h2 id="home-sections-title">Editor de portada</h2><p>Elegí qué parte de la portada querés administrar.</p></div>
   </header>
+
+  <nav class="home-editor-tabs" role="tablist" aria-label="Editor de portada">
+    <button type="button" role="tab" id="home-sections-tab" [class.active]="editorTab() === 'sections'" [attr.aria-selected]="editorTab() === 'sections'" aria-controls="home-sections-panel" (click)="selectEditorTab('sections')">Secciones</button>
+    <button type="button" role="tab" id="home-hero-tab" [class.active]="editorTab() === 'hero'" [attr.aria-selected]="editorTab() === 'hero'" aria-controls="home-hero-panel" (click)="selectEditorTab('hero')">Hero principal</button>
+  </nav>
 
   @if (error()) { <app-feedback class="home-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
   @if (message()) { <app-feedback class="home-message" tone="success" announce="polite">{{ message() }}</app-feedback> }
@@ -10,7 +14,17 @@
   @if (loading()) {
     <div class="home-loading" role="status"><span aria-hidden="true"></span><p>Cargando configuración del inicio...</p></div>
   } @else {
-    <div class="home-workspace">
+    <div id="home-hero-panel" class="home-editor-panel" role="tabpanel" aria-labelledby="home-hero-tab" [hidden]="editorTab() !== 'hero'">
+      <app-home-hero-admin (dirtyChange)="onHeroDirtyChange()" />
+    </div>
+
+    <div id="home-sections-panel" class="home-editor-panel" role="tabpanel" aria-labelledby="home-sections-tab" [hidden]="editorTab() !== 'sections'">
+      <header class="home-admin__head home-admin__section-head">
+        <div><p class="home-kicker">Contenido destacado</p><h2>Secciones publicadas</h2><p>Ordená y editá hasta seis carruseles. Los cambios guardados quedan publicados directamente.</p></div>
+        <div><span>{{ sections().length }} / 6</span><button appButton="filled" type="button" [disabled]="sections().length >= 6 || busy()" (click)="newSection()">Nueva sección</button></div>
+      </header>
+
+      <div class="home-workspace">
       <aside appCard class="home-list" aria-label="Secciones del inicio">
         <div class="home-list__items">
           @for (section of sections(); track section.id; let index = $index) {
@@ -132,6 +146,7 @@
         </fieldset>
         <footer><span [class.visible]="dirty()">Cambios sin guardar</span><button appButton="filled" type="submit" [disabled]="saving() || deleting()">{{ saving() ? 'Publicando...' : selected() ? 'Guardar y publicar' : 'Crear y publicar' }}</button></footer>
       </form>
+      </div>
     </div>
   }
 </section>

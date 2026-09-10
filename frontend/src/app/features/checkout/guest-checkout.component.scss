@@ -64,7 +64,7 @@ input[type='radio'], input[type='checkbox'] { accent-color: var(--color-cyan); h
 .guest-verification > p { color: var(--color-info-text); line-height: 1.5; }
 .code-row { display: grid; gap: var(--space-2); grid-template-columns: minmax(0, 1fr) auto; margin-top: var(--space-4); }
 .code-row label { font-size: var(--text-sm); font-weight: var(--font-weight-bold); grid-column: 1 / -1; }
-.code-row input { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); color: var(--color-text); font: inherit; font-size: 1.15rem; letter-spacing: .3em; min-height: var(--control-min-height); padding: 0 var(--space-3); }
+.code-row input { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); color: var(--color-text); font: inherit; font-size: 1.15rem; letter-spacing: .3em; min-height: var(--control-min-height); min-width: 0; padding: 0 var(--space-3); width: 100%; }
 .code-row input:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
 .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .field-error { color: var(--color-danger) !important; font-weight: var(--font-weight-bold); }

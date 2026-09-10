@@ -1,0 +1,89 @@
+<section class="hero-admin" aria-labelledby="hero-admin-title" [attr.aria-busy]="loading() || saving() || ordering() || deleting()">
+  <header class="hero-admin__head">
+    <div><p class="hero-kicker">Portada de la tienda</p><h2 id="hero-admin-title">Presentación (hero)</h2><p>Creá, editá y reordená hasta cinco slides de la portada. Los cambios guardados quedan publicados directamente.</p></div>
+    <div><span>{{ slides().length }} / {{ MAX_SLIDES }}</span><button appButton="filled" type="button" [disabled]="slides().length >= MAX_SLIDES || busy()" (click)="newSlide()">Nuevo slide</button></div>
+  </header>
+
+  @if (error()) { <app-feedback class="hero-message" tone="error" announce="assertive">{{ error() }}</app-feedback> }
+  @if (message()) { <app-feedback class="hero-message" tone="success" announce="polite">{{ message() }}</app-feedback> }
+
+  @if (loading()) {
+    <div class="hero-loading" role="status"><span aria-hidden="true"></span><p>Cargando presentación del inicio...</p></div>
+  } @else {
+    <div class="hero-workspace">
+      <aside appCard class="hero-list" aria-label="Slides del inicio">
+        <div class="hero-list__items">
+          @for (slide of slides(); track slide.id; let index = $index) {
+            <article [class.selected]="selected()?.id === slide.id">
+              <button class="hero-list__select" type="button" [disabled]="busy()" [attr.aria-pressed]="selected()?.id === slide.id" (click)="open(slide)">
+                <span class="order-number">{{ index + 1 }}</span>
+                <span><strong>{{ slide.title }}</strong><small>{{ slide.active ? 'Activa' : 'Inactiva' }} · {{ slide.images.length }} imagen{{ slide.images.length === 1 ? '' : 'es' }}</small></span>
+              </button>
+              <div class="order-actions" aria-label="Cambiar orden">
+                <button type="button" [disabled]="index === 0 || busy()" [attr.aria-label]="'Subir ' + slide.title" (click)="moveSlide(index, -1)">↑</button>
+                <button type="button" [disabled]="index === slides().length - 1 || busy()" [attr.aria-label]="'Bajar ' + slide.title" (click)="moveSlide(index, 1)">↓</button>
+              </div>
+            </article>
+          } @empty {
+            <div class="hero-empty"><h3>El inicio no tiene slides</h3><p>Creá el primero para publicar la presentación.</p></div>
+          }
+        </div>
+      </aside>
+
+      <form appCard class="hero-editor" #heroForm="ngForm" (ngSubmit)="save(heroForm)" (input)="notifyFormChange()" (change)="notifyFormChange()" novalidate>
+        <header>
+          <div><p class="hero-kicker">{{ selected() ? 'Slide #' + selected()!.id : 'Nuevo slide' }}</p><h2>{{ selected() ? 'Editar contenido' : 'Configurar contenido' }}</h2></div>
+          @if (selected()) { <button appButton="text" tone="danger" type="button" [disabled]="deleting() || saving()" (click)="deleteSlide()">{{ deleting() ? 'Eliminando...' : 'Eliminar' }}</button> }
+        </header>
+
+        <fieldset [disabled]="saving() || deleting()">
+          <section class="copy-fields" aria-labelledby="hero-copy-title">
+            <h3 id="hero-copy-title">Textos</h3>
+            <div class="form-grid">
+              <app-input label="Eyebrow (texto superior)" [(ngModel)]="form.eyebrow" name="heroEyebrow" [maxLength]="100" placeholder="Ej. Pinatech tecnología" required />
+              <app-input label="Título" [(ngModel)]="form.title" name="heroTitle" [maxLength]="150" placeholder="Ej. Elevá tu setup." required />
+              <app-input class="wide" label="Texto destacado en cian" [(ngModel)]="form.accent" name="heroAccent" [maxLength]="150" placeholder="Aparece junto al título, resaltado." required />
+              <app-textarea class="wide" label="Descripción" [rows]="3" [(ngModel)]="form.description" name="heroDescription" [maxLength]="500" required />
+              <app-input label="Etiqueta del botón" [(ngModel)]="form.linkLabel" name="heroLinkLabel" [maxLength]="100" placeholder="Ej. Explorar catálogo" required />
+              <app-input class="wide" label="Ruta de destino" [(ngModel)]="form.link" name="heroLink" [maxLength]="200" placeholder="Ej. /catalog" hint="Ruta interna de la tienda. Ej: /catalog, /cart, /tickets." required />
+              <app-input class="wide" label="Texto alternativo de la imagen" [(ngModel)]="form.altText" name="heroAltText" [maxLength]="200" required />
+            </div>
+            <label><input type="checkbox" [checked]="form.showLoginLink" (change)="form.showLoginLink = $any($event.target).checked; notifyFormChange()"><span>Mostrar acceso secundario a Iniciar sesión (solo para visitantes)</span></label>
+          </section>
+
+          <section class="hero-images" aria-labelledby="hero-images-title">
+             <div class="section-title"><div><h3 id="hero-images-title">Imágenes</h3><p>Subí versiones para escritorio y mobile. Podés publicar el slide antes de cargar imágenes; si solo subís desktop, se usa en ambos.</p></div></div>
+            <div class="image-grid">
+              @for (device of ['DESKTOP', 'MOBILE']; track device) {
+                <article>
+                  <header><strong>{{ device === 'DESKTOP' ? 'Desktop' : 'Mobile' }}</strong><small>{{ device === 'DESKTOP' ? 'Formato horizontal (2000 × 848 px)' : 'Formato vertical o compacto (720 × 512 px)' }}</small></header>
+                  @if ((device === 'DESKTOP' ? pendingDesktop() : pendingMobile()); as pending) {
+                    <img [src]="pending.previewUrl" [alt]="'Vista previa ' + device.toLowerCase()" width="800" height="400">
+                    <span class="file-name">{{ pending.file.name }}</span>
+                  } @else if (imagePreview($any(device)); as savedPreview) {
+                    <img [src]="savedPreview" [alt]="'Imagen ' + device.toLowerCase() + ' publicada'" width="800" height="400">
+                  } @else if (isPreviewLoading($any(device))) {
+                    <div class="image-empty" role="status">Cargando vista previa...</div>
+                  } @else { <div class="image-empty">Sin imagen</div> }
+                  <div class="image-actions">
+                    <label [class.disabled]="imageBusy() !== null">Seleccionar<input type="file" accept="image/*" [disabled]="imageBusy() !== null" (change)="selectImage($event, $any(device))"></label>
+                    @if (device === 'DESKTOP' ? pendingDesktop() : pendingMobile()) {
+                      <button appButton="outlined" type="button" [disabled]="!selected() || imageBusy() !== null" (click)="uploadImage($any(device))">{{ imageBusy() === device ? 'Subiendo...' : 'Subir' }}</button>
+                      <button appButton="text" type="button" [disabled]="imageBusy() !== null" (click)="discardPendingImage($any(device))">Quitar selección</button>
+                    } @else if (selected() && selected()!.images.some((image) => image.device === device)) {
+                      <button appButton="text" tone="danger" type="button" [disabled]="imageBusy() !== null" (click)="deleteImage($any(device))">{{ imageBusy() === device ? 'Eliminando...' : 'Eliminar' }}</button>
+                    }
+                  </div>
+                  @if (!selected() && (device === 'DESKTOP' ? pendingDesktop() : pendingMobile())) { <small class="save-first">Guardá el slide antes de subir la imagen.</small> }
+                </article>
+              }
+            </div>
+          </section>
+
+          <label class="active-option"><input type="checkbox" [(ngModel)]="form.active" name="heroActive"><span><strong>Slide activo</strong><small>Queda habilitado en la portada cuando tenga una imagen. Siempre debe quedar al menos uno activo.</small></span></label>
+        </fieldset>
+        <footer><span [class.visible]="dirty()">Cambios sin guardar</span><button appButton="filled" type="submit" [disabled]="saving() || deleting()">{{ saving() ? 'Publicando...' : selected() ? 'Guardar y publicar' : 'Crear y publicar' }}</button></footer>
+      </form>
+    </div>
+  }
+</section>
