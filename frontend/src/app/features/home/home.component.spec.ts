@@ -6,7 +6,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { BannerCarouselComponent } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { ProductListItemResponse as Product } from '../catalog/catalog.service';
 import { HomeComponent } from './home.component';
-import { HomeSection, HomeSectionsService } from './home-sections.service';
+import { HomeHeroSlide, HomeSection, HomeSectionsService } from './home-sections.service';
 
 describe('HomeComponent', () => {
   const product = (id: number, name: string, categoryId = 5): Product => ({
@@ -21,13 +21,14 @@ describe('HomeComponent', () => {
     bannerMobileUrl: '/api/home/sections/17/mobile', categories: [{ id: 5, name: 'Periféricos', slug: 'perifericos' }], products: [mouse],
   };
 
-  async function createHome(response: Observable<HomeSection[]> = of([automatic])) {
+  async function createHome(response: Observable<HomeSection[]> = of([automatic]), hero: Observable<HomeHeroSlide[]> = of([])) {
     const sections = vi.fn(() => response);
+    const heroSlides = vi.fn(() => hero);
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
-        { provide: HomeSectionsService, useValue: { sections } },
+        { provide: HomeSectionsService, useValue: { sections, heroSlides } },
         { provide: AuthService, useValue: { isAuthenticated: () => false } },
       ],
     }).compileComponents();
@@ -127,5 +128,43 @@ describe('HomeComponent', () => {
     expect(previous.disabled).toBe(true); expect(next.disabled).toBe(false);
     track.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })); fixture.detectChanges();
     expect(scrollLeft).toBe(900); expect(next.disabled).toBe(true);
+  });
+
+  it('renders the hero from API slides with resolved image URLs and per-slide login link', async () => {
+    const hero: HomeHeroSlide[] = [{
+      id: 3, displayOrder: 0, eyebrow: 'Eyebrow API', title: 'Título API', accent: 'Destacado',
+      description: 'Descripción API', link: '/catalog', linkLabel: 'Explorar', showLoginLink: true,
+      altText: 'Imagen de prueba', desktopImage: { id: 9, url: '/api/home/hero/images/9/content', width: 2000, height: 848 },
+      mobileImage: { id: 10, url: '/api/home/hero/images/10/content', width: 720, height: 512 },
+    }];
+    const { fixture } = await createHome(of([]), of(hero));
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+    const copy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
+
+    expect(carousel.slides()).toHaveLength(1);
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/9/content');
+    expect(carousel.slides()[0].mobileSrc).toContain('/api/home/hero/images/10/content');
+    expect(carousel.slides()[0].width).toBe(2000);
+    expect(carousel.slides()[0].alt).toBe('Imagen de prueba');
+    expect(copy.textContent).toContain('Título API');
+    expect(copy.textContent).toContain('Explorar');
+    expect(fixture.nativeElement.querySelector('.hero-actions a:last-child').textContent).toContain('Ingresar');
+  });
+
+  it('uses a mobile-only hero image as the desktop fallback', async () => {
+    const hero: HomeHeroSlide[] = [{
+      id: 4, displayOrder: 0, eyebrow: 'Mobile', title: 'Solo mobile', accent: 'Fallback',
+      description: 'Descripción', link: '/catalog', linkLabel: 'Ver', showLoginLink: false,
+      altText: 'Mobile only', desktopImage: null,
+      mobileImage: { id: 11, url: '/api/home/hero/images/11/content', width: 720, height: 512 },
+    }];
+    const { fixture } = await createHome(of([]), of(hero));
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+
+    expect(carousel.slides()).toHaveLength(1);
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/11/content');
+    expect(carousel.slides()[0].width).toBe(720);
+    expect(carousel.slides()[0].height).toBe(512);
+    expect(carousel.slides()[0].mobileSrc).toBeUndefined();
   });
 });

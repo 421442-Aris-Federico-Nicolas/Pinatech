@@ -4,6 +4,9 @@ import com.computerstore.config.SecurityConfiguration;
 import com.computerstore.home.controller.HomeAdminController;
 import com.computerstore.home.controller.HomeAdminBannerController;
 import com.computerstore.home.controller.HomeController;
+import com.computerstore.home.controller.HomeHeroAdminController;
+import com.computerstore.home.controller.HomeHeroController;
+import com.computerstore.home.service.HomeHeroService;
 import com.computerstore.home.service.HomeSectionService;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.security.CustomUserDetailsService;
@@ -32,11 +35,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.http.MediaType;
 
-@WebMvcTest({HomeController.class, HomeAdminController.class, HomeAdminBannerController.class})
+@WebMvcTest({HomeController.class, HomeAdminController.class, HomeAdminBannerController.class,
+        HomeHeroController.class, HomeHeroAdminController.class})
 @Import({SecurityConfiguration.class, JwtAuthenticationFilter.class,
         RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
 class HomeControllerSecurityTest {
     @MockBean HomeSectionService service;
+    @MockBean HomeHeroService heroService;
     @MockBean JwtService jwtService;
     @MockBean CustomUserDetailsService userDetailsService;
     @Autowired MockMvc mvc;
@@ -114,6 +119,53 @@ class HomeControllerSecurityTest {
                                  "mode":"AUTOMATIC","productLimit":12,"sort":"NAME_ASC",
                                  "categoryIds":[%s],"productIds":[],"active":true}
                                 """.formatted(categoryIds)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void heroSlidesArePublicButAdminEndpointsRequireAdminRole() throws Exception {
+        when(heroService.publicSlides()).thenReturn(List.of());
+        when(heroService.adminSlides()).thenReturn(List.of());
+
+        mvc.perform(get("/api/home/hero")).andExpect(status().isOk());
+        mvc.perform(post("/api/admin/home/hero")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/home/hero").with(user(principal("ROLE_CUSTOMER"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/home/hero").with(user(principal("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicHeroImageIsImmutableForSevenDaysButAdminPreviewIsNoStore(@TempDir Path directory) throws Exception {
+        Path file = Files.write(directory.resolve("hero.png"), new byte[]{1, 2, 3});
+        when(heroService.publicImageContent(5L)).thenReturn(
+                new HomeHeroService.ImageContent(file, "image/png", "hero.png", 3, 2000, 848));
+        when(heroService.adminImageContent(7L)).thenReturn(
+                new HomeHeroService.ImageContent(file, "image/png", "admin-hero.png", 3, 720, 512));
+
+        mvc.perform(get("/api/home/hero/images/5/content"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=604800, public, immutable"))
+                .andExpect(header().string("Content-Type", "image/png"));
+
+        mvc.perform(get("/api/admin/home/hero/images/7/content"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/home/hero/images/7/content").with(user(principal("ROLE_CUSTOMER"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/home/hero/images/7/content").with(user(principal("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "private, no-store"));
+    }
+
+    @Test
+    void validatesHeroSlideTextBeforeCallingTheAdminService() throws Exception {
+        mvc.perform(post("/api/admin/home/hero")
+                        .with(user(principal("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eyebrow":"","title":" ","accent":"","description":"","link":"",
+                                 "linkLabel":"","showLoginLink":false,"altText":"","active":false}
+                                """))
                 .andExpect(status().isBadRequest());
     }
 

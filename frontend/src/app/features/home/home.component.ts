@@ -7,7 +7,7 @@ import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { HomeSection, HomeSectionsService, resolveHomeBannerUrl } from './home-sections.service';
+import { HomeHeroSlide, HomeSection, HomeSectionsService, resolveHomeBannerUrl } from './home-sections.service';
 
 interface HeroPanel {
   readonly eyebrow: string;
@@ -22,6 +22,39 @@ interface ProductTrackPosition {
   readonly atStart: boolean;
   readonly atEnd: boolean;
 }
+
+interface RenderedHeroSlide {
+  readonly slide: BannerSlide;
+  readonly panel: HeroPanel;
+  readonly showLoginLink: boolean;
+}
+
+const FALLBACK_SLIDES: readonly RenderedHeroSlide[] = [
+  {
+    slide: { src: '/pinatech-banner-home.jpg', mobileSrc: '/pinatech-banner-home-mobile.jpg', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
+    panel: {
+      eyebrow: 'Pinatech tecnología',
+      title: 'Elevá tu setup.',
+      accent: 'Elegí con claridad.',
+      description: 'Hardware y periféricos con disponibilidad real para armar o actualizar tu equipo.',
+      link: '/catalog',
+      linkLabel: 'Explorar catálogo',
+    },
+    showLoginLink: true,
+  },
+  {
+    slide: { src: '/pinatech-banner-cart.jpg', mobileSrc: '/pinatech-banner-cart-mobile.jpg', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
+    panel: {
+      eyebrow: 'Tu selección te espera',
+      title: 'No dejes que tu carrito',
+      accent: 'se pierda.',
+      description: 'Revisá tus productos, ajustá las cantidades y continuá cuando estés listo.',
+      link: '/cart',
+      linkLabel: 'Ver mi carrito',
+    },
+    showLoginLink: false,
+  },
+];
 
 @Component({
   selector: 'app-home',
@@ -45,33 +78,16 @@ export class HomeComponent {
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
   protected readonly productTrackPositions = signal<Record<number, ProductTrackPosition>>({});
-  protected readonly heroSlides: readonly BannerSlide[] = [
-    { src: '/pinatech-banner-home.jpg', mobileSrc: '/pinatech-banner-home-mobile.jpg', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
-    { src: '/pinatech-banner-cart.jpg', mobileSrc: '/pinatech-banner-cart-mobile.jpg', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
-  ];
-  protected readonly heroPanels: readonly HeroPanel[] = [
-    {
-      eyebrow: 'Pinatech tecnología',
-      title: 'Elevá tu setup.',
-      accent: 'Elegí con claridad.',
-      description: 'Hardware y periféricos con disponibilidad real para armar o actualizar tu equipo.',
-      link: '/catalog',
-      linkLabel: 'Explorar catálogo',
-    },
-    {
-      eyebrow: 'Tu selección te espera',
-      title: 'No dejes que tu carrito',
-      accent: 'se pierda.',
-      description: 'Revisá tus productos, ajustá las cantidades y continuá cuando estés listo.',
-      link: '/cart',
-      linkLabel: 'Ver mi carrito',
-    },
-  ];
-  protected readonly activeHeroPanel = computed<HeroPanel>(() => this.heroPanels[this.heroIndex()] ?? this.heroPanels[0]!);
+  protected readonly renderedHero = signal<readonly RenderedHeroSlide[]>(FALLBACK_SLIDES);
+  protected readonly heroSlides = computed<readonly BannerSlide[]>(() => this.renderedHero().map((item) => item.slide));
+  protected readonly heroPanels = computed<readonly HeroPanel[]>(() => this.renderedHero().map((item) => item.panel));
+  protected readonly activeHeroPanel = computed<HeroPanel>(() => this.heroPanels()[this.heroIndex()] ?? this.heroPanels()[0]!);
+  protected readonly activeSlideLogin = computed<boolean>(() => this.renderedHero()[this.heroIndex()]?.showLoginLink ?? false);
   protected readonly bannerUrl = resolveHomeBannerUrl;
 
   constructor() {
     this.loadSections();
+    this.loadHero();
   }
 
   protected loadSections(): void {
@@ -90,6 +106,42 @@ export class HomeComponent {
         },
         error: () => this.error.set(true),
       });
+  }
+
+  protected loadHero(): void {
+    this.sectionsService.heroSlides()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (slides) => {
+          const rendered = slides.map((slide) => this.renderHero(slide)).filter((item): item is RenderedHeroSlide => item !== null);
+          if (rendered.length) this.renderedHero.set(rendered);
+        },
+      });
+  }
+
+  private renderHero(slide: HomeHeroSlide): RenderedHeroSlide | null {
+    const desktop = slide.desktopImage;
+    const mobile = slide.mobileImage;
+    const primary = desktop ?? mobile;
+    if (!primary) return null;
+    return {
+      slide: {
+        src: resolveHomeBannerUrl(primary.url),
+        mobileSrc: desktop && mobile ? resolveHomeBannerUrl(mobile.url) : undefined,
+        alt: slide.altText,
+        width: primary.width,
+        height: primary.height,
+      },
+      panel: {
+        eyebrow: slide.eyebrow,
+        title: slide.title,
+        accent: slide.accent,
+        description: slide.description,
+        link: slide.link,
+        linkLabel: slide.linkLabel,
+      },
+      showLoginLink: slide.showLoginLink,
+    };
   }
 
   protected selectHero(index: number): void {

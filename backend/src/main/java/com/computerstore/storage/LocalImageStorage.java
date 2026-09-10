@@ -66,7 +66,8 @@ public class LocalImageStorage {
             Path destination = resolveKey(storageKey);
             move(temporary, destination);
             temporary = null;
-            return new StoredImage(storageKey, originalFilename(file.getOriginalFilename()), metadata.contentType(), size);
+            return new StoredImage(storageKey, originalFilename(file.getOriginalFilename()), metadata.contentType(), size,
+                    metadata.decoded().getWidth(), metadata.decoded().getHeight());
         } catch (InvalidRequestException exception) {
             throw exception;
         } catch (IOException exception) {
@@ -282,5 +283,6 @@ public class LocalImageStorage {
 
     private record ImageMetadata(String contentType, BufferedImage decoded) {}
 
-    public record StoredImage(String storageKey, String originalFilename, String contentType, long sizeBytes) {}
+    public record StoredImage(String storageKey, String originalFilename, String contentType, long sizeBytes,
+            int width, int height) {}
 }

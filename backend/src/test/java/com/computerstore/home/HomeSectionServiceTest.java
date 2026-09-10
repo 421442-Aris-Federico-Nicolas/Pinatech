@@ -288,7 +288,7 @@ class HomeSectionServiceTest {
     }
 
     private LocalImageStorage.StoredImage stored(String key) {
-        return new LocalImageStorage.StoredImage(key, "banner.png", "image/png", 10);
+        return new LocalImageStorage.StoredImage(key, "banner.png", "image/png", 10, 2000, 848);
     }
 
     private List<TransactionSynchronization> synchronizations() {

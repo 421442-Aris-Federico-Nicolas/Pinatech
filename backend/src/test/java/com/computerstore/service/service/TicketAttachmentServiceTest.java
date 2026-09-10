@@ -67,7 +67,7 @@ class TicketAttachmentServiceTest {
         when(attachments.countByTicketId(1L)).thenReturn(0L);
         when(users.findById(20L)).thenReturn(Optional.of(technician));
         when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
-                "3d45a4c2-a70c-4e87-99d3-bd26e2601e15", "board.png", "image/png", 100));
+                "3d45a4c2-a70c-4e87-99d3-bd26e2601e15", "board.png", "image/png", 100, 800, 600));
         when(attachments.saveAndFlush(any(TicketAttachment.class))).thenAnswer(invocation -> {
             TicketAttachment saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 5L);
@@ -98,7 +98,7 @@ class TicketAttachmentServiceTest {
         when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
         when(attachments.countByTicketId(1L)).thenReturn(0L);
         when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
-                storageKey, "board.png", "image/png", 2L * 1024 * 1024));
+                storageKey, "board.png", "image/png", 2L * 1024 * 1024, 800, 600));
         when(users.findByIdForUpdate(10L)).thenReturn(Optional.of(owner));
         when(attachments.sumCustomerSizeBytes(10L)).thenReturn(249L * 1024 * 1024);
 
@@ -116,7 +116,7 @@ class TicketAttachmentServiceTest {
         when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
         when(attachments.countByTicketId(1L)).thenReturn(0L);
         when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
-                "3d45a4c2-a70c-4e87-99d3-bd26e2601e15", "board.png", "image/png", 5L * 1024 * 1024));
+                "3d45a4c2-a70c-4e87-99d3-bd26e2601e15", "board.png", "image/png", 5L * 1024 * 1024, 800, 600));
         when(users.findByIdForUpdate(10L)).thenReturn(Optional.of(owner));
         when(attachments.sumCustomerSizeBytes(10L)).thenReturn(245L * 1024 * 1024);
         when(attachments.saveAndFlush(any(TicketAttachment.class))).thenAnswer(invocation -> {

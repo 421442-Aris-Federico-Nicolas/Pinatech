@@ -99,7 +99,7 @@ class ProductImageServiceTest {
         when(images.findFirstByProductIdOrderByDisplayOrderDesc(1L)).thenReturn(Optional.empty());
         when(product.getName()).thenReturn("Notebook");
         when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
-                STORAGE_KEY, "image.png", "image/png", 100));
+                STORAGE_KEY, "image.png", "image/png", 100, 800, 600));
         when(images.saveAndFlush(any(ProductImage.class))).thenAnswer(invocation -> {
             ProductImage saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 5L);

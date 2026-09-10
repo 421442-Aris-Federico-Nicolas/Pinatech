@@ -184,6 +184,8 @@ describe('Admin section HTTP budgets', () => {
     requests.find((request) => request.request.url.endsWith('/home/sections'))!.flush([]);
     requests.find((request) => request.request.url.endsWith('/categories'))!.flush([]);
     fixture.detectChanges();
+    http.expectOne(`${base}/admin/home/hero`).flush([]);
+    fixture.detectChanges();
     expect(component.section()).toBe('home');
     http.expectNone((request) => request.url.includes('/products/cards'));
 
@@ -218,6 +220,8 @@ describe('Admin section HTTP budgets', () => {
     }]);
     http.expectOne(`${base}/admin/catalog/categories`).flush([]);
     const candidates = http.expectOne((request) => request.url.endsWith('/products/cards'));
+    fixture.detectChanges();
+    http.expectOne(`${base}/admin/home/hero`).flush([]);
     fixture.detectChanges();
     const confirmation = vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
 

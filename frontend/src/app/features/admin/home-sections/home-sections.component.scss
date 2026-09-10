@@ -6,6 +6,12 @@
 .home-admin__head > div:last-child { align-items: center; display: flex; gap: .75rem; }
 .home-admin__head > div:last-child span { color: #7892a2; font-size: .75rem; font-weight: 800; }
 .home-kicker { color: var(--color-cyan) !important; font-size: .68rem !important; font-weight: 900; letter-spacing: .14em; margin: 0 !important; text-transform: uppercase; }
+.home-editor-tabs { background: #09141d; border: 1px solid #1c3949; border-radius: 12px; display: flex; gap: .3rem; margin: .25rem 0 1.25rem; padding: .3rem; width: fit-content; }
+.home-editor-tabs button { background: transparent; border: 0; border-radius: 8px; color: #7891a0; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 800; min-height: 40px; padding: .65rem 1rem; transition: background .2s ease, color .2s ease; }
+.home-editor-tabs button:hover { color: #d8e8ee; }
+.home-editor-tabs button.active { background: #123b4d; color: var(--color-cyan); }
+.home-editor-tabs button:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+.home-editor-panel[hidden] { display: none; }
 .home-message { display: block; margin-bottom: 1rem; }
 .home-loading { display: grid; min-height: 360px; place-content: center; text-align: center; }
 .home-loading span { animation: home-pulse 1s infinite alternate; background: var(--color-orange); height: 4px; margin: auto; width: 120px; }
@@ -87,6 +93,8 @@ button:disabled { cursor: not-allowed !important; opacity: .42; }
 @keyframes home-pulse { to { opacity: .2; transform: scaleX(.45); } }
 @media (max-width: 1100px) { .home-workspace { grid-template-columns: 1fr; } .home-list { position: static; } .home-list__items { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) {
+  .home-editor-tabs { width: 100%; }
+  .home-editor-tabs button { flex: 1; }
   .home-admin__head { align-items: stretch; flex-direction: column; }
   .home-admin__head > div:last-child { justify-content: space-between; }
   .home-list__items, .form-grid, .rules-grid, .candidates, .banner-grid { grid-template-columns: 1fr; }

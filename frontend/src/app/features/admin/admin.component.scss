@@ -542,6 +542,7 @@ main {
 }
 .order-total {
   text-align: right;
+  white-space: nowrap;
 }
 .chevron {
   transition: transform 200ms var(--ease-out);
@@ -837,6 +838,10 @@ main {
 .inventory-products > button > span:not(.stock-indicator) {
   display: grid;
 }
+.inventory-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .inventory-products small {
   color: #768d9d;
   font-size: 0.66rem;
@@ -987,12 +992,31 @@ main {
     min-width: 700px;
   }
   .order-summary {
-    grid-template-columns: 0.7fr 1.4fr 1fr 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    position: relative;
   }
-  .order-summary > span:nth-child(3),
-  .order-summary > span:nth-child(4),
-  .order-summary > .status-badge {
+  .customer {
+    padding-right: 2rem;
+  }
+  .order-summary > .order-date {
+    display: grid;
+  }
+  .order-summary > span:nth-child(4) {
     display: none;
+  }
+  .order-summary > .status-badge {
+    display: inline-block;
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .order-total {
+    grid-area: 2 / 2;
+    justify-self: end;
+  }
+  .order-summary > .chevron {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
   }
   .order-detail {
     grid-template-columns: 1fr;
@@ -1010,10 +1034,21 @@ main {
     grid-column: auto;
   }
   .inventory-products > button {
-    grid-template-columns: 6px 1fr 75px;
+    grid-template-columns: 6px repeat(2, minmax(0, 1fr));
   }
-  .inventory-products .reserved {
-    display: none;
+  .inventory-name {
+    grid-column: 2 / -1;
+  }
+  .stock-numbers {
+    grid-area: 2 / 2;
+  }
+  .reserved {
+    grid-area: 2 / 3;
+  }
+  .stock-numbers small,
+  .reserved small {
+    overflow-wrap: normal;
+    white-space: nowrap;
   }
   .compact-form {
     align-items: stretch;
@@ -1035,13 +1070,6 @@ main {
   }
   .page-heading h1 {
     font-size: 2.25rem;
-  }
-  .order-summary {
-    grid-template-columns: 0.7fr 1.5fr 24px;
-  }
-  .order-summary > span:nth-child(3),
-  .order-total {
-    display: none;
   }
 }
 .shipping-editor,
@@ -1210,7 +1238,7 @@ main {
 :host .admin-search {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   margin-bottom: 16px;
 }

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, Subject } from 'rxjs';
 import { ProductListItemResponse } from '../../catalog/catalog.service';
+import { HomeHeroAdminService } from '../home-hero/home-hero-admin.service';
 import { AdminHomeSection, HomeSectionPayload, HomeSectionsAdminService } from './home-sections-admin.service';
 import { HomeSectionsComponent } from './home-sections.component';
 
@@ -31,7 +32,18 @@ describe('HomeSectionsComponent', () => {
     };
     Object.assign(service, overrides);
     await TestBed.configureTestingModule({
-      imports: [HomeSectionsComponent], providers: [{ provide: HomeSectionsAdminService, useValue: service }],
+      imports: [HomeSectionsComponent],
+      providers: [
+        { provide: HomeSectionsAdminService, useValue: service },
+        { provide: HomeHeroAdminService, useValue: {
+          slides: () => of([]),
+          create: () => of({ id: 0, displayOrder: 0, active: false, eyebrow: '', title: '', accent: '', description: '', link: '/catalog', linkLabel: '', showLoginLink: false, altText: '', images: [] }),
+          update: () => of({ id: 0, displayOrder: 0, active: false, eyebrow: '', title: '', accent: '', description: '', link: '/catalog', linkLabel: '', showLoginLink: false, altText: '', images: [] }),
+          reorder: () => of(void 0), delete: () => of(void 0),
+          uploadImage: () => of({ id: 0, device: 'DESKTOP', url: '/x', width: 1, height: 1, originalFilename: '' }),
+          deleteImage: () => of(void 0), fetchImage: () => of(new Blob()),
+        } },
+      ],
     }).compileComponents();
     const fixture = TestBed.createComponent(HomeSectionsComponent);
     fixture.detectChanges();
@@ -47,6 +59,21 @@ describe('HomeSectionsComponent', () => {
     component.changeCandidatePage(1);
     expect(service.productCandidates).toHaveBeenLastCalledWith('', 1);
     expect(component.candidateTotalElements()).toBe(30);
+  });
+
+  it('switches between the hero and section editors without remounting either one', async () => {
+    const { component, fixture } = await setup();
+
+    expect(component.editorTab()).toBe('sections');
+    expect(fixture.nativeElement.querySelector('#home-sections-panel').hidden).toBe(false);
+    expect(fixture.nativeElement.querySelector('#home-hero-panel').hidden).toBe(true);
+
+    component.selectEditorTab('hero');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#home-sections-panel').hidden).toBe(true);
+    expect(fixture.nativeElement.querySelector('#home-hero-panel').hidden).toBe(false);
+    expect(fixture.nativeElement.querySelector('#home-hero-panel app-home-hero-admin')).toBeTruthy();
   });
 
   it('creates, updates and deletes sections with direct publication', async () => {
