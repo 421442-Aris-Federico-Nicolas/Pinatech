@@ -137,6 +137,39 @@ describe('TicketsComponent attachment gallery', () => {
     expect((fixture.nativeElement.querySelector('.selected-files button') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('keeps cancelled ticket attachments visible while blocking new image selection and upload', async () => {
+    const cancelled = { ...ticket, status: 'CANCELLED' };
+    const upload = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [TicketsComponent],
+      providers: [
+        { provide: TicketsService, useValue: { tickets: () => of([cancelled]) } },
+        { provide: TicketAttachmentService, useValue: { upload, content: () => of(new Blob()) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TicketsComponent);
+    const component = fixture.componentInstance;
+    const file = new File(['image'], 'extra.jpg', { type: 'image/jpeg' });
+    fixture.detectChanges();
+
+    const ticketCard = fixture.nativeElement.querySelector('.ticket-card') as HTMLElement;
+    expect(ticketCard.querySelector('.ticket-upload')).toBeNull();
+    expect(ticketCard.querySelector('button')?.textContent).toContain('Ver imágenes');
+
+    (ticketCard.querySelector('button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(ticketCard.querySelector('app-ticket-attachment-gallery')).not.toBeNull();
+
+    await component.selectTicketImages(cancelled, [file]);
+    expect(component.pendingFor(cancelled.id)).toHaveLength(0);
+
+    component.ticketImages.set({ [cancelled.id]: [{ file, previewUrl: 'blob:extra' }] });
+    component.uploadToTicket(cancelled);
+
+    expect(upload).not.toHaveBeenCalled();
+    expect(component.pendingFor(cancelled.id)).toHaveLength(1);
+  });
+
   it('shows an alert when every attachment upload fails', async () => {
     await TestBed.configureTestingModule({
       imports: [TicketsComponent],

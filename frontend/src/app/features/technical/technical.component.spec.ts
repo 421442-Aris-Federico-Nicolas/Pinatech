@@ -79,4 +79,47 @@ describe('TechnicalComponent filters', () => {
     expect(updateDetails).not.toHaveBeenCalled();
     expect(fixture.componentInstance.error()).toContain('iguales o mayores que cero');
   });
+
+  it('keeps cancelled ticket attachments visible while blocking new image selection and upload', async () => {
+    const cancelled = {
+      ...ticket(1, 'CANCELLED'),
+      attachments: [{
+        id: 12,
+        fileName: 'equipo.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        uploadedByName: 'Ada',
+        uploaderRole: 'CUSTOMER' as const,
+        createdAt: '2026-08-20T10:05:00Z',
+      }],
+    };
+    const upload = vi.fn();
+    await TestBed.configureTestingModule({
+      imports: [TechnicalComponent],
+      providers: [
+        { provide: TechnicalService, useValue: { tickets: () => of([cancelled]), history: () => of([]) } },
+        { provide: TicketAttachmentService, useValue: { upload, content: () => of(new Blob()) } },
+        { provide: AuthService, useValue: { user: () => ({ id: 5, roles: ['TECHNICIAN'] }) } },
+        { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ section: 'queue', status: 'CANCELLED' }) } } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(TechnicalComponent);
+    const component = fixture.componentInstance;
+    const file = new File(['image'], 'extra.jpg', { type: 'image/jpeg' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-ticket-attachment-gallery')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.attachment-upload')).toBeNull();
+
+    await component.selectAttachment([file], cancelled);
+    expect(component.attachmentFile()).toBeNull();
+
+    component.attachmentFile.set(file);
+    component.uploadAttachment();
+
+    expect(upload).not.toHaveBeenCalled();
+    expect(component.attachmentFile()).toBe(file);
+  });
 });
