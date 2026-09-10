@@ -113,7 +113,7 @@ export class TicketsComponent {
   }
 
   async selectTicketImages(ticket: Ticket, files: File[]): Promise<void> {
-    if (this.uploadingTicket() === ticket.id || this.processingImages()) return;
+    if (ticket.status === 'CANCELLED' || this.uploadingTicket() === ticket.id || this.processingImages()) return;
     const current = this.pendingFor(ticket.id);
     if (!files.length || !this.validateCount(files, 10 - ticket.attachments.length - current.length)) return;
     const images = await this.prepare(files);
@@ -136,7 +136,7 @@ export class TicketsComponent {
 
   uploadToTicket(ticket: Ticket): void {
     const images = [...this.pendingFor(ticket.id)];
-    if (!images.length || this.uploadingTicket() !== null || this.processingImages()) return;
+    if (ticket.status === 'CANCELLED' || !images.length || this.uploadingTicket() !== null || this.processingImages()) return;
     this.clearMessages();
     this.clearTicketMessage(ticket.id);
     this.uploadingTicket.set(ticket.id);
