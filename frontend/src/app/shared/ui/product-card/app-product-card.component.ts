@@ -14,6 +14,7 @@ export interface ProductCardImage {
 export interface ProductCardProduct {
   readonly id: number;
   readonly name: string;
+  readonly slug: string;
   readonly price: number;
   readonly categoryName: string;
   readonly brandName: string;
