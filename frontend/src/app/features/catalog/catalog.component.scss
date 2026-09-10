@@ -35,7 +35,6 @@ h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); letter-spacing: -.06em; line-height:
 
 .catalog-layout { align-items: start; display: grid; gap: var(--space-5); grid-template-columns: clamp(15rem, 20vw, 17rem) minmax(0, 1fr); }
 .catalog-layout > * { min-width: 0; }
-.catalog-results { scroll-margin-top: 7rem; }
 .filters { padding: var(--space-4); position: sticky; top: 105px; }
 .filter-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: var(--space-4); }
 .filter-heading h2 { font-size: var(--text-lg); margin: 0; }
@@ -56,8 +55,12 @@ h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); letter-spacing: -.06em; line-height:
 .state.error { border-top: 4px solid var(--color-danger); }
 .loader { animation: spin .8s linear infinite; border: 3px solid var(--color-border); border-radius: 50%; border-top-color: var(--color-cyan); height: 38px; width: 38px; }
 
-.pagination { align-items: center; display: flex; gap: var(--space-3); justify-content: center; margin-top: var(--space-10); }
-.pagination > span { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.pagination, .page-list { align-items: center; display: flex; gap: var(--space-2); justify-content: center; }
+.pagination { margin-top: var(--space-10); }
+.page-list { flex-wrap: wrap; }
+.page-link { align-items: center; display: inline-flex; font-variant-numeric: tabular-nums; justify-content: center; min-height: var(--control-min-height); min-width: var(--control-min-height); padding: var(--space-2); }
+.page-link.current { background: var(--color-cyan); border-radius: var(--radius-md); color: var(--color-text-inverse); font-weight: var(--font-weight-black); }
+.ellipsis { color: var(--color-text-subtle); padding-inline: var(--space-1); }
 .pagination .disabled { opacity: .45; padding: .75rem; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -85,7 +88,7 @@ h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); letter-spacing: -.06em; line-height:
   .search .app-button { width: 100%; }
   .price { grid-template-columns: 1fr; }
   .pagination { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pagination > span:not(.disabled) { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+  .page-list { grid-column: 1 / -1; grid-row: 1; }
   .pagination > :is(a, .disabled):first-child { grid-column: 1; grid-row: 2; }
   .pagination > :is(a, .disabled):last-child { grid-column: 2; grid-row: 2; }
   .pagination > :is(a, .disabled) { justify-self: stretch; text-align: center; }
