@@ -9,11 +9,12 @@ import { checkoutAudienceGuard } from './core/guards/checkout-audience.guard';
 export const routes: Routes = [
   {
     path: '',
-    title: 'Pinatech | Tecnología y hardware',
+    title: 'Pinatech | Tecnología y hardware en Córdoba',
     loadComponent: () => import('./features/home/home.component').then((component) => component.HomeComponent),
   },
-  { path: 'catalog', title: 'Catálogo | Pinatech', loadComponent: () => import('./features/catalog/catalog.component').then((component) => component.CatalogComponent) },
-  { path: 'products/:id', title: 'Producto', loadComponent: () => import('./features/product/product.component').then((component) => component.ProductComponent) },
+  { path: 'catalog', title: 'Catálogo de tecnología | Pinatech', loadComponent: () => import('./features/catalog/catalog.component').then((component) => component.CatalogComponent) },
+  { path: 'products/:id/:slug', title: 'Producto | Pinatech', loadComponent: () => import('./features/product/product.component').then((component) => component.ProductComponent) },
+  { path: 'products/:id', title: 'Producto | Pinatech', loadComponent: () => import('./features/product/product.component').then((component) => component.ProductComponent) },
   { path: 'login', title: 'Iniciar sesión | Pinatech', loadComponent: () => import('./features/auth/login.component').then((component) => component.LoginComponent) },
   { path: 'register', title: 'Crear cuenta | Pinatech', loadComponent: () => import('./features/auth/register.component').then((component) => component.RegisterComponent) },
   { path: 'verify-email', title: 'Verificar email | Pinatech', loadComponent: () => import('./features/account-actions/verify-email.component').then((component) => component.VerifyEmailComponent) },

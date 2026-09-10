@@ -63,6 +63,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/mercado-pago").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/shipping/webhooks/zipnova/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/seo/sitemap.xml").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/home/sections", "/api/home/banners/*/content",
                                 "/api/home/hero", "/api/home/hero/images/*/content").permitAll()
                         .requestMatchers(HttpMethod.POST,
