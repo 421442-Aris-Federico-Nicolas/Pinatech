@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
@@ -27,9 +27,11 @@ export class CatalogComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly catalogResults = viewChild<ElementRef<HTMLElement>>('catalogResults');
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
   private invalidPriceParams = false;
+  private previousPage?: number;
 
   readonly filters: CatalogFilters = { search: '', categoryId: null, categoryIds: [], brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<ProductListItemResponse> | null>(null);
@@ -51,9 +53,13 @@ export class CatalogComponent {
       .subscribe(() => this.applyFilters(1, true));
 
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const page = this.pageNumber(params);
+      const pageChanged = this.previousPage !== undefined && page !== this.previousPage;
+      this.previousPage = page;
       this.readParams(params);
       if (this.validatePrices()) {
-        this.loadPage(this.pageNumber(params));
+        this.loadPage(page);
+        if (pageChanged) queueMicrotask(() => this.scrollToResults());
       } else {
         this.request?.unsubscribe();
         this.page.set(null);
@@ -117,6 +123,11 @@ export class CatalogComponent {
     this.request = this.service.getProductCards(queryFilters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
+  }
+
+  private scrollToResults(): void {
+    const behavior = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    this.catalogResults()?.nativeElement.scrollIntoView({ behavior, block: 'start' });
   }
 
   private readParams(params: ParamMap): void {
