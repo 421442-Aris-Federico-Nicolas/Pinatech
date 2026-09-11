@@ -78,10 +78,10 @@ export class HomeComponent {
   protected readonly isLoading = signal(true);
   protected readonly error = signal(false);
   protected readonly productTrackPositions = signal<Record<number, ProductTrackPosition>>({});
-  protected readonly renderedHero = signal<readonly RenderedHeroSlide[]>(FALLBACK_SLIDES);
+  protected readonly renderedHero = signal<readonly RenderedHeroSlide[]>([]);
   protected readonly heroSlides = computed<readonly BannerSlide[]>(() => this.renderedHero().map((item) => item.slide));
   protected readonly heroPanels = computed<readonly HeroPanel[]>(() => this.renderedHero().map((item) => item.panel));
-  protected readonly activeHeroPanel = computed<HeroPanel>(() => this.heroPanels()[this.heroIndex()] ?? this.heroPanels()[0]!);
+  protected readonly activeHeroPanel = computed<HeroPanel | null>(() => this.heroPanels()[this.heroIndex()] ?? this.heroPanels()[0] ?? null);
   protected readonly activeSlideLogin = computed<boolean>(() => this.renderedHero()[this.heroIndex()]?.showLoginLink ?? false);
   protected readonly bannerUrl = resolveHomeBannerUrl;
 
@@ -114,8 +114,9 @@ export class HomeComponent {
       .subscribe({
         next: (slides) => {
           const rendered = slides.map((slide) => this.renderHero(slide)).filter((item): item is RenderedHeroSlide => item !== null);
-          if (rendered.length) this.renderedHero.set(rendered);
+          this.renderedHero.set(rendered.length ? rendered : FALLBACK_SLIDES);
         },
+        error: () => this.renderedHero.set(FALLBACK_SLIDES),
       });
   }
 
