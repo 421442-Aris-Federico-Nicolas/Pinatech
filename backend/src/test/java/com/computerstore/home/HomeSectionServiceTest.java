@@ -157,7 +157,7 @@ class HomeSectionServiceTest {
         LocalImageStorage.StoredImage replacementStored = stored("22222222-2222-2222-2222-222222222222");
         MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
         when(sections.findByIdForUpdate(1L)).thenReturn(Optional.of(section));
-        when(storage.store(file)).thenReturn(replacementStored);
+        when(storage.storeWebp(file)).thenReturn(replacementStored);
         when(banners.saveAndFlush(any(HomeBanner.class))).thenAnswer(invocation -> {
             HomeBanner saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 11L);
@@ -180,7 +180,7 @@ class HomeSectionServiceTest {
         LocalImageStorage.StoredImage uploaded = stored("33333333-3333-3333-3333-333333333333");
         MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
         when(sections.findByIdForUpdate(1L)).thenReturn(Optional.of(section));
-        when(storage.store(file)).thenReturn(uploaded);
+        when(storage.storeWebp(file)).thenReturn(uploaded);
         when(banners.saveAndFlush(any(HomeBanner.class))).thenAnswer(invocation -> invocation.getArgument(0));
         TransactionSynchronizationManager.initSynchronization();
 
@@ -232,10 +232,11 @@ class HomeSectionServiceTest {
         ReflectionTestUtils.setField(banner, "id", 5L);
         when(banners.findByIdAndSectionActiveTrue(5L)).thenReturn(Optional.empty());
         when(banners.findById(5L)).thenReturn(Optional.of(banner));
-        when(storage.load(banner.getStorageKey())).thenReturn(java.nio.file.Path.of("banner.png"));
+        when(storage.publicWebp(banner.getStorageKey())).thenReturn(
+                new LocalImageStorage.StoredContent(java.nio.file.Path.of("banner.webp"), 10));
 
         assertThrows(ResourceNotFoundException.class, () -> service.publicBannerContent(5L));
-        assertThat(service.adminBannerContent(5L).fileName()).isEqualTo("banner.png");
+        assertThat(service.adminBannerContent(5L).fileName()).isEqualTo("banner.webp");
     }
 
     @Test
@@ -288,7 +289,7 @@ class HomeSectionServiceTest {
     }
 
     private LocalImageStorage.StoredImage stored(String key) {
-        return new LocalImageStorage.StoredImage(key, "banner.png", "image/png", 10, 2000, 848);
+        return new LocalImageStorage.StoredImage(key, "banner.webp", "image/webp", 10, 2000, 848);
     }
 
     private List<TransactionSynchronization> synchronizations() {

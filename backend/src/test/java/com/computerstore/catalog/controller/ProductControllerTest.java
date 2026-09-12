@@ -27,8 +27,8 @@ class ProductControllerTest {
     void imageRoutesServeCorrectBytesAndImmutableCacheHeaders(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
         var images = mock(ProductImageService.class);
         var path = java.nio.file.Files.write(directory.resolve("image"), new byte[]{1, 2, 3});
-        when(images.thumbnail(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/jpeg", "image-5.jpg", 3));
-        when(images.content(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/png", "original.png", 3));
+        when(images.thumbnail(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "image-5.webp", 3));
+        when(images.content(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "original.webp", 3));
         var controller = new ProductController(mock(ProductRepository.class), mock(ProductSpecificationRepository.class),
                 mock(ProductVariantRepository.class), mock(InventoryRepository.class), images);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
@@ -36,7 +36,7 @@ class ProductControllerTest {
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/products/images/5/" + route))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType(
-                            route.equals("thumbnail") ? "image/jpeg" : "image/png"))
+                            "image/webp"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(new byte[]{1, 2, 3}))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Length", "3"))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "max-age=604800, public, immutable"))

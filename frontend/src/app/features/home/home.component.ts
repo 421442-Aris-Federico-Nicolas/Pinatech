@@ -31,7 +31,7 @@ interface RenderedHeroSlide {
 
 const FALLBACK_SLIDES: readonly RenderedHeroSlide[] = [
   {
-    slide: { src: '/pinatech-banner-home.jpg', mobileSrc: '/pinatech-banner-home-mobile.jpg', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
+    slide: { src: '/pinatech-banner-home.webp', mobileSrc: '/pinatech-banner-home-mobile.webp', alt: 'Pinatech, tecnología a tu alcance, junto a componentes de hardware', width: 2000, height: 848 },
     panel: {
       eyebrow: 'Pinatech tecnología',
       title: 'Elevá tu setup.',
@@ -43,7 +43,7 @@ const FALLBACK_SLIDES: readonly RenderedHeroSlide[] = [
     showLoginLink: true,
   },
   {
-    slide: { src: '/pinatech-banner-cart.jpg', mobileSrc: '/pinatech-banner-cart-mobile.jpg', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
+    slide: { src: '/pinatech-banner-cart.webp', mobileSrc: '/pinatech-banner-cart-mobile.webp', alt: 'Carrito de compras Pinatech cargado con componentes de hardware', width: 2000, height: 848 },
     panel: {
       eyebrow: 'Tu selección te espera',
       title: 'No dejes que tu carrito',

@@ -68,21 +68,21 @@ class HomeControllerSecurityTest {
 
     @Test
     void uploadedBannerContentIsPublicAndImmutableForSevenDays(@TempDir Path directory) throws Exception {
-        Path file = Files.write(directory.resolve("banner.png"), new byte[]{1, 2, 3});
+        Path file = Files.write(directory.resolve("banner.webp"), new byte[]{1, 2, 3});
         when(service.publicBannerContent(5L)).thenReturn(
-                new HomeSectionService.BannerContent(file, "image/png", "banner.png", 3));
+                new HomeSectionService.BannerContent(file, "image/webp", "banner.webp", 3));
 
         mvc.perform(get("/api/home/banners/5/content"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "max-age=604800, public, immutable"))
-                .andExpect(header().string("Content-Type", "image/png"));
+                .andExpect(header().string("Content-Type", "image/webp"));
     }
 
     @Test
     void adminBannerPreviewRequiresAdminAndUsesTheProtectedContentMethod(@TempDir Path directory) throws Exception {
-        Path file = Files.write(directory.resolve("admin-banner.png"), new byte[]{1});
+        Path file = Files.write(directory.resolve("admin-banner.webp"), new byte[]{1});
         when(service.adminBannerContent(7L)).thenReturn(
-                new HomeSectionService.BannerContent(file, "image/png", "admin-banner.png", 1));
+                new HomeSectionService.BannerContent(file, "image/webp", "admin-banner.webp", 1));
 
         mvc.perform(get("/api/admin/home/banners/7/content"))
                 .andExpect(status().isUnauthorized());
@@ -137,16 +137,16 @@ class HomeControllerSecurityTest {
 
     @Test
     void publicHeroImageIsImmutableForSevenDaysButAdminPreviewIsNoStore(@TempDir Path directory) throws Exception {
-        Path file = Files.write(directory.resolve("hero.png"), new byte[]{1, 2, 3});
+        Path file = Files.write(directory.resolve("hero.webp"), new byte[]{1, 2, 3});
         when(heroService.publicImageContent(5L)).thenReturn(
-                new HomeHeroService.ImageContent(file, "image/png", "hero.png", 3, 2000, 848));
+                new HomeHeroService.ImageContent(file, "image/webp", "hero.webp", 3, 2000, 848));
         when(heroService.adminImageContent(7L)).thenReturn(
-                new HomeHeroService.ImageContent(file, "image/png", "admin-hero.png", 3, 720, 512));
+                new HomeHeroService.ImageContent(file, "image/webp", "admin-hero.webp", 3, 720, 512));
 
         mvc.perform(get("/api/home/hero/images/5/content"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "max-age=604800, public, immutable"))
-                .andExpect(header().string("Content-Type", "image/png"));
+                .andExpect(header().string("Content-Type", "image/webp"));
 
         mvc.perform(get("/api/admin/home/hero/images/7/content"))
                 .andExpect(status().isUnauthorized());

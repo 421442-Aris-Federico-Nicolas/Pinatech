@@ -138,7 +138,7 @@ class HomeHeroIntegrationTest {
 
         assertThat(publicSlides).extracting("title").containsExactly("A");
         assertThat(publicSlides.get(0).desktopImage().url()).isEqualTo(
-                "/api/home/hero/images/%d/content".formatted(publicSlides.get(0).desktopImage().id()));
+                "/api/home/hero/images/%d/content?v=webp-1".formatted(publicSlides.get(0).desktopImage().id()));
         assertThat(publicSlides.get(0).desktopImage().width()).isEqualTo(2000);
     }
 

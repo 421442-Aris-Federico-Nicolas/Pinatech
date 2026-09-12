@@ -12,7 +12,7 @@ public record ProductListItemResponse(Long id, String name, String slug, BigDeci
             String originalFilename, Integer displayOrder, boolean inStock) {
         this(id, name, slug, price, categoryId, categoryName, brandId, brandName,
                 imageId == null ? List.of() : List.of(new ProductImageResponse(imageId,
-                        storageKey == null ? imageUrl : "/api/products/images/" + imageId + "/thumbnail",
+                        storageKey == null ? imageUrl : "/api/products/images/" + imageId + "/thumbnail?v=webp-1",
                         altText, originalFilename, displayOrder)), inStock);
     }
 }

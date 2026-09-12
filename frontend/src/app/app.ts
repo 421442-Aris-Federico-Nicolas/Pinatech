@@ -65,6 +65,7 @@ export class App {
       if (previousPath === null || previousPath === path) return;
       queueMicrotask(() => {
         const content = this.document.getElementById('main-content');
+
         const heading = content?.querySelector<HTMLElement>('h1');
         if (heading) heading.tabIndex = -1;
         (heading ?? content)?.focus();
@@ -72,6 +73,7 @@ export class App {
     });
 
     afterRenderEffect(() => {
+      import('iconify-icon');
       const notification = this.notifications.notification();
       const shell = this.notificationShell()?.nativeElement;
       if (notification && shell && !shell.contains(this.document.activeElement)) {

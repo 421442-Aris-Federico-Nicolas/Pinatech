@@ -334,8 +334,8 @@ export class CheckoutComponent {
 
   carrierLogo(carrier: string): string | null {
     const normalized = carrier.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
-    if (/\boca\b/.test(normalized)) return '/Logooca.png';
-    if (normalized.includes('correo argentino') || normalized === 'correo') return '/logo-correo.png';
+    if (/\boca\b/.test(normalized)) return '/Logooca.webp';
+    if (normalized.includes('correo argentino') || normalized === 'correo') return '/logo-correo.webp';
     return null;
   }
 

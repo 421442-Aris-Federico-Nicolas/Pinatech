@@ -110,7 +110,7 @@ class ProductCardsRepositoryTest {
         assertThat(page.getContent().getFirst().images()).hasSize(1);
         assertThat(page.getContent().getFirst().images().getFirst().id()).isEqualTo(image.getId());
         assertThat(page.getContent().getFirst().images().getFirst().contentUrl())
-                .isEqualTo("/api/products/images/" + image.getId() + "/thumbnail");
+                .isEqualTo("/api/products/images/" + image.getId() + "/thumbnail?v=webp-1");
         assertThat(page.getContent().getFirst().inStock()).isTrue();
         assertThat(page.getContent().getLast().inStock()).isFalse();
         assertThat(page.getContent().getLast().images().getFirst().contentUrl()).isEqualTo("https://example.com/image.png");

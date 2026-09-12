@@ -11,6 +11,7 @@ import com.computerstore.common.exception.InvalidRequestException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.computerstore.storage.LocalImageStorage;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -53,7 +54,7 @@ public class ProductImageService {
             throw new InvalidRequestException("Alternative text must not exceed 250 characters.");
         }
 
-        LocalImageStorage.StoredImage stored = storage.store(file);
+        LocalImageStorage.StoredImage stored = storage.storeWebp(file);
         cleanupOnRollback(stored.storageKey());
         try {
             ProductImage image = images.saveAndFlush(new ProductImage(product, normalizedAlt, nextOrder,
@@ -84,7 +85,7 @@ public class ProductImageService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ProductImageContent content(Long imageId) {
         ProductImage image = images.findByIdAndProductActiveTrue(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product image not found."));
@@ -92,11 +93,12 @@ public class ProductImageService {
                 || image.getOriginalFilename() == null || image.getSizeBytes() == null) {
             throw new ResourceNotFoundException("Image content not found.");
         }
-        return new ProductImageContent(storage.load(image.getStorageKey()), image.getContentType(),
-                image.getOriginalFilename(), image.getSizeBytes());
+        var content = storage.publicWebp(image.getStorageKey());
+        return new ProductImageContent(content.path(), "image/webp", webpFilename(image.getOriginalFilename()),
+                content.sizeBytes());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ProductImageContent thumbnail(Long imageId) {
         ProductImage image = images.findByIdAndProductActiveTrue(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product image not found."));
@@ -105,7 +107,7 @@ public class ProductImageService {
         }
         Path path = storage.thumbnail(image.getStorageKey());
         try {
-            return new ProductImageContent(path, "image/jpeg", "image-" + imageId + ".jpg", Files.size(path));
+            return new ProductImageContent(path, "image/webp", "image-" + imageId + ".webp", Files.size(path));
         } catch (IOException exception) {
             throw new FileStorageException("Could not read image thumbnail.", exception);
         }
@@ -132,7 +134,13 @@ public class ProductImageService {
     }
 
     private String contentUrl(Long imageId) {
-        return "/api/products/images/" + imageId + "/content";
+        return "/api/products/images/" + imageId + "/content?v=webp-1";
+    }
+
+    private String webpFilename(String filename) {
+        int dot = filename.lastIndexOf('.');
+        String basename = dot > 0 ? filename.substring(0, dot) : filename;
+        return (basename.length() > 250 ? basename.substring(0, 250) : basename) + ".webp";
     }
 
     private void cleanupOnRollback(String storageKey) {

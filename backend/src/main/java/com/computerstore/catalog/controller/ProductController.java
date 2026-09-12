@@ -105,7 +105,7 @@ public class ProductController {
     public ResponseEntity<Resource> imageThumbnail(@PathVariable Long imageId) {
         var content = productImages.thumbnail(imageId);
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.IMAGE_JPEG);
+        headers.setContentType(MediaType.parseMediaType("image/webp"));
         headers.setContentLength(content.sizeBytes());
         headers.setContentDisposition(ContentDisposition.inline().filename(content.fileName()).build());
         headers.setCacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic().immutable());

@@ -23,10 +23,10 @@ public class HomeSectionReadRepository {
                        section.description, section.button_label, section.mode, section.product_limit,
                        section.sort,
                        CASE WHEN desktop.storage_key IS NOT NULL
-                            THEN '/api/home/banners/' || desktop.id || '/content'
+                             THEN '/api/home/banners/' || desktop.id || '/content?v=webp-1'
                             ELSE desktop.external_url END AS desktop_url,
                        CASE WHEN mobile.storage_key IS NOT NULL
-                            THEN '/api/home/banners/' || mobile.id || '/content'
+                             THEN '/api/home/banners/' || mobile.id || '/content?v=webp-1'
                             ELSE mobile.external_url END AS mobile_url
                 FROM home_sections section
                 LEFT JOIN home_section_banners desktop

@@ -18,6 +18,7 @@ import com.computerstore.storage.LocalImageStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -125,7 +126,7 @@ public class HomeHeroService {
         HomeHeroSlide slide = slides.findByIdForUpdate(slideId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home hero slide not found."));
         HomeHeroImage previous = image(slide, device);
-        LocalImageStorage.StoredImage stored = storage.store(file);
+        LocalImageStorage.StoredImage stored = storage.storeWebp(file);
         cleanupOnRollback(stored.storageKey());
         try {
             if (previous != null) {
@@ -165,14 +166,14 @@ public class HomeHeroService {
         deleteAfterCommit(image.getStorageKey());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImageContent publicImageContent(Long imageId) {
         HomeHeroImage image = images.findByIdAndSlideActiveTrue(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home hero image not found."));
         return imageContent(image);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImageContent adminImageContent(Long imageId) {
         HomeHeroImage image = images.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home hero image not found."));
@@ -232,7 +233,7 @@ public class HomeHeroService {
     }
 
     private String publicImageUrl(Long imageId) {
-        return "/api/home/hero/images/" + imageId + "/content";
+        return "/api/home/hero/images/" + imageId + "/content?v=webp-1";
     }
 
     private String adminImageUrl(Long imageId) {
@@ -240,8 +241,17 @@ public class HomeHeroService {
     }
 
     private ImageContent imageContent(HomeHeroImage image) {
-        return new ImageContent(storage.load(image.getStorageKey()), image.getContentType(),
-                image.getOriginalFilename(), image.getSizeBytes(), image.getWidth(), image.getHeight());
+        var content = storage.publicWebp(image.getStorageKey());
+        int width = content.width() > 0 ? content.width() : image.getWidth();
+        int height = content.height() > 0 ? content.height() : image.getHeight();
+        return new ImageContent(content.path(), "image/webp", webpFilename(image.getOriginalFilename()),
+                content.sizeBytes(), width, height);
+    }
+
+    private String webpFilename(String filename) {
+        int dot = filename.lastIndexOf('.');
+        String basename = dot > 0 ? filename.substring(0, dot) : filename;
+        return (basename.length() > 250 ? basename.substring(0, 250) : basename) + ".webp";
     }
 
     private void cleanupOnRollback(String storageKey) {
