@@ -2,11 +2,11 @@ import { CurrencyPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CartService } from '../../core/cart/cart.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { bankTransferPrice, priceWithoutNationalTax } from '../../core/payments/payment-pricing';
-import { SeoService } from '../../core/seo/seo.service';
 import { resolveApiContentUrl } from '../../core/utils/api-content-url';
 import { hasVisibleColorVariants } from '../../core/utils/product-variant';
 import { AppButtonDirective } from '../../shared/ui/app-button.directive';
@@ -25,7 +25,8 @@ export class ProductComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly catalog = inject(CatalogService);
-  private readonly seo = inject(SeoService);
+  private readonly title = inject(Title);
+  private readonly meta = inject(Meta);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notifications = inject(NotificationService);
   private readonly checkout = inject(CheckoutService);
@@ -62,6 +63,7 @@ export class ProductComponent {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.meta.updateTag({ name: 'description', content: 'Catálogo de hardware y tecnología de Pinatech.' }));
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const product = this.product();
       if (!product) return;
@@ -105,10 +107,8 @@ export class ProductComponent {
         this.selectedVariantId.set(selectedVariantId);
         this.selectVariantImage(selectedVariantId);
         this.loading.set(false);
-        this.seo.setProduct({ ...product, inStock: product.variants.some((variant) => variant.inStock) }, this.imageUrl);
-        if (this.route.snapshot.paramMap.get('slug') !== product.slug) {
-          void this.router.navigate(['/products', product.id, product.slug], { queryParamsHandling: 'preserve', replaceUrl: true });
-        }
+        this.title.setTitle(`${product.name} | Pinatech`);
+        this.meta.updateTag({ name: 'description', content: product.description.slice(0, 155) || `${product.name} en Pinatech.` });
       },
       error: (error: HttpErrorResponse) => {
         this.loading.set(false);
@@ -175,6 +175,9 @@ export class ProductComponent {
 
   private showError(type: 'not-found' | 'request'): void {
     this.error.set(type);
-    this.seo.setProductError(type === 'not-found');
+    const title = type === 'not-found' ? 'Producto no encontrado | Pinatech' : 'No pudimos cargar el producto | Pinatech';
+    const description = type === 'not-found' ? 'El producto no existe o ya no está publicado.' : 'No pudimos cargar el producto. Intentá nuevamente.';
+    this.title.setTitle(title);
+    this.meta.updateTag({ name: 'description', content: description });
   }
 }
