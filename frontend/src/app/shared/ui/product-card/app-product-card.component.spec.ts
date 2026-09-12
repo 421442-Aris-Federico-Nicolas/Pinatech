@@ -6,6 +6,7 @@ describe('AppProductCardComponent', () => {
   const product: ProductCardProduct = {
     id: 1,
     name: 'Mouse Pro',
+    slug: 'mouse-pro',
     price: 100,
     categoryName: 'Periféricos',
     brandName: 'Pinatech',
@@ -30,7 +31,7 @@ describe('AppProductCardComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Lista / Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Disponible');
     expect(fixture.nativeElement.textContent).toContain('$90.00');
-    expect(fixture.nativeElement.querySelector('.product-card__actions a').getAttribute('href')).toBe('/products/1');
+    expect(fixture.nativeElement.querySelector('.product-card__actions a').getAttribute('href')).toBe('/products/1/mouse-pro');
   });
 
   it('uses the correct heading level inside a featured showcase', async () => {
