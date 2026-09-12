@@ -159,7 +159,7 @@ describe('CheckoutComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.panel.app-card').length).toBe(1);
     expect(fixture.nativeElement.querySelector('.summary')?.classList).toContain('app-card');
     expect(fixture.nativeElement.querySelector('.product-list')).toBeNull();
-    expect((fixture.nativeElement.querySelector('img[src="/mercadopago-logo.png"]') as HTMLImageElement).src).toContain('mercadopago-logo.png');
+    expect((fixture.nativeElement.querySelector('img[src="/mercadopago-logo.webp"]') as HTMLImageElement).src).toContain('mercadopago-logo.webp');
     fixture.componentInstance.returnToShipping();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.product-list')?.tagName).toBe('UL');
@@ -382,8 +382,8 @@ describe('CheckoutComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('OCA');
     expect(fixture.nativeElement.textContent).toContain('Correo Argentino');
     expect(fixture.nativeElement.textContent).toContain('Lo Bruno');
-    expect(fixture.nativeElement.querySelector('img[src="/Logooca.png"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('img[src="/logo-correo.png"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('img[src="/Logooca.webp"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('img[src="/logo-correo.webp"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('input[value="lo-bruno"] + .carrier-brand')?.textContent).toContain('LB');
 
     (fixture.nativeElement.querySelector(`input[value="${pickupLocation.code}"]`) as HTMLInputElement).click();

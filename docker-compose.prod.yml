@@ -100,7 +100,7 @@ services:
       - ALL
     stop_grace_period: 45s
     tmpfs:
-      - /tmp:mode=1777
+      - /tmp:exec,nosuid,nodev,uid=999,gid=999,mode=0700,size=64m
     volumes:
       - media_uploads:/app/uploads
     environment:

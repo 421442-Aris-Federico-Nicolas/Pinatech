@@ -16,7 +16,7 @@ describe('HomeSectionsService', () => {
   });
 
   it('keeps frontend assets local and resolves API content URLs', () => {
-    expect(resolveHomeBannerUrl('/pinatech-banner-hardware.jpg')).toBe('/pinatech-banner-hardware.jpg');
+    expect(resolveHomeBannerUrl('/pinatech-banner-hardware.webp')).toBe('/pinatech-banner-hardware.webp');
     expect(resolveHomeBannerUrl('/api/home/sections/1/banner')).toContain('/api/home/sections/1/banner');
     expect(resolveHomeBannerUrl(null)).toBe('');
   });

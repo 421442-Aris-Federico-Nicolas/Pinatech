@@ -9,13 +9,15 @@ RUN ./mvnw --batch-mode dependency:go-offline
 COPY src src
 RUN ./mvnw --batch-mode -DskipTests package
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
-RUN apk upgrade --no-cache \
-    && apk add --no-cache su-exec \
-    && addgroup --system spring \
-    && adduser --system --ingroup spring spring \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system spring \
+    && useradd --system --gid spring spring \
     && mkdir -p /app/uploads \
     && chown spring:spring /app/uploads
 

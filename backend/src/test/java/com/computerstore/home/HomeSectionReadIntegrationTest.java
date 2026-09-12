@@ -186,7 +186,7 @@ class HomeSectionReadIntegrationTest {
         assertThat(withAdminBanner.bannerDesktopUrl())
                 .isEqualTo("/api/admin/home/banners/" + bannerId + "/content");
         assertThat(withPublicBanner.bannerDesktopUrl())
-                .isEqualTo("/api/home/banners/" + bannerId + "/content");
+                .isEqualTo("/api/home/banners/" + bannerId + "/content?v=webp-1");
         jdbc.update("UPDATE products SET is_active = FALSE WHERE id = ?", secondProduct);
         jdbc.update("UPDATE inventory SET available_quantity = 0 WHERE variant_id IN "
                 + "(SELECT id FROM product_variants WHERE product_id = ?)", firstProduct);
@@ -227,10 +227,11 @@ class HomeSectionReadIntegrationTest {
                     section_id, device, storage_key, original_filename, content_type, size_bytes)
                 VALUES (?, 'DESKTOP', ?, 'inactive.png', 'image/png', 10) RETURNING id
                 """, Long.class, sectionId, storageKey);
-        when(storage.load(storageKey)).thenReturn(java.nio.file.Path.of("inactive.png"));
+        when(storage.publicWebp(storageKey)).thenReturn(
+                new LocalImageStorage.StoredContent(java.nio.file.Path.of("inactive.webp"), 10));
 
         assertThrows(ResourceNotFoundException.class, () -> service.publicBannerContent(bannerId));
-        assertThat(service.adminBannerContent(bannerId).fileName()).isEqualTo("inactive.png");
+        assertThat(service.adminBannerContent(bannerId).fileName()).isEqualTo("inactive.webp");
     }
 
     @Test

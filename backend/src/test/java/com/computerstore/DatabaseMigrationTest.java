@@ -269,7 +269,7 @@ class DatabaseMigrationTest {
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM home_sections", Integer.class));
         assertEquals(List.of("Completá tu setup", "Potencia para tu equipo"), jdbc.queryForList(
                 "SELECT title FROM home_sections ORDER BY display_order", String.class));
-        assertEquals("/pinatech-banner-perifericos.jpg", jdbc.queryForObject("""
+        assertEquals("/pinatech-banner-perifericos.webp", jdbc.queryForObject("""
                 SELECT banner.external_url FROM home_section_banners banner
                 JOIN home_sections section ON section.id = banner.section_id
                 WHERE section.title = 'Completá tu setup' AND banner.device = 'DESKTOP'
@@ -280,7 +280,14 @@ class DatabaseMigrationTest {
                 JOIN categories category ON category.id = selected.category_id
                 WHERE section.title = 'Potencia para tu equipo' AND category.slug = 'perifericos'
                 """, Integer.class));
-        assertEquals("32", jdbc.queryForObject(
+        assertEquals(3, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conname IN ('chk_product_images_storage_metadata',
+                                  'chk_home_section_banners_source',
+                                  'home_hero_images_content_type_check')
+                  AND pg_get_constraintdef(oid) LIKE '%image/webp%'
+                """, Integer.class));
+        assertEquals("34", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
         assertEquals(1, jdbc.queryForObject("""

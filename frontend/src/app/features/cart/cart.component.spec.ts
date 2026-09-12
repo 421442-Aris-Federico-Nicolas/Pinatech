@@ -35,7 +35,7 @@ describe('CartComponent', () => {
     fixture.detectChanges();
     const image = fixture.nativeElement.querySelector('.empty-cart-image') as HTMLImageElement;
 
-    expect(image.getAttribute('src')).toBe('/pinatech-carrito.png');
+    expect(image.getAttribute('src')).toBe('/pinatech-carrito.webp');
     expect(image.getAttribute('aria-hidden')).toBe('true');
     expect(image.getAttribute('width')).toBe('715');
     expect(fixture.nativeElement.querySelector('.empty .placeholder')).toBeNull();

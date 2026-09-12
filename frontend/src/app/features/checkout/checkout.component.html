@@ -185,7 +185,7 @@
                   @if (mercadoPagoEnabled(options)) {
                     <label class="payment-card" [class.selected]="selectedPaymentMethod() === 'MERCADO_PAGO'">
                       <input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="selectedPaymentMethod() === 'MERCADO_PAGO'" (change)="selectPaymentMethod($event)">
-                      <span class="payment-brand" aria-hidden="true"><img src="/mercadopago-logo.png" alt="" width="84" height="46"></span>
+                      <span class="payment-brand" aria-hidden="true"><img src="/mercadopago-logo.webp" alt="" width="84" height="46"></span>
                       <span class="option-copy"><strong translate="no">Mercado Pago</strong><small>Precio de lista: {{ mercadoPagoPricing().total | currency:options.currency:'symbol-narrow':'1.2-2' }} · sin impuestos {{ priceWithoutTax(mercadoPagoPricing().total) | currency:options.currency:'symbol-narrow':'1.2-2' }}</small></span>
                     </label>
                   }

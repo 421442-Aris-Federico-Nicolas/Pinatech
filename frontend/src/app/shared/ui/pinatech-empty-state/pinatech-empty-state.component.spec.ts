@@ -27,7 +27,7 @@ describe('PinatechEmptyStateComponent', () => {
     expect(status.querySelector('h2')?.textContent).toBe('Sin coincidencias');
     const image = status.querySelector('.mascot-image') as HTMLImageElement;
     expect(image.getAttribute('aria-hidden')).toBe('true');
-    expect(image.getAttribute('src')).toBe('/pinatech-not-found.png?v=transparent-1');
+    expect(image.getAttribute('src')).toBe('/pinatech-not-found.webp?v=transparent-1');
     expect(image.getAttribute('width')).toBe('1254');
     button.click();
     expect(fixture.componentInstance.cleared()).toBe(true);

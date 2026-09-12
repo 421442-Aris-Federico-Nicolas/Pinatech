@@ -61,7 +61,7 @@ main {
 .status { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text-muted); display: grid; grid-column: 1 / -1; justify-items: center; min-height: 240px; padding: var(--space-8); text-align: center; }
 .loader { animation: spin .8s linear infinite; border: 3px solid var(--color-border); border-radius: 50%; border-top-color: var(--color-cyan); height: 36px; width: 36px; }
 
-.service { align-items: center; background-image: linear-gradient(90deg, var(--color-bg-deep) 0%, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 35%, color-mix(in srgb, var(--color-bg-deep) 50%, transparent) 60%, transparent 82%), url('/pinatech-banner-servicio-tecnico.jpg'); background-position: center, center; background-repeat: no-repeat; background-size: cover; border: 1px solid var(--color-border); border-left: 4px solid var(--color-orange); border-radius: var(--radius-lg); display: grid; grid-template-columns: minmax(300px, .8fr) minmax(0, 1.2fr); min-height: 520px; overflow: hidden; padding: clamp(var(--space-6), 4vw, var(--space-12)); }
+.service { align-items: center; background-image: linear-gradient(90deg, var(--color-bg-deep) 0%, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 35%, color-mix(in srgb, var(--color-bg-deep) 50%, transparent) 60%, transparent 82%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center, center; background-repeat: no-repeat; background-size: cover; border: 1px solid var(--color-border); border-left: 4px solid var(--color-orange); border-radius: var(--radius-lg); display: grid; grid-template-columns: minmax(300px, .8fr) minmax(0, 1.2fr); min-height: 520px; overflow: hidden; padding: clamp(var(--space-6), 4vw, var(--space-12)); }
 .service-copy { max-width: 510px; min-width: 0; position: relative; z-index: 1; }
 .service h2 { font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.06em; line-height: .95; margin: var(--space-3) 0 var(--space-5); text-transform: uppercase; }
 .service-copy > p:not(.eyebrow) { color: var(--color-text-muted); line-height: var(--line-height-relaxed); }
@@ -89,7 +89,7 @@ main {
   .product-promo { min-height: 250px; }
   .product-promo__copy { max-width: 420px; }
   .products > li { flex-basis: 86%; }
-  .service { background-image: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-deep) 48%, color-mix(in srgb, var(--color-bg-deep) 60%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.jpg'); background-position: center, center bottom; background-size: 100% 100%, 100% auto; grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(14rem, 46vw, 21rem); }
+  .service { background-image: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-deep) 48%, color-mix(in srgb, var(--color-bg-deep) 60%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center, center bottom; background-size: 100% 100%, 100% auto; grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(14rem, 46vw, 21rem); }
 }
 
 @media (max-width: 620px) {

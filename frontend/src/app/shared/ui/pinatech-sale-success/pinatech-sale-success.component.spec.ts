@@ -26,7 +26,7 @@ describe('PinatechSaleSuccessComponent', () => {
     expect(status.querySelector('.order-number')?.textContent).toContain('Pedido #42');
     const image = status.querySelector('.success-image') as HTMLImageElement;
     expect(image.getAttribute('aria-hidden')).toBe('true');
-    expect(image.getAttribute('src')).toBe('/pinatech-success-sale.png');
+    expect(image.getAttribute('src')).toBe('/pinatech-success-sale.webp');
     expect(status.querySelector('a')?.textContent).toBe('Ver pedido');
   });
 

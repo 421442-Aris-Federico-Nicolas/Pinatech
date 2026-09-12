@@ -25,6 +25,7 @@ import com.computerstore.storage.LocalImageStorage;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -169,7 +170,7 @@ public class HomeSectionService {
         HomeSection section = sections.findByIdForUpdate(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home section not found."));
         HomeBanner previous = banner(section, device);
-        LocalImageStorage.StoredImage stored = storage.store(file);
+        LocalImageStorage.StoredImage stored = storage.storeWebp(file);
         cleanupOnRollback(stored.storageKey());
         try {
             if (previous != null) {
@@ -209,14 +210,14 @@ public class HomeSectionService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public BannerContent publicBannerContent(Long bannerId) {
         HomeBanner banner = banners.findByIdAndSectionActiveTrue(bannerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home banner not found."));
         return bannerContent(banner);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public BannerContent adminBannerContent(Long bannerId) {
         HomeBanner banner = banners.findById(bannerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home banner not found."));
@@ -228,8 +229,9 @@ public class HomeSectionService {
                 || banner.getOriginalFilename() == null || banner.getSizeBytes() == null) {
             throw new ResourceNotFoundException("Home banner content not found.");
         }
-        return new BannerContent(storage.load(banner.getStorageKey()), banner.getContentType(),
-                banner.getOriginalFilename(), banner.getSizeBytes());
+        var content = storage.publicWebp(banner.getStorageKey());
+        return new BannerContent(content.path(), "image/webp", webpFilename(banner.getOriginalFilename()),
+                content.sizeBytes());
     }
 
     private Configuration configuration(HomeSectionRequest request) {
@@ -299,6 +301,12 @@ public class HomeSectionService {
 
     private String adminBannerUrl(HomeBanner banner) {
         return "/api/admin/home/banners/" + banner.getId() + "/content";
+    }
+
+    private String webpFilename(String filename) {
+        int dot = filename.lastIndexOf('.');
+        String basename = dot > 0 ? filename.substring(0, dot) : filename;
+        return (basename.length() > 250 ? basename.substring(0, 250) : basename) + ".webp";
     }
 
     private void cleanupOnRollback(String storageKey) {

@@ -24,6 +24,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -179,9 +180,9 @@ class HomeHeroServiceTest {
         ReflectionTestUtils.setField(slide, "id", 1L);
         when(slides.findByIdForUpdate(1L)).thenReturn(Optional.of(slide));
 
-        LocalImageStorage.StoredImage stored = new LocalImageStorage.StoredImage("key-1", "hero.jpg",
-                "image/jpeg", 2048, 2000, 848);
-        when(storage.store(any())).thenReturn(stored);
+        LocalImageStorage.StoredImage stored = new LocalImageStorage.StoredImage("key-1", "hero.webp",
+                "image/webp", 2048, 2000, 848);
+        when(storage.storeWebp(any())).thenReturn(stored);
         when(images.saveAndFlush(any())).thenAnswer(invocation -> {
             HomeHeroImage saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 77L);
@@ -207,8 +208,8 @@ class HomeHeroServiceTest {
         ReflectionTestUtils.setField(previous, "id", 9L);
         slide.addImage(previous);
         when(slides.findByIdForUpdate(1L)).thenReturn(Optional.of(slide));
-        when(storage.store(any())).thenReturn(new LocalImageStorage.StoredImage(
-                "new-key", "new.jpg", "image/jpeg", 2, 2000, 848));
+        when(storage.storeWebp(any())).thenReturn(new LocalImageStorage.StoredImage(
+                "new-key", "new.webp", "image/webp", 2, 2000, 848));
         when(images.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         TransactionSynchronizationManager.initSynchronization();
         try {
@@ -270,6 +271,24 @@ class HomeHeroServiceTest {
     void publicImageContentRequiresAnActiveSlide() {
         when(images.findByIdAndSlideActiveTrue(1L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.publicImageContent(1L));
+    }
+
+    @Test
+    void publicImageContentReturnsAWebpDerivative() {
+        HomeHeroSlide slide = new HomeHeroSlide(0);
+        HomeHeroImage image = new HomeHeroImage(slide, HomeHeroImageDevice.DESKTOP,
+                new LocalImageStorage.StoredImage("key", "hero.png", "image/png", 10, 2000, 848), 2000, 848);
+        when(images.findByIdAndSlideActiveTrue(1L)).thenReturn(Optional.of(image));
+        when(storage.publicWebp("key")).thenReturn(
+                new LocalImageStorage.StoredContent(Path.of("hero.webp"), 6, 848, 2000));
+
+        var content = service.publicImageContent(1L);
+
+        assertThat(content.contentType()).isEqualTo("image/webp");
+        assertThat(content.fileName()).isEqualTo("hero.webp");
+        assertThat(content.sizeBytes()).isEqualTo(6);
+        assertThat(content.width()).isEqualTo(848);
+        assertThat(content.height()).isEqualTo(2000);
     }
 
     private HomeHeroSlideRequest request(boolean active) {

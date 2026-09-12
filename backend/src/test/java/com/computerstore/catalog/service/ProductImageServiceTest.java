@@ -52,21 +52,25 @@ class ProductImageServiceTest {
     }
 
     @Test
-    void thumbnailReturnsJpegMetadataWhileDetailKeepsOriginal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+    void thumbnailAndDetailReturnWebpMetadata(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
         ProductImage image = new ProductImage(product, "Notebook", 0, STORAGE_KEY,
                 "image.png", "image/png", 100);
         ReflectionTestUtils.setField(image, "id", 5L);
         when(images.findByIdAndProductActiveTrue(5L)).thenReturn(Optional.of(image));
-        var path = java.nio.file.Files.write(directory.resolve("thumbnail.jpg"), new byte[]{1, 2, 3});
+        var path = java.nio.file.Files.write(directory.resolve("thumbnail.webp"), new byte[]{1, 2, 3});
         when(storage.thumbnail(STORAGE_KEY)).thenReturn(path);
+        when(storage.publicWebp(STORAGE_KEY)).thenReturn(new LocalImageStorage.StoredContent(path, 3));
 
         var thumbnail = service.thumbnail(5L);
+        var detail = service.content(5L);
 
         assertEquals(path, thumbnail.path());
-        assertEquals("image/jpeg", thumbnail.contentType());
-        assertEquals("image-5.jpg", thumbnail.fileName());
+        assertEquals("image/webp", thumbnail.contentType());
+        assertEquals("image-5.webp", thumbnail.fileName());
         assertEquals(3, thumbnail.sizeBytes());
-        assertEquals("/api/products/images/5/content", service.response(image).contentUrl());
+        assertEquals("image/webp", detail.contentType());
+        assertEquals("image.webp", detail.fileName());
+        assertEquals("/api/products/images/5/content?v=webp-1", service.response(image).contentUrl());
         verify(storage, never()).load(any());
     }
 
@@ -88,7 +92,7 @@ class ProductImageServiceTest {
         assertThrows(BusinessRuleException.class,
                 () -> service.upload(1L, new MockMultipartFile("file", new byte[]{1}), null));
 
-        verify(storage, never()).store(any());
+        verify(storage, never()).storeWebp(any());
     }
 
     @Test
@@ -98,8 +102,8 @@ class ProductImageServiceTest {
         when(images.countByProductId(1L)).thenReturn(0L);
         when(images.findFirstByProductIdOrderByDisplayOrderDesc(1L)).thenReturn(Optional.empty());
         when(product.getName()).thenReturn("Notebook");
-        when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
-                STORAGE_KEY, "image.png", "image/png", 100, 800, 600));
+        when(storage.storeWebp(file)).thenReturn(new LocalImageStorage.StoredImage(
+                STORAGE_KEY, "image.webp", "image/webp", 100, 800, 600));
         when(images.saveAndFlush(any(ProductImage.class))).thenAnswer(invocation -> {
             ProductImage saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 5L);
@@ -108,7 +112,7 @@ class ProductImageServiceTest {
         TransactionSynchronizationManager.initSynchronization();
 
         var response = service.upload(1L, file, null);
-        assertEquals("image.png", response.originalFilename());
+        assertEquals("image.webp", response.originalFilename());
         verify(storage, never()).delete(STORAGE_KEY);
 
         synchronizations().forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));

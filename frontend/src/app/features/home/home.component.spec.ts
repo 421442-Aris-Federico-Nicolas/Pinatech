@@ -17,7 +17,7 @@ describe('HomeComponent', () => {
   const automatic: HomeSection = {
     id: 17, displayOrder: 0, eyebrow: 'Periféricos', title: 'Completá tu setup',
     description: 'Todo para tu escritorio.', buttonLabel: 'Ver periféricos', mode: 'AUTOMATIC',
-    productLimit: 12, sort: 'NAME_ASC', bannerDesktopUrl: '/pinatech-banner-perifericos.jpg',
+    productLimit: 12, sort: 'NAME_ASC', bannerDesktopUrl: '/pinatech-banner-perifericos.webp',
     bannerMobileUrl: '/api/home/sections/17/mobile', categories: [{ id: 5, name: 'Periféricos', slug: 'perifericos' }], products: [mouse],
   };
 
@@ -50,7 +50,7 @@ describe('HomeComponent', () => {
     expect(showcase.querySelector('.products')?.id).toBe('product-track-17');
     expect(fixture.nativeElement.querySelectorAll('.paths a')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('.service a').getAttribute('href')).toBe('/tickets');
-    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.jpg', '/pinatech-banner-cart.jpg']);
+    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.webp', '/pinatech-banner-cart.webp']);
   });
 
   it('uses responsive banner fallback, keeps static assets on the frontend and resolves API paths', async () => {
@@ -58,9 +58,9 @@ describe('HomeComponent', () => {
     const { fixture } = await createHome(of([automatic, desktopOnly]));
     const [responsive, fallback] = [...fixture.nativeElement.querySelectorAll('.product-showcase')] as HTMLElement[];
 
-    expect(responsive.querySelector('img')?.getAttribute('src')).toBe('/pinatech-banner-perifericos.jpg');
+    expect(responsive.querySelector('img')?.getAttribute('src')).toBe('/pinatech-banner-perifericos.webp');
     expect(responsive.querySelector('source')?.getAttribute('srcset')).toContain('/api/home/sections/17/mobile');
-    expect(fallback.querySelector('source')?.getAttribute('srcset')).toBe('/pinatech-banner-perifericos.jpg');
+    expect(fallback.querySelector('source')?.getAttribute('srcset')).toBe('/pinatech-banner-perifericos.webp');
   });
 
   it('shows CTA only for automatic sections with a nonblank label and encodes multiple categories as CSV', async () => {
