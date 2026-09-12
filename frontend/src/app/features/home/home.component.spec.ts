@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { BannerCarouselComponent } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { ProductListItemResponse as Product } from '../catalog/catalog.service';
@@ -149,6 +149,34 @@ describe('HomeComponent', () => {
     expect(copy.textContent).toContain('Título API');
     expect(copy.textContent).toContain('Explorar');
     expect(fixture.nativeElement.querySelector('.hero-actions a:last-child').textContent).toContain('Ingresar');
+  });
+
+  it('does not render a stale fallback while the hero request is pending', async () => {
+    const response = new Subject<HomeHeroSlide[]>();
+    const { fixture } = await createHome(of([]), response);
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+
+    expect(carousel.slides()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.banner-carousel__deck img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.hero-copy')).toBeNull();
+
+    response.next([{
+      id: 3, displayOrder: 0, eyebrow: 'Nuevo', title: 'Hero vigente', accent: 'Ahora',
+      description: 'Descripción vigente', link: '/catalog', linkLabel: 'Explorar', showLoginLink: false,
+      altText: 'Banner vigente', desktopImage: { id: 12, url: '/api/home/hero/images/12/content', width: 2000, height: 848 },
+      mobileImage: null,
+    }]);
+    fixture.detectChanges();
+
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/12/content');
+    expect(fixture.nativeElement.querySelector('.hero-copy')?.textContent).toContain('Hero vigente');
+  });
+
+  it('uses the static fallback when the hero request fails', async () => {
+    const { fixture } = await createHome(of([]), throwError(() => new Error('offline')));
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+
+    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.webp', '/pinatech-banner-cart.webp']);
   });
 
   it('uses a mobile-only hero image as the desktop fallback', async () => {
