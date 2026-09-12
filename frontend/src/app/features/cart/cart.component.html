@@ -17,7 +17,7 @@
             } @else { <div class="placeholder" aria-hidden="true"><span>PIN</span></div> }
             <div class="item-info">
                <small><span translate="no">{{ item.product.brandName }}</span> · {{ item.product.categoryName }}</small>
-               <a [routerLink]="['/products', item.product.id]" [queryParams]="{ variant: item.variant.id }" translate="no">{{ item.product.name }}</a>
+               <a [routerLink]="['/products', item.product.id, item.product.slug]" [queryParams]="{ variant: item.variant.id }" translate="no">{{ item.product.name }}</a>
               @if (hasVisibleColorVariants(item.product.variants)) { <span>Color: {{ item.variant.colorName }}</span> }
               <span>Precio unitario: {{ unitPrice(item) | currency:'ARS':'symbol-narrow':'1.2-2' }}</span>
               <span class="stock-note">Stock disponible: {{ cart.stockLimit(item.variant) }}</span>

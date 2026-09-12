@@ -43,6 +43,10 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://api.pinatech.com.ar/api/seo/sitemap.xml"
+    },
+    {
       "source": "/:path((?!.*\\.).*)",
       "destination": "/index.html"
     }

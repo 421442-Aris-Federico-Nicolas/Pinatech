@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
@@ -27,12 +28,24 @@ export class CatalogComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly document = inject(DOCUMENT);
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
   private invalidPriceParams = false;
+  private previousPage?: number;
 
   readonly filters: CatalogFilters = { search: '', categoryId: null, categoryIds: [], brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<ProductListItemResponse> | null>(null);
+  readonly pageLinks = computed(() => {
+    const result = this.page();
+    if (!result || result.totalPages < 1) return [];
+    const total = result.totalPages;
+    if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+    const current = Math.min(total, Math.max(1, result.number + 1));
+    if (current <= 4) return [1, 2, 3, 4, 5, total];
+    if (current >= total - 3) return [1, total - 4, total - 3, total - 2, total - 1, total];
+    return [1, current - 1, current, current + 1, total];
+  });
   readonly categories = signal<Category[]>([]);
   readonly brands = signal<Brand[]>([]);
   readonly sort = signal<CatalogSort>('name,asc');
@@ -51,9 +64,13 @@ export class CatalogComponent {
       .subscribe(() => this.applyFilters(1, true));
 
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const page = this.pageNumber(params);
+      const pageChanged = this.previousPage !== undefined && page !== this.previousPage;
+      this.previousPage = page;
       this.readParams(params);
       if (this.validatePrices()) {
-        this.loadPage(this.pageNumber(params));
+        this.loadPage(page);
+        if (pageChanged) queueMicrotask(() => this.scrollToCatalog());
       } else {
         this.request?.unsubscribe();
         this.page.set(null);
@@ -117,6 +134,12 @@ export class CatalogComponent {
     this.request = this.service.getProductCards(queryFilters, page, this.sort())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (result) => this.page.set(result), error: () => { this.page.set(null); this.error.set(true); } });
+  }
+
+  private scrollToCatalog(): void {
+    const view = this.document.defaultView;
+    const behavior = view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    view?.scrollTo({ behavior, top: 0 });
   }
 
   private readParams(params: ParamMap): void {
