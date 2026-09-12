@@ -1,5 +1,5 @@
 <article appCard class="product-card">
-  <a class="product-card__visual" [routerLink]="['/products', product().id, product().slug]" [attr.aria-label]="'Ver ' + product().name">
+  <a class="product-card__visual" [routerLink]="['/products', product().id]" [attr.aria-label]="'Ver ' + product().name">
     @if (product().images[0]; as image) {
       <img
         [src]="imageUrl(image.contentUrl)"
@@ -18,9 +18,9 @@
   <header class="product-card__header">
     <p translate="no">{{ product().brandName }}</p>
     @if (mode() === 'featured') {
-      <h4><a [routerLink]="['/products', product().id, product().slug]" translate="no">{{ product().name }}</a></h4>
+      <h4><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h4>
     } @else {
-      <h2><a [routerLink]="['/products', product().id, product().slug]" translate="no">{{ product().name }}</a></h2>
+      <h2><a [routerLink]="['/products', product().id]" translate="no">{{ product().name }}</a></h2>
     }
   </header>
 
@@ -32,6 +32,6 @@
   </div>
 
   <footer class="product-card__actions">
-    <a appButton="outlined" [routerLink]="['/products', product().id, product().slug]">Ver producto</a>
+    <a appButton="outlined" [routerLink]="['/products', product().id]">Ver producto</a>
   </footer>
 </article>

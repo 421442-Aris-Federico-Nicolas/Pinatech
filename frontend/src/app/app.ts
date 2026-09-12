@@ -10,7 +10,6 @@ import { AuthService } from './core/auth/auth.service';
 import { CartService } from './core/cart/cart.service';
 import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { NotificationService, NotificationTone } from './core/notifications/notification.service';
-import { SeoService } from './core/seo/seo.service';
 import { AppFeedbackComponent } from './shared/ui/feedback/app-feedback.component';
 
 const mobileNavBreakpoint = '(max-width: 960px)';
@@ -39,7 +38,6 @@ export class App {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly notificationShell = viewChild<ElementRef<HTMLElement>>('notificationShell');
-  private readonly seo = inject(SeoService);
   readonly notifications = inject(NotificationService);
   readonly deploymentVersion = inject(DeploymentVersionService);
   readonly notificationItems = computed(() => {
@@ -60,7 +58,6 @@ export class App {
       if (event instanceof NavigationEnd || event instanceof NavigationCancel || event instanceof NavigationError || event instanceof NavigationSkipped) this.navigating.set(false);
       if (!(event instanceof NavigationEnd)) return;
       const path = new URL(event.urlAfterRedirects, this.document.baseURI).pathname;
-      this.seo.applyRoute(event.urlAfterRedirects);
       const previousPath = this.currentPath;
       this.currentPath = path;
       this.catalogActive.set(path === '/catalog' || path.startsWith('/products/'));

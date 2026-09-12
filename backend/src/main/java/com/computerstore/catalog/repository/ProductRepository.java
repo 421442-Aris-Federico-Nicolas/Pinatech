@@ -50,7 +50,6 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     boolean existsByCategory_IdAndActiveTrue(Long categoryId);
     boolean existsByBrand_IdAndActiveTrue(Long brandId);
-    List<Product> findAllByActiveTrueOrderByIdAsc();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id")
