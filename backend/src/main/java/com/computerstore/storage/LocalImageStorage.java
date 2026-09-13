@@ -2,6 +2,7 @@ package com.computerstore.storage;
 
 import com.computerstore.common.exception.FileStorageException;
 import com.computerstore.common.exception.InvalidRequestException;
+import com.computerstore.common.exception.RateLimitExceededException;
 import com.computerstore.common.exception.ResourceNotFoundException;
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.imaging.ImageProcessingException;
@@ -34,8 +35,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
+import java.util.function.Supplier;
 
 @Service
 public class LocalImageStorage {
@@ -45,9 +48,14 @@ public class LocalImageStorage {
     static final long MAX_PIXELS = 12_000_000L;
     private static final int THUMBNAIL_SIZE = 640;
     private static final float WEBP_QUALITY = 0.85f;
+    private static final float RESPONSIVE_WEBP_QUALITY = 0.78f;
+    private static final Set<Integer> PUBLIC_VARIANT_WIDTHS = Set.of(480, 720, 1280, 1920);
+    private static final Set<Integer> THUMBNAIL_VARIANT_WIDTHS = Set.of(320, 640);
     private static final String PUBLIC_WEBP_SUFFIX = ".public-v1.webp";
     private static final String THUMBNAIL_SUFFIX = ".thumbnail-v2.webp";
     private static final String LEGACY_THUMBNAIL_SUFFIX = ".thumbnail-v1.jpg";
+    private static final Semaphore IMAGE_DERIVATION_REQUESTS = new Semaphore(16, true);
+    private static final Semaphore IMAGE_PROCESSING_ADMISSIONS = new Semaphore(16, true);
     private static final Semaphore IMAGE_PROCESSING_PERMITS = new Semaphore(2, true);
     // Bounded locks also coordinate storage instances sharing a root in this JVM.
     private static final Object[] IMAGE_LOCKS = java.util.stream.IntStream.range(0, 64)
@@ -119,7 +127,7 @@ public class LocalImageStorage {
             throw new FileStorageException("Could not store image file.", exception);
         } finally {
             if (processingPermit) {
-                IMAGE_PROCESSING_PERMITS.release();
+                releaseProcessingPermit();
             }
             if (temporary != null) {
                 try {
@@ -160,10 +168,9 @@ public class LocalImageStorage {
     public Path thumbnail(String storageKey) {
         Path original = resolveKey(storageKey);
         Path destination = root.resolve(storageKey + THUMBNAIL_SUFFIX);
-        synchronized (IMAGE_LOCKS[Math.floorMod(original.hashCode(), IMAGE_LOCKS.length)]) {
-            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) {
-                return destination;
-            }
+        if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return destination;
+        return withDerivationLock(original, () -> {
+            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return destination;
             Path temporary = null;
             boolean processingPermit = false;
             try {
@@ -204,7 +211,7 @@ public class LocalImageStorage {
                 throw new FileStorageException("Could not create image thumbnail.", exception);
             } finally {
                 if (processingPermit) {
-                    IMAGE_PROCESSING_PERMITS.release();
+                    releaseProcessingPermit();
                 }
                 if (temporary != null) {
                     try {
@@ -214,16 +221,22 @@ public class LocalImageStorage {
                     }
                 }
             }
+        });
+    }
+
+    public Path thumbnail(String storageKey, int width) {
+        if (!THUMBNAIL_VARIANT_WIDTHS.contains(width)) {
+            throw new InvalidRequestException("Unsupported thumbnail width.");
         }
+        return responsiveWebp(storageKey, width, true, ".thumbnail-w" + width + "-v3.webp").path();
     }
 
     public StoredContent publicWebp(String storageKey) {
         Path original = resolveKey(storageKey);
-        synchronized (IMAGE_LOCKS[Math.floorMod(original.hashCode(), IMAGE_LOCKS.length)]) {
-            Path destination = root.resolve(storageKey + PUBLIC_WEBP_SUFFIX);
-            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) {
-                return content(destination);
-            }
+        Path destination = root.resolve(storageKey + PUBLIC_WEBP_SUFFIX);
+        if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return content(destination);
+        return withDerivationLock(original, () -> {
+            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return content(destination);
             Path source = load(storageKey);
             if (isWebp(source)) {
                 return content(source);
@@ -243,7 +256,7 @@ public class LocalImageStorage {
                 throw new FileStorageException("Could not create WebP image.", exception);
             } finally {
                 if (processingPermit) {
-                    IMAGE_PROCESSING_PERMITS.release();
+                    releaseProcessingPermit();
                 }
                 if (temporary != null) {
                     try {
@@ -254,7 +267,14 @@ public class LocalImageStorage {
                 }
             }
             return content(destination);
+        });
+    }
+
+    public StoredContent publicWebp(String storageKey, int width) {
+        if (!PUBLIC_VARIANT_WIDTHS.contains(width)) {
+            throw new InvalidRequestException("Unsupported public image width.");
         }
+        return responsiveWebp(storageKey, width, false, ".public-w" + width + "-v2.webp");
     }
 
     public void delete(String storageKey) {
@@ -264,6 +284,12 @@ public class LocalImageStorage {
                 Files.deleteIfExists(root.resolve(storageKey + PUBLIC_WEBP_SUFFIX));
                 Files.deleteIfExists(root.resolve(storageKey + THUMBNAIL_SUFFIX));
                 Files.deleteIfExists(root.resolve(storageKey + LEGACY_THUMBNAIL_SUFFIX));
+                for (int width : PUBLIC_VARIANT_WIDTHS) {
+                    Files.deleteIfExists(root.resolve(storageKey + ".public-w" + width + "-v2.webp"));
+                }
+                for (int width : THUMBNAIL_VARIANT_WIDTHS) {
+                    Files.deleteIfExists(root.resolve(storageKey + ".thumbnail-w" + width + "-v3.webp"));
+                }
                 if (!Files.exists(path)) {
                     return;
                 }
@@ -298,6 +324,64 @@ public class LocalImageStorage {
             throw new InvalidRequestException("An image file is required.");
         }
         return total;
+    }
+
+    private StoredContent responsiveWebp(String storageKey, int width, boolean flattenTransparency, String suffix) {
+        Path original = resolveKey(storageKey);
+        Path destination = root.resolve(storageKey + suffix);
+        if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return content(destination);
+        return withDerivationLock(original, () -> {
+            if (Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)) return content(destination);
+            Path temporary = null;
+            boolean processingPermit = false;
+            try {
+                Path source = load(storageKey);
+                if (Files.size(source) > MAX_FILE_SIZE) {
+                    throw new InvalidRequestException("Image files must not exceed 5 MiB.");
+                }
+                acquireProcessingPermit();
+                processingPermit = true;
+                BufferedImage decoded = inspect(source).decoded();
+                int height = Math.max(1, (int) Math.round((double) decoded.getHeight() * width / decoded.getWidth()));
+                if (width > MAX_WIDTH || height > MAX_HEIGHT || (long) width * height > MAX_PIXELS) {
+                    throw new InvalidRequestException("Responsive image dimensions exceed the allowed limit.");
+                }
+                int type = flattenTransparency || !decoded.getColorModel().hasAlpha()
+                        ? BufferedImage.TYPE_INT_RGB
+                        : BufferedImage.TYPE_INT_ARGB;
+                BufferedImage resized = new BufferedImage(width, height, type);
+                Graphics2D graphics = resized.createGraphics();
+                try {
+                    if (flattenTransparency) {
+                        graphics.setColor(Color.WHITE);
+                        graphics.fillRect(0, 0, width, height);
+                    }
+                    graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    graphics.drawImage(decoded, 0, 0, width, height, null);
+                } finally {
+                    graphics.dispose();
+                }
+                temporary = Files.createTempFile(root, ".responsive-", ".tmp");
+                writeWebp(resized, temporary, RESPONSIVE_WEBP_QUALITY);
+                publishDerived(temporary, destination);
+                Files.deleteIfExists(temporary);
+                temporary = null;
+                return content(destination);
+            } catch (IOException exception) {
+                throw new FileStorageException("Could not create responsive WebP image.", exception);
+            } finally {
+                if (processingPermit) {
+                    releaseProcessingPermit();
+                }
+                if (temporary != null) {
+                    try {
+                        Files.deleteIfExists(temporary);
+                    } catch (IOException ignored) {
+                        // Preserve the actionable storage failure.
+                    }
+                }
+            }
+        });
     }
 
     private ImageMetadata inspect(Path path) {
@@ -460,15 +544,45 @@ public class LocalImageStorage {
     }
 
     private void acquireProcessingPermit() {
+        if (!IMAGE_PROCESSING_ADMISSIONS.tryAcquire()) {
+            throw new RateLimitExceededException("Too many image processing requests.");
+        }
         try {
             IMAGE_PROCESSING_PERMITS.acquire();
         } catch (InterruptedException exception) {
+            IMAGE_PROCESSING_ADMISSIONS.release();
             Thread.currentThread().interrupt();
             throw new FileStorageException("Image processing was interrupted.", exception);
         }
     }
 
+    private void acquireDerivationRequestPermit() {
+        if (!IMAGE_DERIVATION_REQUESTS.tryAcquire()) {
+            throw new RateLimitExceededException("Too many image processing requests.");
+        }
+    }
+
+    private <T> T withDerivationLock(Path original, Supplier<T> operation) {
+        acquireDerivationRequestPermit();
+        try {
+            synchronized (IMAGE_LOCKS[Math.floorMod(original.hashCode(), IMAGE_LOCKS.length)]) {
+                return operation.get();
+            }
+        } finally {
+            IMAGE_DERIVATION_REQUESTS.release();
+        }
+    }
+
+    private void releaseProcessingPermit() {
+        IMAGE_PROCESSING_PERMITS.release();
+        IMAGE_PROCESSING_ADMISSIONS.release();
+    }
+
     private void writeWebp(BufferedImage image, Path target) throws IOException {
+        writeWebp(image, target, WEBP_QUALITY);
+    }
+
+    private void writeWebp(BufferedImage image, Path target, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByMIMEType("image/webp");
         if (!writers.hasNext()) {
             throw new IOException("WebP encoder unavailable.");
@@ -481,7 +595,7 @@ public class LocalImageStorage {
             if (compressionTypes != null && compressionTypes.length > 0) {
                 parameters.setCompressionType(compressionTypes[0]);
             }
-            parameters.setCompressionQuality(WEBP_QUALITY);
+            parameters.setCompressionQuality(quality);
             writer.setOutput(output);
             writer.write(null, new IIOImage(image, null, null), parameters);
         } finally {

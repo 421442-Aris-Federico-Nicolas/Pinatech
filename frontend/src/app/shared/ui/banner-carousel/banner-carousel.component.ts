@@ -3,7 +3,11 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 
 export interface BannerSlide {
   readonly src: string;
+  readonly srcset?: string;
   readonly mobileSrc?: string;
+  readonly mobileSrcset?: string;
+  readonly mobileWidth?: number;
+  readonly mobileHeight?: number;
   readonly alt: string;
   readonly width: number;
   readonly height: number;
@@ -28,6 +32,7 @@ export class BannerCarouselComponent {
   readonly autoplayDelay = input(7000);
   readonly indexChange = output<number>();
   readonly activeIndex = signal(0);
+  readonly activeSlide = computed(() => this.slides()[this.activeIndex()] ?? this.slides()[0] ?? null);
   readonly reducedMotion = signal(false);
   readonly autoplayPaused = computed(() => this.paused());
   readonly driftDuration = computed(() => `${Math.max(this.autoplayDelay(), 6000)}ms`);
@@ -69,6 +74,24 @@ export class BannerCarouselComponent {
     const slides = this.slides();
     if (!slides.length || index < 0 || index >= slides.length || index === this.activeIndex()) return;
     this.activate(index, true);
+  }
+
+  imageLoaded(): void {
+    const view = this.document.defaultView;
+    const slides = this.slides();
+    if (!view || slides.length < 2) return;
+
+    const next = slides[(this.activeIndex() + 1) % slides.length];
+    const mobile = view.matchMedia?.('(max-width: 620px)').matches && next.mobileSrc;
+    const source = mobile ? next.mobileSrc! : next.src;
+    const sourceSet = mobile ? next.mobileSrcset : next.srcset;
+    const image = new view.Image();
+    image.decoding = 'async';
+    if (sourceSet) {
+      image.srcset = sourceSet;
+      image.sizes = '100vw';
+    }
+    image.src = source;
   }
 
   private move(change: number, manual = true): void {

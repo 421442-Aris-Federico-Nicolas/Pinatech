@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /cart
+Disallow: /checkout
+Disallow: /confirm-email-change
+Disallow: /forgot-password
+Disallow: /login
+Disallow: /orders
+Disallow: /pedido/
+Disallow: /profile
+Disallow: /register
+Disallow: /reset-password
+Disallow: /technical
+Disallow: /tickets
+Disallow: /verify-email
+
+Sitemap: https://pinatech.com.ar/sitemap.xml

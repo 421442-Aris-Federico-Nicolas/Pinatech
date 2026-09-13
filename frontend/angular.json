@@ -54,6 +54,10 @@
               "outputHashing": "all"
             },
             "vercel": {
+              "index": {
+                "input": "src/index.vercel.html",
+                "output": "index.html"
+              },
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",

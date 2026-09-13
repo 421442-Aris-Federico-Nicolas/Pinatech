@@ -34,6 +34,10 @@ export function resolveHomeBannerUrl(url: string | null | undefined): string {
   return url.startsWith('/api/') || url === '/api' ? resolveApiContentUrl(url) : url;
 }
 
+export function resolveHomeHeroVariantUrl(imageId: number, width: number): string {
+  return resolveApiContentUrl(`/api/home/hero/images/${imageId}/${width}.webp?v=responsive-1`);
+}
+
 export interface HomeHeroImage {
   readonly id: number;
   readonly url: string;

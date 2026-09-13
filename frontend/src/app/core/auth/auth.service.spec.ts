@@ -48,4 +48,17 @@ describe('AuthService', () => {
     auth.resetPassword('reset-token', 'Password1').subscribe();
     expect(http.expectOne(`${environment.apiBaseUrl}/auth/reset-password`).request.body).toEqual({ token: 'reset-token', password: 'Password1' });
   });
+
+  it('shares one non-blocking session restoration request', () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    auth.startSessionRestore();
+    auth.restoreSession().subscribe();
+
+    const request = http.expectOne(`${environment.apiBaseUrl}/auth/refresh`);
+    expect(request.request.withCredentials).toBe(true);
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(auth.isAuthenticated()).toBe(false);
+  });
 });

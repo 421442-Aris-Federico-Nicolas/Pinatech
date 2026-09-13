@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build && node scripts/write-deployment-version.mjs",
     "build:vercel": "ng build --configuration production,vercel && node scripts/write-deployment-version.mjs",
+    "pretest": "node --test scripts/*.test.mjs",
     "test:deployment-version-script": "node --test scripts/write-deployment-version.test.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"

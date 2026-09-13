@@ -103,12 +103,21 @@ public class ProductController {
 
     @GetMapping("/images/{imageId}/thumbnail")
     public ResponseEntity<Resource> imageThumbnail(@PathVariable Long imageId) {
-        var content = productImages.thumbnail(imageId);
+        return thumbnailResponse(productImages.thumbnail(imageId), Duration.ofDays(7));
+    }
+
+    @GetMapping("/images/{imageId}/thumbnail-{width}.webp")
+    public ResponseEntity<Resource> responsiveImageThumbnail(@PathVariable Long imageId, @PathVariable int width) {
+        return thumbnailResponse(productImages.thumbnail(imageId, width), Duration.ofDays(365));
+    }
+
+    private ResponseEntity<Resource> thumbnailResponse(ProductImageService.ProductImageContent content,
+            Duration maxAge) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("image/webp"));
         headers.setContentLength(content.sizeBytes());
         headers.setContentDisposition(ContentDisposition.inline().filename(content.fileName()).build());
-        headers.setCacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic().immutable());
+        headers.setCacheControl(CacheControl.maxAge(maxAge).cachePublic().immutable());
         return ResponseEntity.ok().headers(headers).body(new FileSystemResource(content.path()));
     }
 

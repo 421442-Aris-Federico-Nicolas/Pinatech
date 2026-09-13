@@ -28,6 +28,9 @@ class ProductControllerTest {
         var images = mock(ProductImageService.class);
         var path = java.nio.file.Files.write(directory.resolve("image"), new byte[]{1, 2, 3});
         when(images.thumbnail(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "image-5.webp", 3));
+        when(images.thumbnail(5L, 320)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "image-5.webp", 3));
+        when(images.thumbnail(5L, 640)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "image-5.webp", 3));
+        when(images.thumbnail(5L, 320)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "image-5.webp", 3));
         when(images.content(5L)).thenReturn(new ProductImageService.ProductImageContent(path, "image/webp", "original.webp", 3));
         var controller = new ProductController(mock(ProductRepository.class), mock(ProductSpecificationRepository.class),
                 mock(ProductVariantRepository.class), mock(InventoryRepository.class), images);
@@ -43,6 +46,16 @@ class ProductControllerTest {
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition",
                             org.hamcrest.Matchers.startsWith("inline;")));
         }
+        for (int width : List.of(320, 640)) {
+            mvc.perform(get("/api/products/images/5/thumbnail-" + width + ".webp"))
+                    .andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                            .string("Cache-Control", "max-age=31536000, public, immutable"));
+        }
+        mvc.perform(get("/api/products/images/5/thumbnail-320.webp"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", "max-age=31536000, public, immutable"));
     }
 
     @Test

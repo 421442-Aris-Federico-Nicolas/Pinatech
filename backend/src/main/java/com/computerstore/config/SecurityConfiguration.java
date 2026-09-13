@@ -64,7 +64,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/shipping/webhooks/zipnova/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/brands/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/home/sections", "/api/home/banners/*/content",
-                                "/api/home/hero", "/api/home/hero/images/*/content").permitAll()
+                                "/api/home/hero", "/api/home/hero/images/*/content",
+                                "/api/home/hero/images/*/*.webp", "/api/home/hero/current/*/*.webp").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
                                 "/api/auth/email-verification/request", "/api/auth/email-verification/confirm",

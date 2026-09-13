@@ -1,15 +1,17 @@
 <main>
-  <section class="hero" aria-labelledby="hero-title" (pointerenter)="heroPointerPaused.set(true)" (pointerleave)="heroPointerPaused.set(false)" (focusin)="heroFocusPaused.set(true)" (focusout)="resumeHeroAfterFocus($event)">
+  <section class="hero" [attr.aria-labelledby]="activeHeroPanel() ? 'hero-title' : null" [attr.aria-label]="activeHeroPanel() ? null : 'Presentación de Pinatech'" (pointerenter)="heroPointerPaused.set(true)" (pointerleave)="heroPointerPaused.set(false)" (focusin)="heroFocusPaused.set(true)" (focusout)="resumeHeroAfterFocus($event)">
     <div class="hero-stage">
       <app-banner-carousel [slides]="heroSlides()" ariaLabel="Presentación de Pinatech" [imagePriority]="true" [paused]="heroPointerPaused() || heroFocusPaused()" (indexChange)="selectHero($event)" />
-      @for (panel of [activeHeroPanel()]; track panel?.title) {
-        @if (panel) {
-          <div class="hero-copy">
+      <div class="hero-copy" [class.is-loading]="!activeHeroPanel()">
+        @for (panel of [activeHeroPanel()]; track panel?.title) {
+          @if (panel) {
             <div><p class="eyebrow">{{ panel.eyebrow }}</p><h1 id="hero-title">{{ panel.title }} <span>{{ panel.accent }}</span></h1><p class="lead">{{ panel.description }}</p></div>
             <div class="hero-actions"><a appButton="filled" [routerLink]="panel.link">{{ panel.linkLabel }}</a>@if (!auth.isAuthenticated() && activeSlideLogin()) { <a appButton="outlined" routerLink="/login">Ingresar</a> }</div>
-          </div>
+          } @else {
+            <span class="hero-placeholder" aria-hidden="true"></span>
+          }
         }
-      }
+      </div>
     </div>
   </section>
 

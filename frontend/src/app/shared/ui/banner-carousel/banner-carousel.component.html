@@ -11,18 +11,27 @@
   (keydown.arrowright)="$event.preventDefault(); next()">
   <div class="banner-carousel__stage">
     <div class="banner-carousel__deck">
-      @for (slide of slides(); track slide.src; let index = $index; let first = $first) {
+      @if (activeSlide(); as slide) {
         <picture>
-          @if (slide.mobileSrc) { <source media="(max-width: 620px)" [srcset]="slide.mobileSrc"> }
+          @if (slide.mobileSrc) {
+            <source
+              media="(max-width: 620px)"
+              [srcset]="slide.mobileSrcset || slide.mobileSrc"
+              sizes="100vw"
+              [attr.width]="slide.mobileWidth"
+              [attr.height]="slide.mobileHeight">
+          }
           <img
-            [class.active]="index === activeIndex()"
+            class="active"
             [src]="slide.src"
+            [attr.srcset]="slide.srcset || null"
+            sizes="100vw"
             [alt]="slide.alt"
             [width]="slide.width"
             [height]="slide.height"
-            [attr.aria-hidden]="index === activeIndex() ? null : 'true'"
-            [attr.loading]="imagePriority() && first ? 'eager' : 'lazy'"
-            [attr.fetchpriority]="imagePriority() && first ? 'high' : null">
+            [attr.loading]="imagePriority() && activeIndex() === 0 ? 'eager' : 'lazy'"
+            [attr.fetchpriority]="imagePriority() && activeIndex() === 0 ? 'high' : null"
+            (load)="imageLoaded()">
         </picture>
       }
     </div>

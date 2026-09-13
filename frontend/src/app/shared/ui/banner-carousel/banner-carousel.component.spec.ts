@@ -11,7 +11,7 @@ interface ControlledMediaQuery {
 
 describe('BannerCarouselComponent', () => {
   const slides: readonly BannerSlide[] = [
-    { src: '/first.jpg', mobileSrc: '/first-mobile.jpg', alt: 'Primer banner', width: 2000, height: 848 },
+    { src: '/first.jpg', srcset: '/first-480.jpg 480w, /first-1920.jpg 1920w', mobileSrc: '/first-mobile.jpg', mobileSrcset: '/first-mobile-480.jpg 480w, /first-mobile-720.jpg 720w', mobileWidth: 720, mobileHeight: 512, alt: 'Primer banner', width: 2000, height: 848 },
     { src: '/second.jpg', alt: 'Segundo banner', width: 2000, height: 848 },
     { src: '/third.jpg', alt: 'Tercer banner', width: 2000, height: 848 },
   ];
@@ -83,6 +83,19 @@ describe('BannerCarouselComponent', () => {
     fixture.componentInstance.indexChange.subscribe((index) => changes.push(index));
     const carousel = fixture.nativeElement.querySelector('.banner-carousel') as HTMLElement;
     const next = fixture.nativeElement.querySelector('.banner-carousel__control.next') as HTMLButtonElement;
+    const initialImage = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+
+    expect(initialImage.getAttribute('src')).toBe('/first.jpg');
+    expect(initialImage.getAttribute('loading')).toBe('eager');
+    expect(initialImage.getAttribute('fetchpriority')).toBe('high');
+    expect(initialImage.getAttribute('srcset')).toContain('/first-1920.jpg 1920w');
+    const mobileSource = fixture.nativeElement.querySelector('source');
+    expect(mobileSource.getAttribute('srcset')).toContain('/first-mobile-720.jpg 720w');
+    expect(mobileSource.getAttribute('media')).toBe('(max-width: 620px)');
+    expect(mobileSource.getAttribute('sizes')).toBe('100vw');
+    expect(mobileSource.getAttribute('width')).toBe('720');
+    expect(mobileSource.getAttribute('height')).toBe('512');
+    expect(initialImage.getAttribute('sizes')).toBe('100vw');
 
     next.click();
     next.click();
@@ -108,12 +121,11 @@ describe('BannerCarouselComponent', () => {
     expect(dots[1].getAttribute('aria-label')).toBe('Ver banner 2 de 3');
 
     const images = fixture.nativeElement.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
-    expect(images[0].getAttribute('loading')).toBe('eager');
-    expect(images[0].getAttribute('fetchpriority')).toBe('high');
-    expect(images[1].getAttribute('loading')).toBe('lazy');
-    expect(images[0].getAttribute('aria-hidden')).toBe('true');
-    expect(images[1].getAttribute('aria-hidden')).toBeNull();
-    expect(fixture.nativeElement.querySelector('source').getAttribute('srcset')).toBe('/first-mobile.jpg');
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute('loading')).toBe('lazy');
+    expect(images[0].getAttribute('fetchpriority')).toBeNull();
+    expect(images[0].getAttribute('aria-hidden')).toBeNull();
+    expect(fixture.nativeElement.querySelector('source')).toBeNull();
     expect(fixture.nativeElement.querySelector('.banner-carousel__label')).toBeNull();
   });
 

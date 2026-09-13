@@ -4,7 +4,7 @@
 .banner-carousel__stage { aspect-ratio: 2000 / 848; background: var(--color-bg-chrome); overflow: hidden; position: relative; }
 .banner-carousel__deck { inset: 0; position: absolute; }
 .banner-carousel__deck picture { display: contents; }
-.banner-carousel__deck img { box-shadow: 0 16px 38px rgb(0 0 0 / .42); height: 100%; inset: 0; object-fit: contain; opacity: 0; pointer-events: none; position: absolute; transform: scale(1); transition: opacity 420ms var(--ease-out); width: 100%; will-change: transform, opacity; }
+.banner-carousel__deck img { box-shadow: 0 16px 38px rgb(0 0 0 / .42); height: 100%; inset: 0; object-fit: contain; opacity: 1; pointer-events: none; position: absolute; transform: scale(1); transition: opacity 420ms var(--ease-out); width: 100%; will-change: transform; }
 .banner-carousel.has-drift .banner-carousel__deck img { animation: banner-carousel-drift var(--carousel-drift-duration) linear infinite alternate both; }
 .banner-carousel__deck img.active { opacity: 1; z-index: 1; }
 .banner-carousel.is-paused .banner-carousel__deck img { animation-play-state: paused; }
@@ -21,6 +21,10 @@
 .banner-carousel__dots button:focus-visible { outline-offset: 4px; }
 
 @keyframes banner-carousel-drift { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+@starting-style {
+  .banner-carousel__deck img { opacity: 0; }
+}
 
 @media (max-width: 620px) {
   .banner-carousel__stage { aspect-ratio: 720 / 509; }

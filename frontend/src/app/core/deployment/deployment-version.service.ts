@@ -9,6 +9,7 @@ interface DeploymentVersionResponse {
 
 @Injectable({ providedIn: 'root' })
 export class DeploymentVersionService implements OnDestroy {
+  private static readonly initialDelayMs = 3_000;
   private static readonly pollIntervalMs = 60_000;
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
@@ -17,6 +18,7 @@ export class DeploymentVersionService implements OnDestroy {
     .querySelector<HTMLMetaElement>('meta[name="pinatech-deployment-version"]')
     ?.content.trim() || null;
   private pollHandle: ReturnType<typeof setInterval> | null = null;
+  private initialHandle: ReturnType<typeof setTimeout> | null = null;
   private request: Subscription | null = null;
   private initialized = false;
   readonly updateAvailable = this.updateAvailableState.asReadonly();
@@ -25,8 +27,11 @@ export class DeploymentVersionService implements OnDestroy {
     if (this.initialized) return;
     this.initialized = true;
     this.document.addEventListener('visibilitychange', this.onVisibilityChange);
-    this.checkForUpdate();
-    this.pollHandle = setInterval(() => this.checkForUpdate(), DeploymentVersionService.pollIntervalMs);
+    this.initialHandle = setTimeout(() => {
+      this.initialHandle = null;
+      this.checkForUpdate();
+      this.pollHandle = setInterval(() => this.checkForUpdate(), DeploymentVersionService.pollIntervalMs);
+    }, DeploymentVersionService.initialDelayMs);
   }
 
   reload(): void {
@@ -34,6 +39,8 @@ export class DeploymentVersionService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.initialHandle !== null) clearTimeout(this.initialHandle);
+    this.initialHandle = null;
     if (this.pollHandle !== null) clearInterval(this.pollHandle);
     this.pollHandle = null;
     this.request?.unsubscribe();
@@ -42,7 +49,7 @@ export class DeploymentVersionService implements OnDestroy {
   }
 
   private readonly onVisibilityChange = (): void => {
-    if (this.document.visibilityState === 'visible') this.checkForUpdate();
+    if (this.document.visibilityState === 'visible' && this.initialHandle === null) this.checkForUpdate();
   };
 
   private checkForUpdate(): void {

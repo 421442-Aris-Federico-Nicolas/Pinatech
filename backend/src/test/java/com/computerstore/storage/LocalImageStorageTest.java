@@ -201,6 +201,38 @@ class LocalImageStorageTest {
     }
 
     @Test
+    void responsiveVariantsUseAllowedExactWidthsCacheOnceAndAreDeleted() throws Exception {
+        var storage = new LocalImageStorage(directory.toString());
+        var stored = storage.storeWebp(
+                new MockMultipartFile("file", "hero.png", "image/png", image("png", 1280, 800)));
+
+        var hero = storage.publicWebp(stored.storageKey(), 480);
+        var product = storage.thumbnail(stored.storageKey(), 320);
+        var largeProduct = storage.thumbnail(stored.storageKey(), 640);
+        var heroModified = Files.getLastModifiedTime(hero.path());
+
+        assertEquals(480, hero.width());
+        assertEquals(300, hero.height());
+        assertEquals(320, ImageIO.read(product.toFile()).getWidth());
+        assertEquals(200, ImageIO.read(product.toFile()).getHeight());
+        assertEquals(640, ImageIO.read(largeProduct.toFile()).getWidth());
+        assertEquals(400, ImageIO.read(largeProduct.toFile()).getHeight());
+        assertEquals(hero.path(), new LocalImageStorage(directory.toString())
+                .publicWebp(stored.storageKey(), 480).path());
+        assertEquals(heroModified, Files.getLastModifiedTime(hero.path()));
+        assertAll(
+                () -> assertThrows(InvalidRequestException.class,
+                        () -> storage.publicWebp(stored.storageKey(), 481)),
+                () -> assertThrows(InvalidRequestException.class,
+                        () -> storage.thumbnail(stored.storageKey(), 321)));
+
+        storage.delete(stored.storageKey());
+        assertFalse(Files.exists(hero.path()));
+        assertFalse(Files.exists(product));
+        assertFalse(Files.exists(largeProduct));
+    }
+
+    @Test
     void thumbnailCacheSurvivesStorageRestartWithoutReadingOriginalAndDeletesBothFiles() throws Exception {
         var storage = new LocalImageStorage(directory.toString());
         var stored = storage.store(new MockMultipartFile("file", "image.png", "image/png", image("png", 1280, 800)));
