@@ -9,6 +9,12 @@ import { HomeComponent } from './home.component';
 import { HomeHeroSlide, HomeSection, HomeSectionsService } from './home-sections.service';
 
 describe('HomeComponent', () => {
+  const path = (url: string | undefined) => url ? new URL(url).pathname : undefined;
+  const candidates = (srcset: string | undefined) => srcset?.split(', ').map((candidate) => {
+    const [url, descriptor] = candidate.split(' ');
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search} ${descriptor}`;
+  });
   const product = (id: number, name: string, categoryId = 5): Product => ({
     id, name, slug: name.toLowerCase().replaceAll(' ', '-'), price: 1000, categoryId,
     categoryName: 'Periféricos', brandId: 1, brandName: 'Pinatech', images: [], inStock: true,
@@ -142,13 +148,18 @@ describe('HomeComponent', () => {
     const copy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
 
     expect(carousel.slides()).toHaveLength(1);
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/9/1920.webp');
-    expect(carousel.slides()[0].srcset).toContain('/api/home/hero/images/9/480.webp');
-    expect(carousel.slides()[0].mobileSrc).toContain('/api/home/hero/images/10/720.webp');
-    expect(carousel.slides()[0].mobileSrcset).toContain('/api/home/hero/images/10/480.webp');
+    expect(path(carousel.slides()[0].src)).toBe('/api/home/hero/current/DESKTOP/1920.webp');
+    expect(carousel.slides()[0].srcset).toBeUndefined();
+    expect(path(carousel.slides()[0].mobileSrc)).toBe('/api/home/hero/current/MOBILE/720.webp');
+    expect(carousel.slides()[0].mobileSrcset).toBeUndefined();
     expect(carousel.slides()[0].mobileWidth).toBe(720);
     expect(carousel.slides()[0].width).toBe(2000);
     expect(carousel.slides()[0].alt).toBe('Imagen de prueba');
+    const renderedImage = fixture.nativeElement.querySelector('.banner-carousel img') as HTMLImageElement;
+    const renderedMobile = fixture.nativeElement.querySelector('.banner-carousel source') as HTMLSourceElement;
+    expect(path(renderedImage.src)).toBe('/api/home/hero/current/DESKTOP/1920.webp');
+    expect(renderedImage.hasAttribute('srcset')).toBe(false);
+    expect(path(renderedMobile.srcset)).toBe('/api/home/hero/current/MOBILE/720.webp');
     expect(copy.textContent).toContain('Título API');
     expect(copy.textContent).toContain('Explorar');
     expect(fixture.nativeElement.querySelector('.hero-actions a:last-child').textContent).toContain('Ingresar');
@@ -172,7 +183,7 @@ describe('HomeComponent', () => {
     }]);
     fixture.detectChanges();
 
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/12/1920.webp');
+    expect(path(carousel.slides()[0].src)).toBe('/api/home/hero/current/DESKTOP/1920.webp');
     expect(fixture.nativeElement.querySelector('.hero-copy')?.textContent).toContain('Hero vigente');
   });
 
@@ -184,7 +195,7 @@ describe('HomeComponent', () => {
     expect(fixture.nativeElement.querySelector('.hero-copy.is-loading')).toBeTruthy();
   });
 
-  it('uses a mobile-only hero image as the desktop fallback', async () => {
+  it('uses current device URLs and dimensions when the first hero has only a mobile image', async () => {
     const hero: HomeHeroSlide[] = [{
       id: 4, displayOrder: 0, eyebrow: 'Mobile', title: 'Solo mobile', accent: 'Fallback',
       description: 'Descripción', link: '/catalog', linkLabel: 'Ver', showLoginLink: false,
@@ -195,10 +206,53 @@ describe('HomeComponent', () => {
     const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
 
     expect(carousel.slides()).toHaveLength(1);
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/11/720.webp');
-    expect(carousel.slides()[0].srcset).not.toContain('1280w');
+    expect(path(carousel.slides()[0].src)).toBe('/api/home/hero/current/DESKTOP/1920.webp');
+    expect(carousel.slides()[0].srcset).toBeUndefined();
+    expect(path(carousel.slides()[0].mobileSrc)).toBe('/api/home/hero/current/MOBILE/720.webp');
+    expect(carousel.slides()[0].mobileSrcset).toBeUndefined();
     expect(carousel.slides()[0].width).toBe(720);
     expect(carousel.slides()[0].height).toBe(512);
-    expect(carousel.slides()[0].mobileSrc).toBeUndefined();
+    expect(carousel.slides()[0].mobileWidth).toBe(720);
+    expect(carousel.slides()[0].mobileHeight).toBe(512);
+  });
+
+  it('uses current URLs only for the first renderable hero and immutable IDs for later slides', async () => {
+    const hero: HomeHeroSlide[] = [
+      {
+        id: 1, displayOrder: 0, eyebrow: 'Vacío', title: 'Sin imagen', accent: '', description: '',
+        link: '/catalog', linkLabel: 'Ver', showLoginLink: false, altText: 'Sin imagen',
+        desktopImage: null, mobileImage: null,
+      },
+      {
+        id: 2, displayOrder: 1, eyebrow: 'Primero', title: 'Actual', accent: '', description: '',
+        link: '/catalog', linkLabel: 'Ver', showLoginLink: false, altText: 'Primer banner',
+        desktopImage: { id: 9, url: '/api/home/hero/images/9/content', width: 2000, height: 848 },
+        mobileImage: { id: 10, url: '/api/home/hero/images/10/content', width: 720, height: 512 },
+      },
+      {
+        id: 3, displayOrder: 2, eyebrow: 'Segundo', title: 'Siguiente', accent: '', description: '',
+        link: '/catalog', linkLabel: 'Ver', showLoginLink: false, altText: 'Segundo banner',
+        desktopImage: { id: 4, url: '/api/home/hero/images/4/content', width: 2000, height: 848 },
+        mobileImage: { id: 12, url: '/api/home/hero/images/12/content', width: 720, height: 512 },
+      },
+    ];
+    const { fixture } = await createHome(of([]), of(hero));
+    const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
+
+    expect(carousel.slides()).toHaveLength(2);
+    expect(path(carousel.slides()[0].src)).toBe('/api/home/hero/current/DESKTOP/1920.webp');
+    expect(path(carousel.slides()[0].mobileSrc)).toBe('/api/home/hero/current/MOBILE/720.webp');
+    expect(path(carousel.slides()[1].src)).toBe('/api/home/hero/images/4/1920.webp');
+    expect(candidates(carousel.slides()[1].srcset)).toEqual([
+      '/api/home/hero/images/4/480.webp?v=responsive-1 480w',
+      '/api/home/hero/images/4/720.webp?v=responsive-1 720w',
+      '/api/home/hero/images/4/1280.webp?v=responsive-1 1280w',
+      '/api/home/hero/images/4/1920.webp?v=responsive-1 1920w',
+    ]);
+    expect(path(carousel.slides()[1].mobileSrc)).toBe('/api/home/hero/images/12/720.webp');
+    expect(candidates(carousel.slides()[1].mobileSrcset)).toEqual([
+      '/api/home/hero/images/12/480.webp?v=responsive-1 480w',
+      '/api/home/hero/images/12/720.webp?v=responsive-1 720w',
+    ]);
   });
 });

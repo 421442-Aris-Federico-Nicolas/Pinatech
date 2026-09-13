@@ -38,6 +38,10 @@ export function resolveHomeHeroVariantUrl(imageId: number, width: number): strin
   return resolveApiContentUrl(`/api/home/hero/images/${imageId}/${width}.webp?v=responsive-1`);
 }
 
+export function resolveCurrentHomeHeroVariantUrl(device: 'DESKTOP' | 'MOBILE', width: number): string {
+  return resolveApiContentUrl(`/api/home/hero/current/${device}/${width}.webp`);
+}
+
 export interface HomeHeroImage {
   readonly id: number;
   readonly url: string;
