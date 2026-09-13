@@ -7,6 +7,7 @@ import { AppButtonDirective } from '../app-button.directive';
 import { AppCardDirective } from '../app-card.directive';
 
 export interface ProductCardImage {
+  readonly id: number;
   readonly contentUrl: string;
   readonly altText: string;
 }
@@ -38,7 +39,19 @@ export class AppProductCardComponent {
   readonly product = input.required<ProductCardProduct>();
   readonly mode = input<ProductCardMode>('catalog');
   readonly imagePriority = input(false);
-  protected readonly imageUrl = resolveApiContentUrl;
+  protected imageVariantUrl(image: ProductCardImage, width: 320 | 640): string {
+    if (!this.isStoredThumbnail(image)) return resolveApiContentUrl(image.contentUrl);
+    return resolveApiContentUrl(`/api/products/images/${image.id}/thumbnail-${width}.webp?v=responsive-1`);
+  }
+
+  protected imageSrcset(image: ProductCardImage): string | null {
+    if (!this.isStoredThumbnail(image)) return null;
+    return `${this.imageVariantUrl(image, 320)} 320w, ${this.imageVariantUrl(image, 640)} 640w`;
+  }
+
+  private isStoredThumbnail(image: ProductCardImage): boolean {
+    return image.contentUrl.startsWith(`/api/products/images/${image.id}/thumbnail`);
+  }
   protected readonly hasStock = computed(() => this.product().inStock);
   protected readonly displayedPrice = computed(() => bankTransferPrice(this.product().price).total);
 }

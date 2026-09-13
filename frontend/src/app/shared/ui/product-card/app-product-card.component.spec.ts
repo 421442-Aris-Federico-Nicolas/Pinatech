@@ -54,4 +54,33 @@ describe('AppProductCardComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Disponible');
   });
+
+  it('serves responsive immutable thumbnails for stored product images', async () => {
+    await TestBed.configureTestingModule({ imports: [AppProductCardComponent], providers: [provideRouter([])] }).compileComponents();
+    const fixture = TestBed.createComponent(AppProductCardComponent);
+    fixture.componentRef.setInput('product', {
+      ...product,
+      images: [{ id: 8, contentUrl: '/api/products/images/8/thumbnail?v=webp-1', altText: 'Mouse' }],
+    });
+    fixture.detectChanges();
+
+    const image = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+    expect(image.getAttribute('src')).toContain('/api/products/images/8/thumbnail-640.webp');
+    expect(image.getAttribute('srcset')).toContain('/api/products/images/8/thumbnail-320.webp');
+    expect(image.getAttribute('sizes')).toContain('320px');
+  });
+
+  it('does not rewrite external image URLs containing thumbnail', async () => {
+    await TestBed.configureTestingModule({ imports: [AppProductCardComponent], providers: [provideRouter([])] }).compileComponents();
+    const fixture = TestBed.createComponent(AppProductCardComponent);
+    fixture.componentRef.setInput('product', {
+      ...product,
+      images: [{ id: 8, contentUrl: 'https://cdn.example.com/thumbnail/image.webp', altText: 'Mouse' }],
+    });
+    fixture.detectChanges();
+
+    const image = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe('https://cdn.example.com/thumbnail/image.webp');
+    expect(image.getAttribute('srcset')).toBeNull();
+  });
 });

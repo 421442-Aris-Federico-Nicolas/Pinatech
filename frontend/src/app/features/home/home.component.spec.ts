@@ -50,7 +50,7 @@ describe('HomeComponent', () => {
     expect(showcase.querySelector('.products')?.id).toBe('product-track-17');
     expect(fixture.nativeElement.querySelectorAll('.paths a')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('.service a').getAttribute('href')).toBe('/tickets');
-    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.webp', '/pinatech-banner-cart.webp']);
+    expect(carousel.slides()).toEqual([]);
   });
 
   it('uses responsive banner fallback, keeps static assets on the frontend and resolves API paths', async () => {
@@ -142,8 +142,11 @@ describe('HomeComponent', () => {
     const copy = fixture.nativeElement.querySelector('.hero-copy') as HTMLElement;
 
     expect(carousel.slides()).toHaveLength(1);
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/9/content');
-    expect(carousel.slides()[0].mobileSrc).toContain('/api/home/hero/images/10/content');
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/9/1920.webp');
+    expect(carousel.slides()[0].srcset).toContain('/api/home/hero/images/9/480.webp');
+    expect(carousel.slides()[0].mobileSrc).toContain('/api/home/hero/images/10/720.webp');
+    expect(carousel.slides()[0].mobileSrcset).toContain('/api/home/hero/images/10/480.webp');
+    expect(carousel.slides()[0].mobileWidth).toBe(720);
     expect(carousel.slides()[0].width).toBe(2000);
     expect(carousel.slides()[0].alt).toBe('Imagen de prueba');
     expect(copy.textContent).toContain('Título API');
@@ -158,7 +161,8 @@ describe('HomeComponent', () => {
 
     expect(carousel.slides()).toEqual([]);
     expect(fixture.nativeElement.querySelector('.banner-carousel__deck img')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.hero-copy')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.hero-copy.is-loading')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.hero-copy').textContent.trim()).toBe('');
 
     response.next([{
       id: 3, displayOrder: 0, eyebrow: 'Nuevo', title: 'Hero vigente', accent: 'Ahora',
@@ -168,15 +172,16 @@ describe('HomeComponent', () => {
     }]);
     fixture.detectChanges();
 
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/12/content');
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/12/1920.webp');
     expect(fixture.nativeElement.querySelector('.hero-copy')?.textContent).toContain('Hero vigente');
   });
 
-  it('uses the static fallback when the hero request fails', async () => {
+  it('keeps the neutral reserved hero when the request fails', async () => {
     const { fixture } = await createHome(of([]), throwError(() => new Error('offline')));
     const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
 
-    expect(carousel.slides().map((slide) => slide.src)).toEqual(['/pinatech-banner-home.webp', '/pinatech-banner-cart.webp']);
+    expect(carousel.slides()).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.hero-copy.is-loading')).toBeTruthy();
   });
 
   it('uses a mobile-only hero image as the desktop fallback', async () => {
@@ -190,7 +195,8 @@ describe('HomeComponent', () => {
     const carousel = fixture.debugElement.query(By.directive(BannerCarouselComponent)).componentInstance as BannerCarouselComponent;
 
     expect(carousel.slides()).toHaveLength(1);
-    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/11/content');
+    expect(carousel.slides()[0].src).toContain('/api/home/hero/images/11/720.webp');
+    expect(carousel.slides()[0].srcset).not.toContain('1280w');
     expect(carousel.slides()[0].width).toBe(720);
     expect(carousel.slides()[0].height).toBe(512);
     expect(carousel.slides()[0].mobileSrc).toBeUndefined();

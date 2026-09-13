@@ -27,6 +27,7 @@ main {
 .hero h1 span { color: var(--color-cyan); text-shadow: var(--shadow-glow); }
 .lead { color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-relaxed); margin: var(--space-3) 0 0; max-width: 42rem; }
 .hero-actions { animation: hero-copy-in 500ms var(--ease-out) 80ms both; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.hero-placeholder { display: block; min-height: 8rem; }
 
 .paths { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); margin: var(--space-4) 0 var(--space-20); }
 .paths a { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text); display: flex; gap: var(--space-4); padding: var(--space-5); text-decoration: none; }
@@ -83,7 +84,7 @@ main {
 
 @media (max-width: 850px) {
   .hero-stage { background: var(--color-bg-deep); }
-  .hero-copy { align-items: start; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 4rem); grid-template-columns: 1fr; margin-top: clamp(-4rem, -8vw, -2.5rem); padding: clamp(5rem, 12vw, 7rem) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-8); position: relative; }
+  .hero-copy { align-items: start; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 4rem); grid-template-columns: 1fr; margin-top: clamp(-4rem, -8vw, -2.5rem); min-height: 18rem; padding: clamp(5rem, 12vw, 7rem) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-8); position: relative; }
   .product-showcase { grid-template-columns: 1fr; padding: var(--space-4); }
   .product-banner::after { background: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 88%, transparent) 34%, var(--color-bg-chrome) 100%); }
   .product-promo { min-height: 250px; }
@@ -97,7 +98,7 @@ main {
   main { padding-inline: var(--space-4); }
   .hero { border-radius: var(--radius-md); }
   .hero-copy { padding: var(--space-6) var(--space-5); }
-  .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 98%, transparent) 2.5rem); margin-top: -2.5rem; padding-top: 4.5rem; }
+  .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 98%, transparent) 2.5rem); margin-top: -2.5rem; min-height: 24rem; padding-top: 4.5rem; }
   .hero h1 { font-size: clamp(2.25rem, 11vw, 3.25rem); }
   .hero-actions, .hero-actions .app-button { width: 100%; }
   .paths { grid-template-columns: 1fr; margin-bottom: var(--space-16); }

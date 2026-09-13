@@ -5,12 +5,13 @@ import { technicalGuard } from './core/guards/technical.guard';
 import { customerGuard } from './core/guards/customer.guard';
 import { unsavedAdminGuard } from './core/guards/unsaved-admin.guard';
 import { checkoutAudienceGuard } from './core/guards/checkout-audience.guard';
+import { HomeComponent } from './features/home/home.component';
 
 export const routes: Routes = [
   {
     path: '',
     title: 'Pinatech | Tecnología y hardware',
-    loadComponent: () => import('./features/home/home.component').then((component) => component.HomeComponent),
+    component: HomeComponent,
   },
   { path: 'catalog', title: 'Catálogo | Pinatech', loadComponent: () => import('./features/catalog/catalog.component').then((component) => component.CatalogComponent) },
   { path: 'products/:id', title: 'Producto', loadComponent: () => import('./features/product/product.component').then((component) => component.ProductComponent) },

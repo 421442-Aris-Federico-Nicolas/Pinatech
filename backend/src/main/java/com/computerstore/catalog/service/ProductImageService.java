@@ -100,12 +100,19 @@ public class ProductImageService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ProductImageContent thumbnail(Long imageId) {
+        return thumbnail(imageId, null);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ProductImageContent thumbnail(Long imageId, Integer width) {
         ProductImage image = images.findByIdAndProductActiveTrue(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product image not found."));
         if (image.getStorageKey() == null) {
             throw new ResourceNotFoundException("Image content not found.");
         }
-        Path path = storage.thumbnail(image.getStorageKey());
+        Path path = width == null
+                ? storage.thumbnail(image.getStorageKey())
+                : storage.thumbnail(image.getStorageKey(), width);
         try {
             return new ProductImageContent(path, "image/webp", "image-" + imageId + ".webp", Files.size(path));
         } catch (IOException exception) {

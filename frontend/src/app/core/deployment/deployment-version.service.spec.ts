@@ -48,6 +48,8 @@ describe('DeploymentVersionService', () => {
 
   it('uses the first version as its baseline and reports a later version once', () => {
     service.initialize();
+    http.expectNone(versionRequest);
+    vi.advanceTimersByTime(3_000);
     flushVersion('build-a');
     expect(service.updateAvailable()).toBe(false);
 
@@ -68,6 +70,7 @@ describe('DeploymentVersionService', () => {
 
   it('retains the embedded build after a network failure and detects the next deployment', () => {
     service.initialize();
+    vi.advanceTimersByTime(3_000);
     http.expectOne(versionRequest).error(new ProgressEvent('network error'));
     expect(service.updateAvailable()).toBe(false);
 
@@ -80,6 +83,7 @@ describe('DeploymentVersionService', () => {
 
   it('checks when the page becomes visible but not when it becomes hidden', () => {
     service.initialize();
+    vi.advanceTimersByTime(3_000);
     flushVersion('build-a');
 
     visibilityState = 'hidden';
@@ -94,6 +98,7 @@ describe('DeploymentVersionService', () => {
 
   it('reloads only when the explicit action method is called', () => {
     service.initialize();
+    vi.advanceTimersByTime(3_000);
     flushVersion('build-a');
     vi.advanceTimersByTime(60_000);
     flushVersion('build-b');

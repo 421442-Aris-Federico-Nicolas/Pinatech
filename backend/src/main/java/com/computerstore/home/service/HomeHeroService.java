@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 public class HomeHeroService {
     private static final Logger LOGGER = LoggerFactory.getLogger(HomeHeroService.class);
     private static final int MAX_SLIDES = 5;
+    private static final Set<Integer> RESPONSIVE_WIDTHS = Set.of(480, 720, 1280, 1920);
 
     private final HomeHeroSlideRepository slides;
     private final HomeHeroImageRepository images;
@@ -174,6 +176,30 @@ public class HomeHeroService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ImageContent publicImageContent(Long imageId, int width) {
+        validateResponsiveWidth(width);
+        HomeHeroImage image = images.findByIdAndSlideActiveTrue(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Home hero image not found."));
+        return imageContent(image, width);
+    }
+
+    @Transactional(readOnly = true)
+    public String currentPrimaryImageUrl(HomeHeroImageDevice device, int width) {
+        validateResponsiveWidth(width);
+        for (HomeHeroSlide slide : slides.findAllByOrderByDisplayOrderAscIdAsc()) {
+            if (!slide.isActive()) continue;
+            HomeHeroImage selected = image(slide, device);
+            if (selected == null) {
+                selected = image(slide, device == HomeHeroImageDevice.DESKTOP
+                        ? HomeHeroImageDevice.MOBILE
+                        : HomeHeroImageDevice.DESKTOP);
+            }
+            if (selected != null) return publicImageVariantUrl(selected.getId(), responsiveWidth(selected, width));
+        }
+        throw new ResourceNotFoundException("Home hero image not found.");
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ImageContent adminImageContent(Long imageId) {
         HomeHeroImage image = images.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home hero image not found."));
@@ -236,6 +262,10 @@ public class HomeHeroService {
         return "/api/home/hero/images/" + imageId + "/content?v=webp-1";
     }
 
+    private String publicImageVariantUrl(Long imageId, int width) {
+        return "/api/home/hero/images/" + imageId + "/" + width + ".webp?v=responsive-1";
+    }
+
     private String adminImageUrl(Long imageId) {
         return "/api/admin/home/hero/images/" + imageId + "/content";
     }
@@ -246,6 +276,27 @@ public class HomeHeroService {
         int height = content.height() > 0 ? content.height() : image.getHeight();
         return new ImageContent(content.path(), "image/webp", webpFilename(image.getOriginalFilename()),
                 content.sizeBytes(), width, height);
+    }
+
+    private ImageContent imageContent(HomeHeroImage image, int width) {
+        var content = storage.publicWebp(image.getStorageKey(), width);
+        return new ImageContent(content.path(), "image/webp", webpFilename(image.getOriginalFilename()),
+                content.sizeBytes(), content.width(), content.height());
+    }
+
+    private void validateResponsiveWidth(int width) {
+        if (!RESPONSIVE_WIDTHS.contains(width)) {
+            throw new InvalidRequestException("Unsupported hero image width.");
+        }
+    }
+
+    private int responsiveWidth(HomeHeroImage image, int requestedWidth) {
+        int maximumWidth = Math.min(image.getWidth(), requestedWidth);
+        return RESPONSIVE_WIDTHS.stream()
+                .filter(width -> width <= maximumWidth)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(480);
     }
 
     private String webpFilename(String filename) {

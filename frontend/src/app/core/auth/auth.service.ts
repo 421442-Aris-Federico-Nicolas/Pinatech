@@ -9,6 +9,7 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly accessToken = signal<string | null>(null);
   private refreshInFlight?: Observable<void>;
+  private sessionRestore?: Observable<void>;
   readonly user = signal<AuthenticatedUser | null>(null);
   readonly isAuthenticated = computed(() => this.accessToken() !== null && this.user() !== null);
 
@@ -31,11 +32,18 @@ export class AuthService {
     return this.http.post<void>(`${environment.apiBaseUrl}/auth/reset-password`, { token, password });
   }
   restoreSession() {
-    return this.refreshSession().pipe(catchError(() => {
-      this.clear();
-      return of(void 0);
-    }));
+    if (!this.sessionRestore) {
+      this.sessionRestore = this.refreshSession().pipe(
+        catchError(() => {
+          this.clear();
+          return of(void 0);
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+    }
+    return this.sessionRestore;
   }
+  startSessionRestore(): void { this.restoreSession().subscribe(); }
   refreshSession(): Observable<void> {
     if (!this.refreshInFlight) {
       this.refreshInFlight = this.http.post<AuthResponse>(`${environment.apiBaseUrl}/auth/refresh`, {}, { withCredentials: true }).pipe(

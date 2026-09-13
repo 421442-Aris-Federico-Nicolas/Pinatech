@@ -18,7 +18,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
-    provideAppInitializer(() => inject(AuthService).restoreSession()),
+    provideAppInitializer(() => inject(AuthService).startSessionRestore()),
     provideAppInitializer(() => inject(DeploymentVersionService).initialize()),
     { provide: LOCALE_ID, useValue: 'es-AR' },
   ]

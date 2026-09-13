@@ -158,6 +158,24 @@ class HomeControllerSecurityTest {
     }
 
     @Test
+    void responsiveHeroIsPublicAndCurrentHeroRedirectIsNotCached(@TempDir Path directory) throws Exception {
+        Path file = Files.write(directory.resolve("hero-720.webp"), new byte[]{1, 2, 3});
+        when(heroService.publicImageContent(5L, 720)).thenReturn(
+                new HomeHeroService.ImageContent(file, "image/webp", "hero.webp", 3, 720, 305));
+        when(heroService.currentPrimaryImageUrl(
+                com.computerstore.home.domain.HomeHeroImageDevice.MOBILE, 720))
+                .thenReturn("/api/home/hero/images/5/720.webp?v=responsive-1");
+
+        mvc.perform(get("/api/home/hero/images/5/720.webp"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"));
+        mvc.perform(get("/api/home/hero/current/MOBILE/720.webp"))
+                .andExpect(status().isTemporaryRedirect())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Location", "/api/home/hero/images/5/720.webp?v=responsive-1"));
+    }
+
+    @Test
     void validatesHeroSlideTextBeforeCallingTheAdminService() throws Exception {
         mvc.perform(post("/api/admin/home/hero")
                         .with(user(principal("ROLE_ADMIN")))

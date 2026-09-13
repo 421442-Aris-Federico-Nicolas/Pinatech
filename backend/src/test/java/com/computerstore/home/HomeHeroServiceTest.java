@@ -291,6 +291,25 @@ class HomeHeroServiceTest {
         assertThat(content.height()).isEqualTo(2000);
     }
 
+    @Test
+    void currentPrimaryImageUsesTheFirstActiveSlideAndFallsBackAcrossDevices() {
+        HomeHeroSlide hidden = new HomeHeroSlide(0);
+        HomeHeroSlide active = new HomeHeroSlide(1);
+        active.setActive(true);
+        HomeHeroImage desktop = new HomeHeroImage(active, HomeHeroImageDevice.DESKTOP,
+                new LocalImageStorage.StoredImage("key", "hero.webp", "image/webp", 10, 720, 512), 720, 512);
+        ReflectionTestUtils.setField(desktop, "id", 44L);
+        active.addImage(desktop);
+        when(slides.findAllByOrderByDisplayOrderAscIdAsc()).thenReturn(List.of(hidden, active));
+
+        assertThat(service.currentPrimaryImageUrl(HomeHeroImageDevice.MOBILE, 720))
+                .isEqualTo("/api/home/hero/images/44/720.webp?v=responsive-1");
+        assertThat(service.currentPrimaryImageUrl(HomeHeroImageDevice.MOBILE, 1920))
+                .isEqualTo("/api/home/hero/images/44/720.webp?v=responsive-1");
+        assertThrows(InvalidRequestException.class,
+                () -> service.currentPrimaryImageUrl(HomeHeroImageDevice.DESKTOP, 721));
+    }
+
     private HomeHeroSlideRequest request(boolean active) {
         return new HomeHeroSlideRequest("Eyebrow", "Título", "Accent", "Descripción del slide.",
                 "/catalog", "Ir", false, "Texto alternativo", active);
