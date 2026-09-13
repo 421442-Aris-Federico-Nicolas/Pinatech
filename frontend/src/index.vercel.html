@@ -9,8 +9,30 @@
   <meta name="theme-color" content="#041f34">
   <link rel="preconnect" href="https://api.pinatech.com.ar">
   <link rel="dns-prefetch" href="https://api.pinatech.com.ar">
-  <link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(max-width: 620px)" href="https://api.pinatech.com.ar/api/home/hero/current/MOBILE/720.webp" imagesrcset="https://api.pinatech.com.ar/api/home/hero/current/MOBILE/480.webp 480w, https://api.pinatech.com.ar/api/home/hero/current/MOBILE/720.webp 720w" imagesizes="100vw">
-  <link rel="preload" as="image" type="image/webp" fetchpriority="high" media="(min-width: 621px)" href="https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/1280.webp" imagesrcset="https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/480.webp 480w, https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/720.webp 720w, https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/1280.webp 1280w, https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/1920.webp 1920w" imagesizes="100vw">
+  <script>
+    if (window.location.pathname === '/') {
+      const heroPreloads = [
+        {
+          media: '(max-width: 620px)',
+          href: 'https://api.pinatech.com.ar/api/home/hero/current/MOBILE/720.webp',
+        },
+        {
+          media: '(min-width: 621px)',
+          href: 'https://api.pinatech.com.ar/api/home/hero/current/DESKTOP/1920.webp',
+        },
+      ];
+      for (const source of heroPreloads) {
+        const preload = document.createElement('link');
+        preload.rel = 'preload';
+        preload.as = 'image';
+        preload.type = 'image/webp';
+        preload.fetchPriority = 'high';
+        preload.media = source.media;
+        preload.href = source.href;
+        document.head.append(preload);
+      }
+    }
+  </script>
   <link rel="icon" type="image/png" sizes="256x256" href="pinatech-favicon.png">
 </head>
 <body>

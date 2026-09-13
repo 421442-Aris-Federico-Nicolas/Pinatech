@@ -7,7 +7,7 @@ import { AppButtonDirective } from '../../shared/ui/app-button.directive';
 import { AppFeedbackComponent } from '../../shared/ui/feedback/app-feedback.component';
 import { BannerCarouselComponent, BannerSlide } from '../../shared/ui/banner-carousel/banner-carousel.component';
 import { AppProductCardComponent } from '../../shared/ui/product-card/app-product-card.component';
-import { HomeHeroImage, HomeHeroSlide, HomeSection, HomeSectionsService, resolveHomeBannerUrl, resolveHomeHeroVariantUrl } from './home-sections.service';
+import { HomeHeroImage, HomeHeroSlide, HomeSection, HomeSectionsService, resolveCurrentHomeHeroVariantUrl, resolveHomeBannerUrl, resolveHomeHeroVariantUrl } from './home-sections.service';
 
 const HERO_IMAGE_WIDTHS = [480, 720, 1280, 1920] as const;
 
@@ -88,28 +88,35 @@ export class HomeComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (slides) => {
-          const rendered = slides.map((slide) => this.renderHero(slide)).filter((item): item is RenderedHeroSlide => item !== null);
+          const rendered: RenderedHeroSlide[] = [];
+          for (const slide of slides) {
+            const item = this.renderHero(slide, rendered.length === 0);
+            if (item) rendered.push(item);
+          }
           this.renderedHero.set(rendered);
         },
         error: () => this.renderedHero.set([]),
       });
   }
 
-  private renderHero(slide: HomeHeroSlide): RenderedHeroSlide | null {
+  private renderHero(slide: HomeHeroSlide, current: boolean): RenderedHeroSlide | null {
     const desktop = slide.desktopImage;
     const mobile = slide.mobileImage;
     const primary = desktop ?? mobile;
     if (!primary) return null;
-    const desktopSources = this.heroSources(primary);
-    const mobileSources = desktop && mobile ? this.heroSources(mobile) : null;
+    const desktopSources = current ? this.currentHeroSources('DESKTOP') : this.heroSources(primary);
+    const mobileSources = current
+      ? this.currentHeroSources('MOBILE')
+      : desktop && mobile ? this.heroSources(mobile) : null;
+    const mobileDimensions = mobile ?? primary;
     return {
       slide: {
         src: desktopSources.src,
         srcset: desktopSources.srcset,
         mobileSrc: mobileSources?.src,
         mobileSrcset: mobileSources?.srcset,
-        mobileWidth: mobile?.width,
-        mobileHeight: mobile?.height,
+        mobileWidth: mobileSources ? mobileDimensions.width : undefined,
+        mobileHeight: mobileSources ? mobileDimensions.height : undefined,
         alt: slide.altText,
         width: primary.width,
         height: primary.height,
@@ -133,6 +140,10 @@ export class HomeComponent {
       src: resolveHomeHeroVariantUrl(image.id, widths.at(-1)!),
       srcset: widths.map((width) => `${resolveHomeHeroVariantUrl(image.id, width)} ${width}w`).join(', '),
     };
+  }
+
+  private currentHeroSources(device: 'DESKTOP' | 'MOBILE'): { src: string; srcset?: string } {
+    return { src: resolveCurrentHomeHeroVariantUrl(device, device === 'MOBILE' ? 720 : 1920) };
   }
 
   protected selectHero(index: number): void {
