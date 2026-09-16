@@ -80,9 +80,9 @@ describe('CartComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Precio de lista');
     expect(fixture.nativeElement.querySelector('input[type="checkbox"]')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('recargo');
-    expect(fixture.componentInstance.displayedTotal()).toBe(2700);
-    expect(fixture.componentInstance.unitPrice(item)).toBe(1350);
-    expect(fixture.componentInstance.itemTotal(item)).toBe(2700);
+    expect(fixture.componentInstance.displayedTotal()).toBe(2550);
+    expect(fixture.componentInstance.unitPrice(item)).toBe(1275);
+    expect(fixture.componentInstance.itemTotal(item)).toBe(2550);
     expect(link.getAttribute('href')).toBe('/checkout?paymentMethod=BANK_TRANSFER');
     expect(cart.checkout).not.toHaveBeenCalled();
   });

@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/orders")
 public class OrderController {
 
-    public static final BigDecimal BANK_TRANSFER_DISCOUNT_RATE = new BigDecimal("0.10");
+    public static final BigDecimal BANK_TRANSFER_DISCOUNT_RATE = new BigDecimal("0.15");
 
     private final CustomerOrderRepository orders;
     private final ProductVariantRepository variants;

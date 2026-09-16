@@ -106,7 +106,7 @@ La creacion admite una clave de idempotencia. El stock se reserva durante una ve
 
 ### Pagos
 
-El modulo de pagos admite Mercado Pago y transferencia bancaria como metodos inmutables por pedido. El precio del catalogo es el precio de lista y de Mercado Pago; la transferencia obtiene un descuento del 10% calculado por el backend una sola vez sobre el subtotal completo.
+El modulo de pagos admite Mercado Pago y transferencia bancaria como metodos inmutables por pedido. El precio del catalogo es el precio de lista y de Mercado Pago; la transferencia obtiene un descuento del 15% calculado por el backend una sola vez sobre el subtotal completo.
 
 Mercado Pago se aisla mediante un gateway. El checkout crea una preferencia asociada al pedido y registra cada intento. Los webhooks se validan y luego se consulta al proveedor antes de modificar el estado local. Las transferencias reservan stock durante 24 horas hasta recibir un comprobante; luego requieren una revision administrativa auditada.
 

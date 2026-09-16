@@ -71,7 +71,7 @@ export class CheckoutComponent {
   });
   readonly transferPricing = computed(() => bankTransferPrice(
     this.cart.total(),
-    this.capabilities()?.bankTransferDiscountRate ?? 0.1,
+    this.capabilities()?.bankTransferDiscountRate ?? 0.15,
   ));
   readonly mercadoPagoPricing = computed(() => listPrice(this.cart.total()));
   readonly selectedPricing = computed(() => this.selectedPaymentMethod() === 'BANK_TRANSFER'

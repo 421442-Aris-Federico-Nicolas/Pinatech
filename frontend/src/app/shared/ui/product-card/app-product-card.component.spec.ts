@@ -29,7 +29,7 @@ describe('AppProductCardComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('10% menos');
     expect(fixture.nativeElement.textContent).not.toContain('Lista / Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Disponible');
-    expect(fixture.nativeElement.textContent).toContain('$90.00');
+    expect(fixture.nativeElement.textContent).toContain('$85.00');
     expect(fixture.nativeElement.querySelector('.product-card__actions a').getAttribute('href')).toBe('/products/1');
   });
 

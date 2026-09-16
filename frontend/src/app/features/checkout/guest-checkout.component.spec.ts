@@ -18,7 +18,7 @@ describe('GuestCheckoutComponent', () => {
   };
   const pickup = { code: 'CORDOBA_CENTRO', version: 'v1', name: 'Pinatech Centro', addressLines: ['Av. Colón 123'], locality: 'Córdoba', provinceCode: 'X', postalCode: '5000', instructions: 'Presentá tu DNI.', hours: 'Lunes a viernes' };
   const capabilities: CheckoutCapabilities = { currency: 'ARS', orderRequestsEnabled: true, onlinePaymentsEnabled: true,
-    deliveryQuotesEnabled: true, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'], bankTransferDiscountRate: .1,
+    deliveryQuotesEnabled: true, paymentMethods: ['BANK_TRANSFER', 'MERCADO_PAGO'], bankTransferDiscountRate: .15,
     deliveryMethods: ['ZIPNOVA'], fulfillmentMethods: ['PICKUP', 'DELIVERY'], pickupLocations: [pickup] };
   const order: Order = { id: 42, status: 'PENDING_PAYMENT', paymentStatus: 'PENDING', fulfillmentStatus: 'PENDING', currency: 'ARS',
     paymentMethod: 'MERCADO_PAGO', deliveryMethod: null, fulfillmentMethod: 'PICKUP', pickupLocation: pickup, subtotal: 3000,

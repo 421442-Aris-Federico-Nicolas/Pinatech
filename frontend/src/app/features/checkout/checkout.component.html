@@ -204,7 +204,7 @@
         <div><span>Precio de lista / Mercado Pago</span><strong>{{ selectedPricing().subtotal | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         <div><span>{{ selectedFulfillmentMethod() === 'DELIVERY' ? 'Envío' : selectedFulfillmentMethod() === 'PICKUP' ? 'Retiro en el local' : 'Entrega' }}</span><strong>{{ selectedFulfillmentMethod() === 'DELIVERY' ? (selectedShippingCost() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2') : selectedFulfillmentMethod() === 'PICKUP' ? 'Sin costo' : 'A definir' }}</strong></div>
         @if (selectedPaymentMethod() === 'BANK_TRANSFER') {
-          <div class="discount"><span>Descuento por transferencia ({{ (capabilities()?.bankTransferDiscountRate ?? 0.1) | percent:'1.0-2' }})</span><strong>− {{ selectedPricing().discount | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
+          <div class="discount"><span>Descuento por transferencia ({{ (capabilities()?.bankTransferDiscountRate ?? 0.15) | percent:'1.0-2' }})</span><strong>− {{ selectedPricing().discount | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         }
         <div class="total"><span>{{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Total por transferencia' : selectedPaymentMethod() === 'MERCADO_PAGO' ? 'Total con Mercado Pago' : 'Total de lista' }}</span><strong>{{ selectedTotal() | currency:(capabilities()?.currency ?? 'ARS'):'symbol-narrow':'1.2-2' }}</strong></div>
         <p class="summary-note">La transferencia aplica el descuento una sola vez sobre los productos. El envío no tiene descuento.</p>

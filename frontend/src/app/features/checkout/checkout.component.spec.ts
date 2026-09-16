@@ -23,7 +23,7 @@ describe('CheckoutComponent', () => {
     onlinePaymentsEnabled: true,
     deliveryQuotesEnabled: false,
     paymentMethods: ['MERCADO_PAGO'],
-    bankTransferDiscountRate: 0.1,
+    bankTransferDiscountRate: 0.15,
     deliveryMethods: ['ZIPNOVA'],
     fulfillmentMethods: ['PICKUP'],
     pickupLocations: [pickupLocation],
@@ -240,7 +240,7 @@ describe('CheckoutComponent', () => {
   });
 
   it('creates a transfer order without calling Mercado Pago, clears the cart and deep-links to orders', async () => {
-    const transferOrder: OrderConfirmation = { ...order, paymentMethod: 'BANK_TRANSFER', paymentDiscount: 300, total: 2700, reservationExpiresAt: null };
+    const transferOrder: OrderConfirmation = { ...order, paymentMethod: 'BANK_TRANSFER', paymentDiscount: 450, total: 2550, reservationExpiresAt: null };
     const mercadoPago = vi.fn();
     const cart = {
       items: signal([item]), count: signal(2), total: signal(3000), confirmation: signal(null),
@@ -306,7 +306,7 @@ describe('CheckoutComponent', () => {
     };
     const deliveryOrder: OrderConfirmation = {
       ...order, paymentMethod: 'BANK_TRANSFER', fulfillmentMethod: 'DELIVERY', pickupLocation: null,
-      shippingCost: 850, paymentDiscount: 300, total: 3550, reservationExpiresAt: null,
+      shippingCost: 850, paymentDiscount: 450, total: 3400, reservationExpiresAt: null,
       deliveryAddress: { recipientName: 'Ada Lovelace', street: 'San Martín', streetNumber: '123', floorApartment: null, locality: 'Córdoba', province: 'Córdoba', provinceCode: 'X', postalCode: '5000', countryCode: 'AR', reference: null },
     };
     const cart = {
@@ -334,8 +334,8 @@ describe('CheckoutComponent', () => {
     fixture.detectChanges();
 
     expect(shippingQuotes).toHaveBeenCalledWith([{ variantId: 11, quantity: 2 }]);
-    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 300, total: 2700 });
-    expect(fixture.componentInstance.selectedTotal()).toBe(3550);
+    expect(fixture.componentInstance.transferPricing()).toEqual({ subtotal: 3000, discount: 450, total: 2550 });
+    expect(fixture.componentInstance.selectedTotal()).toBe(3400);
     expect(fixture.nativeElement.textContent).toContain('Andreani');
     expect(fixture.nativeElement.textContent).toContain('El envío no tiene descuento');
 

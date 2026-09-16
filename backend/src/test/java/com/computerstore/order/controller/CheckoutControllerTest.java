@@ -53,7 +53,7 @@ class CheckoutControllerTest {
                 .andExpect(jsonPath("$.onlinePaymentsEnabled").value(false))
                 .andExpect(jsonPath("$.deliveryQuotesEnabled").value(false))
                 .andExpect(jsonPath("$.mercadoPagoSurchargeRate").value(0))
-                .andExpect(jsonPath("$.bankTransferDiscountRate").value(0.1))
+                .andExpect(jsonPath("$.bankTransferDiscountRate").value(0.15))
                 .andExpect(jsonPath("$.paymentMethods").isEmpty())
                 .andExpect(jsonPath("$.deliveryMethods").isEmpty())
                 .andExpect(jsonPath("$.fulfillmentMethods").isEmpty())
