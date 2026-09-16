@@ -6,6 +6,7 @@ import com.computerstore.common.exception.UnauthorizedResourceAccessException;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.service.domain.TechnicalServiceTicket;
 import com.computerstore.service.domain.TicketAttachment;
+import com.computerstore.service.domain.TicketStatus;
 import com.computerstore.service.domain.UploaderRole;
 import com.computerstore.service.repository.TechnicalServiceTicketRepository;
 import com.computerstore.service.repository.TicketAttachmentRepository;
@@ -130,6 +131,58 @@ class TicketAttachmentServiceTest {
         assertEquals(6L, response.id());
         assertEquals(UploaderRole.CUSTOMER, response.uploaderRole());
         verify(attachments).sumCustomerSizeBytes(10L);
+    }
+
+    @Test
+    void customerCannotUploadToDeliveredTicket() {
+        ticket.updateStatus(TicketStatus.UNDER_DIAGNOSIS);
+        ticket.updateStatus(TicketStatus.IN_REPAIR);
+        ticket.updateStatus(TicketStatus.READY_FOR_PICKUP);
+        ticket.updateStatus(TicketStatus.DELIVERED);
+        when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
+
+        assertThrows(BusinessRuleException.class,
+                () -> service.upload(1L, mock(MockMultipartFile.class), auth(10L, "CUSTOMER")));
+        verifyNoInteractions(storage);
+        verify(attachments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void customerCannotUploadToCancelledTicket() {
+        ticket.updateStatus(TicketStatus.CANCELLED);
+        when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
+
+        assertThrows(BusinessRuleException.class,
+                () -> service.upload(1L, mock(MockMultipartFile.class), auth(10L, "CUSTOMER")));
+        verifyNoInteractions(storage);
+        verify(attachments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void assignedTechnicianCanStillUploadToDeliveredTicket() {
+        UserAccount technician = user(20L, "Tech", "One");
+        ticket.assignTechnician(technician);
+        ticket.updateStatus(TicketStatus.UNDER_DIAGNOSIS);
+        ticket.updateStatus(TicketStatus.IN_REPAIR);
+        ticket.updateStatus(TicketStatus.READY_FOR_PICKUP);
+        ticket.updateStatus(TicketStatus.DELIVERED);
+        MockMultipartFile file = new MockMultipartFile("file", "board.png", "image/png", new byte[]{1});
+        when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
+        when(attachments.countByTicketId(1L)).thenReturn(0L);
+        when(users.findById(20L)).thenReturn(Optional.of(technician));
+        when(storage.store(file)).thenReturn(new LocalImageStorage.StoredImage(
+                "3d45a4c2-a70c-4e87-99d3-bd26e2601e15", "board.png", "image/png", 100, 800, 600));
+        when(attachments.saveAndFlush(any(TicketAttachment.class))).thenAnswer(invocation -> {
+            TicketAttachment saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 7L);
+            return saved;
+        });
+
+        var response = service.upload(1L, file, auth(20L, "TECHNICIAN"));
+
+        assertEquals(7L, response.id());
+        assertEquals(UploaderRole.TECHNICIAN, response.uploaderRole());
+        verify(storage).store(file);
     }
 
     @Test
