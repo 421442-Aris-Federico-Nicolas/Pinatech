@@ -26,7 +26,7 @@ describe('AppProductCardComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Mouse profesional');
     expect(fixture.nativeElement.textContent).not.toContain('Sin impuestos');
     expect(fixture.nativeElement.textContent).not.toContain('Transferencia');
-    expect(fixture.nativeElement.textContent).not.toContain('10% menos');
+    expect(fixture.nativeElement.textContent).not.toContain('15% menos');
     expect(fixture.nativeElement.textContent).not.toContain('Lista / Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Disponible');
     expect(fixture.nativeElement.textContent).toContain('$85.00');
