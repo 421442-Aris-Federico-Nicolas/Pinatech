@@ -6,6 +6,7 @@ import com.computerstore.common.exception.UnauthorizedResourceAccessException;
 import com.computerstore.security.AuthenticatedUser;
 import com.computerstore.service.domain.TechnicalServiceTicket;
 import com.computerstore.service.domain.TicketAttachment;
+import com.computerstore.service.domain.TicketStatus;
 import com.computerstore.service.domain.UploaderRole;
 import com.computerstore.service.dto.TicketAttachmentResponse;
 import com.computerstore.service.repository.TechnicalServiceTicketRepository;
@@ -54,6 +55,10 @@ public class TicketAttachmentService {
         TechnicalServiceTicket ticket = tickets.findByIdForUpdate(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found."));
         UploaderRole role = authorizeUpload(ticket, auth);
+        if (role == UploaderRole.CUSTOMER
+                && (ticket.getStatus() == TicketStatus.DELIVERED || ticket.getStatus() == TicketStatus.CANCELLED)) {
+            throw new BusinessRuleException("Customers cannot add images to a delivered or cancelled ticket.");
+        }
         if (attachments.countByTicketId(ticketId) >= MAX_ATTACHMENTS) {
             throw new BusinessRuleException("A ticket cannot have more than 10 attachments.");
         }

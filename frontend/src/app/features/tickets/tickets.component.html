@@ -34,7 +34,7 @@
             <button appButton="text" type="button" [attr.aria-expanded]="imagesExpanded(ticket.id)" [attr.aria-controls]="'ticket-images-' + ticket.id" (click)="toggleImages(ticket.id)">{{ imagesExpanded(ticket.id) ? 'Ocultar imágenes' : 'Ver imágenes' }}</button>
             @if (imagesExpanded(ticket.id)) { <div [id]="'ticket-images-' + ticket.id"><app-ticket-attachment-gallery [attachments]="ticket.attachments" /></div> }
           }
-           @if (ticket.status !== 'CANCELLED') {
+           @if (ticket.status !== 'CANCELLED' && ticket.status !== 'DELIVERED') {
              <section class="ticket-upload">
                <div><strong>Agregar imágenes</strong><small>{{ attachmentLimitReached(ticket) ? 'Límite de 10 adjuntos alcanzado' : 'Opcional, hasta completar 10 adjuntos.' }}</small></div>
                 <app-ticket-image-picker label="Agregar imágenes" [inputName]="'ticketImages' + ticket.id" [multiple]="true" [disabled]="uploadingTicket() === ticket.id || processingImages() || attachmentLimitReached(ticket)" (filesSelected)="selectTicketImages(ticket, $event)" />
