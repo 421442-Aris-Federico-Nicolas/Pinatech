@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
@@ -26,10 +26,12 @@ export class CatalogComponent {
   private readonly service = inject(CatalogService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly host = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
   private readonly searchChanges = new Subject<string>();
   private request?: Subscription;
   private invalidPriceParams = false;
+  private currentPage: number | null = null;
 
   readonly filters: CatalogFilters = { search: '', categoryId: null, categoryIds: [], brandId: null, minPrice: null, maxPrice: null };
   readonly page = signal<Page<ProductListItemResponse> | null>(null);
@@ -48,12 +50,15 @@ export class CatalogComponent {
     this.loadOptions();
 
     this.searchChanges.pipe(debounceTime(350), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.applyFilters(1, true));
+      .subscribe(() => this.applyFilters(1, true, false));
 
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readParams(params);
       if (this.validatePrices()) {
-        this.loadPage(this.pageNumber(params));
+        const page = this.pageNumber(params);
+        if (this.currentPage !== null && page !== this.currentPage) this.scrollResultsToTop(true);
+        this.currentPage = page;
+        this.loadPage(page);
       } else {
         this.request?.unsubscribe();
         this.page.set(null);
@@ -64,7 +69,7 @@ export class CatalogComponent {
 
   searchChanged(value: string): void { this.searchChanges.next(value); }
 
-  applyFilters(page = 1, replaceUrl = false): void {
+  applyFilters(page = 1, replaceUrl = false, scrollTop = true): void {
     this.invalidPriceParams = false;
     if (!this.validatePrices()) return;
     this.resultsAnnounce.set(true);
@@ -79,6 +84,7 @@ export class CatalogComponent {
     if (this.sort() !== 'name,asc') queryParams['sort'] = this.sort();
     if (page > 1) queryParams['page'] = page;
     void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl });
+    if (scrollTop) this.scrollResultsToTop(false);
   }
 
   clearFilters(): void {
@@ -135,6 +141,25 @@ export class CatalogComponent {
   private pageNumber(params: ParamMap): number {
     const page = Number(params.get('page'));
     return Number.isInteger(page) && page > 0 ? page - 1 : 0;
+  }
+
+  private scrollResultsToTop(moveFocus: boolean): void {
+    try {
+      window.scrollTo({ top: 0, behavior: this.reducedMotion() ? 'auto' : 'smooth' });
+    } catch {
+      // Entornos no visuales (p. ej. jsdom) sin scroll implementado.
+    }
+    if (moveFocus) {
+      const heading = this.host.nativeElement.querySelector('h1') as HTMLElement | null;
+      if (heading) {
+        heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  private reducedMotion(): boolean {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   }
 
   private positiveNumber(value: string | null): number | null {

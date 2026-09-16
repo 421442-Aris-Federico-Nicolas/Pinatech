@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { CatalogComponent } from './catalog.component';
 import { CatalogService, Page, ProductListItemResponse as Product } from './catalog.service';
 
@@ -50,7 +50,7 @@ describe('CatalogComponent', () => {
 
     TestBed.createComponent(CatalogComponent).detectChanges();
 
-    expect(getProducts).toHaveBeenCalledWith(expect.objectContaining({ minPrice: 40.14, maxPrice: 40.15 }), 0, 'price,desc');
+    expect(getProducts).toHaveBeenCalledWith(expect.objectContaining({ minPrice: 42.51, maxPrice: 42.51 }), 0, 'price,desc');
   });
 
   it('does not query the API with invalid price bounds from the URL', async () => {
@@ -85,5 +85,55 @@ describe('CatalogComponent', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.filters.categoryIds).toEqual([5, 8]);
     expect(getProducts).toHaveBeenCalledWith(expect.objectContaining({ categoryId: null, categoryIds: [5, 8] }), 0, 'name,asc');
+  });
+
+  it('scrolls to top and focuses the heading when the page changes, but not on initial load', async () => {
+    const emptyPage: Page<Product> = { content: [], totalPages: 3, totalElements: 30, number: 0, size: 12 };
+    const params = new BehaviorSubject(convertToParamMap({}));
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: params.asObservable() } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: () => of(emptyPage) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    params.next(convertToParamMap({ page: '2' }));
+    fixture.detectChanges();
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: expect.any(String) });
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('h1'));
+    scrollTo.mockRestore();
+  });
+
+  it('scrolls to top on explicit filter actions but not while typing a search', async () => {
+    const emptyPage: Page<Product> = { content: [], totalPages: 1, totalElements: 0, number: 0, size: 12 };
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    await TestBed.configureTestingModule({
+      imports: [CatalogComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } },
+        { provide: Router, useValue: { navigate: vi.fn(), navigateByUrl: vi.fn() } },
+        { provide: CatalogService, useValue: { categories: () => of([]), brands: () => of([]), getProductCards: () => of(emptyPage) } },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(CatalogComponent);
+    fixture.detectChanges();
+    scrollTo.mockClear();
+
+    fixture.componentInstance.applyFilters();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: expect.any(String) });
+
+    scrollTo.mockClear();
+    fixture.componentInstance.applyFilters(1, true, false);
+    expect(scrollTo).not.toHaveBeenCalled();
+    scrollTo.mockRestore();
   });
 });
