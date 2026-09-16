@@ -91,6 +91,9 @@
       <a class="nav-link" routerLink="/tickets" routerLinkActive="active" ariaCurrentWhenActive="page">Servicio técnico</a>
     }
     <span class="spacer"></span>
+    <button mat-button type="button" class="theme-toggle" (click)="theme.toggle()" [attr.aria-pressed]="theme.theme() === 'light'" [attr.aria-label]="theme.theme() === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'" [title]="theme.theme() === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'">
+      <iconify-icon [icon]="theme.theme() === 'light' ? 'mdi:weather-night' : 'mdi:weather-sunny'" aria-hidden="true"></iconify-icon>
+    </button>
     @if (auth.isAuthenticated()) {
       <a class="user-name" routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" [attr.aria-label]="'Ver perfil de ' + auth.user()?.firstName">Hola, {{ auth.user()?.firstName }}</a>
       <button mat-button type="button" (click)="logout()" [disabled]="loggingOut()"><iconify-icon icon="line-md:log-out" aria-hidden="true"></iconify-icon> {{ loggingOut() ? 'Saliendo…' : 'Salir' }}</button>
