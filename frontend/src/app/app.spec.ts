@@ -48,6 +48,32 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
+  it('toggles between dark and light mode from the header', () => {
+    localStorage.clear();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector('.theme-toggle') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.getAttribute('aria-label')).toBe('Cambiar a modo claro');
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.theme.theme()).toBe('light');
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.getAttribute('aria-label')).toBe('Cambiar a modo oscuro');
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.theme.theme()).toBe('dark');
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
   it('shows the global footer with a safe Instagram link and copyright', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

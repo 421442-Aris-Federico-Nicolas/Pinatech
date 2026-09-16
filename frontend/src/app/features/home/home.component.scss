@@ -20,12 +20,24 @@ main {
   overflow: hidden;
 }
 .hero-stage { position: relative; }
-.hero-copy { align-items: end; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--color-bg-deep) 82%, transparent) 28%, color-mix(in srgb, var(--color-bg-deep) 97%, transparent) 72%); bottom: 0; display: grid; gap: var(--space-8); grid-template-columns: minmax(0, 1fr) auto; left: 0; padding: clamp(7rem, 14vw, 11rem) clamp(var(--space-6), 4vw, var(--space-10)) clamp(var(--space-6), 3vw, var(--space-8)); position: absolute; right: 0; z-index: 3; }
+.hero-copy { align-items: end; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--color-bg-deep) 40%, transparent) 28%, color-mix(in srgb, var(--color-bg-deep) 40%, transparent) 72%); bottom: 0; display: grid; gap: var(--space-8); grid-template-columns: minmax(0, 1fr) auto; left: 0; padding: clamp(7rem, 14vw, 11rem) clamp(var(--space-6), 4vw, var(--space-10)) clamp(var(--space-6), 3vw, var(--space-8)); position: absolute; right: 0; z-index: 3; }
+:host-context([data-theme="light"]) .hero-copy { background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 28%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 72%); }
 .hero-copy > div:first-child { animation: hero-copy-in 500ms var(--ease-out) both; }
 .eyebrow { color: var(--color-cyan); font-size: var(--text-xs); font-weight: var(--font-weight-bold); letter-spacing: .16em; margin: 0 0 var(--space-2); text-transform: uppercase; }
 .hero h1 { font-size: clamp(2.1rem, 4vw, 3.6rem); letter-spacing: -.065em; line-height: .92; margin: 0; max-width: 760px; text-transform: uppercase; }
 .hero h1 span { color: var(--color-cyan); text-shadow: var(--shadow-glow); }
 .lead { color: var(--color-text-muted); font-size: var(--text-md); line-height: var(--line-height-relaxed); margin: var(--space-3) 0 0; max-width: 42rem; }
+.hero-copy h1, .hero-copy .lead, .hero-copy .eyebrow,
+.service h2, .service-copy > p, .service-copy ul, .service-copy .eyebrow { text-shadow: 0 1px 3px rgba(2, 7, 13, .8), 0 2px 18px rgba(2, 7, 13, .6); }
+.hero-copy h1 { color: #fdfdfd; }
+.hero-copy .lead { color: #dbe5ec; }
+.service h2 { color: #fdfdfd; }
+.service-copy > p, .service-copy ul { color: #d7e0e7; }
+:host-context([data-theme="light"]) .hero-copy .eyebrow,
+:host-context([data-theme="light"]) .service-copy .eyebrow { color: var(--color-orange); }
+:host-context([data-theme="light"]) .hero h1 span { color: var(--color-orange); text-shadow: 0 0 24px rgba(245, 138, 8, .4); }
+:host-context([data-theme="light"]) .service-copy > p:not(.eyebrow),
+:host-context([data-theme="light"]) .service-copy ul { color: #fdfdfd; }
 .hero-actions { animation: hero-copy-in 500ms var(--ease-out) 80ms both; display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .hero-placeholder { display: block; min-height: 8rem; }
 
@@ -41,12 +53,14 @@ main {
 .section-heading h2 { font-size: clamp(2.25rem, 5vw, 4rem); letter-spacing: -.06em; margin: 0; }
 .section-heading > a { color: var(--color-cyan); flex: 0 0 auto; font-weight: var(--font-weight-bold); text-decoration: none; }
 .product-sections { display: grid; gap: var(--space-12); }
-.product-showcase { background: var(--color-bg-chrome); border: 1px solid var(--color-border-strong); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: grid; gap: clamp(var(--space-5), 3vw, var(--space-8)); grid-template-columns: minmax(270px, .65fr) minmax(0, 1.6fr); min-height: 510px; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); position: relative; }
+.product-showcase { background: var(--color-bg-chrome); border: 1px solid var(--color-border-strong); border-radius: var(--radius-xl); display: grid; gap: clamp(var(--space-5), 3vw, var(--space-8)); grid-template-columns: minmax(270px, .65fr) minmax(0, 1.6fr); min-height: 510px; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); position: relative; }
 .product-banner { inset: 0; position: absolute; }
 .product-banner::after { background: linear-gradient(90deg, color-mix(in srgb, var(--color-bg-chrome) 96%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 70%, transparent) 42%, color-mix(in srgb, var(--color-bg-chrome) 38%, transparent) 100%); content: ""; inset: 0; position: absolute; }
+:host-context([data-theme="light"]) .product-banner::after { background: linear-gradient(90deg, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 42%, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 100%); }
 .product-banner img { height: 100%; object-fit: cover; width: 100%; }
 .product-showcase.no-banner { background: linear-gradient(135deg, var(--color-bg-chrome), var(--color-surface)); }
 .product-showcase::after { background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--color-bg-chrome) 35%, transparent)); content: ""; inset: 0; pointer-events: none; position: absolute; }
+:host-context([data-theme="light"]) .product-showcase::after { background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent)); }
 .product-promo { align-items: end; display: flex; min-width: 0; position: relative; z-index: 1; }
 .product-promo__copy { backdrop-filter: blur(8px); background: color-mix(in srgb, var(--color-bg-deep) 86%, transparent); border: 1px solid color-mix(in srgb, var(--color-cyan) 18%, transparent); border-radius: var(--radius-lg); display: flex; flex-direction: column; padding: var(--space-6); width: 100%; }
 .product-promo__copy h3 { font-size: clamp(1.8rem, 3vw, 2.8rem); letter-spacing: -.045em; line-height: var(--line-height-tight); margin: var(--space-2) 0 var(--space-3); }
@@ -62,8 +76,10 @@ main {
 .status { align-items: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text-muted); display: grid; grid-column: 1 / -1; justify-items: center; min-height: 240px; padding: var(--space-8); text-align: center; }
 .loader { animation: spin .8s linear infinite; border: 3px solid var(--color-border); border-radius: 50%; border-top-color: var(--color-cyan); height: 36px; width: 36px; }
 
-.service { align-items: center; background-image: linear-gradient(90deg, var(--color-bg-deep) 0%, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 35%, color-mix(in srgb, var(--color-bg-deep) 50%, transparent) 60%, transparent 82%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center, center; background-repeat: no-repeat; background-size: cover; border: 1px solid var(--color-border); border-left: 4px solid var(--color-orange); border-radius: var(--radius-lg); display: grid; grid-template-columns: minmax(300px, .8fr) minmax(0, 1.2fr); min-height: 520px; overflow: hidden; padding: clamp(var(--space-6), 4vw, var(--space-12)); }
+.service { align-items: center; background-image: linear-gradient(90deg, var(--color-bg-deep) 0%, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 35%, color-mix(in srgb, var(--color-bg-deep) 50%, transparent) 60%, transparent 82%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center; background-repeat: no-repeat; background-size: cover; border: 1px solid var(--color-border); border-left: 4px solid var(--color-orange); border-radius: var(--radius-lg); display: grid; grid-template-columns: minmax(300px, .8fr) minmax(0, 1.2fr); min-height: 520px; overflow: hidden; padding: clamp(var(--space-6), 4vw, var(--space-12)); }
 .service-copy { max-width: 510px; min-width: 0; position: relative; z-index: 1; }
+.service-copy .app-button { color: var(--color-orange); }
+:host-context([data-theme="light"]) .service { background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 0%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 35%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 60%, transparent 82%), url('/pinatech-banner-servicio-tecnico.webp'); }
 .service h2 { font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.06em; line-height: .95; margin: var(--space-3) 0 var(--space-5); text-transform: uppercase; }
 .service-copy > p:not(.eyebrow) { color: var(--color-text-muted); line-height: var(--line-height-relaxed); }
 .service ul { color: var(--color-text-muted); display: grid; gap: var(--space-2); list-style: none; margin: var(--space-5) 0 var(--space-6); padding: 0; }
@@ -84,13 +100,18 @@ main {
 
 @media (max-width: 850px) {
   .hero-stage { background: var(--color-bg-deep); }
-  .hero-copy { align-items: start; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 96%, transparent) 4rem); grid-template-columns: 1fr; margin-top: clamp(-4rem, -8vw, -2.5rem); min-height: 18rem; padding: clamp(5rem, 12vw, 7rem) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-8); position: relative; }
+  .hero-copy { align-items: start; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 40%, transparent) 4rem); grid-template-columns: 1fr; margin-top: clamp(-4rem, -8vw, -2.5rem); min-height: 18rem; padding: clamp(5rem, 12vw, 7rem) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-8); position: relative; }
+  :host-context([data-theme="light"]) .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 4rem); }
+  .hero-copy h1, .service h2 { color: var(--color-text-strong); text-shadow: none; }
+  .hero-copy .lead, .service-copy > p, .service-copy ul { color: var(--color-text-muted); text-shadow: none; }
   .product-showcase { grid-template-columns: 1fr; padding: var(--space-4); }
   .product-banner::after { background: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 55%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 88%, transparent) 34%, var(--color-bg-chrome) 100%); }
+  :host-context([data-theme="light"]) .product-banner::after { background: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 0%, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 34%, color-mix(in srgb, var(--color-bg-chrome) 20%, transparent) 100%); }
   .product-promo { min-height: 250px; }
   .product-promo__copy { max-width: 420px; }
   .products > li { flex-basis: 86%; }
-  .service { background-image: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-deep) 48%, color-mix(in srgb, var(--color-bg-deep) 60%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center, center bottom; background-size: 100% 100%, 100% auto; grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(14rem, 46vw, 21rem); }
+  .service { background-image: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-deep) 48%, color-mix(in srgb, var(--color-bg-deep) 60%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.webp'); background-position: center bottom; background-size: 100% auto; grid-template-columns: 1fr; min-height: 0; padding-bottom: clamp(14rem, 46vw, 21rem); }
+  :host-context([data-theme="light"]) .service { background-image: linear-gradient(180deg, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 0%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 48%, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 68%, transparent 88%), url('/pinatech-banner-servicio-tecnico.webp'); }
 }
 
 @media (max-width: 620px) {
@@ -98,7 +119,8 @@ main {
   main { padding-inline: var(--space-4); }
   .hero { border-radius: var(--radius-md); }
   .hero-copy { padding: var(--space-6) var(--space-5); }
-  .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 98%, transparent) 2.5rem); margin-top: -2.5rem; min-height: 24rem; padding-top: 4.5rem; }
+  .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 40%, transparent) 2.5rem); margin-top: -2.5rem; min-height: 24rem; padding-top: 4.5rem; }
+  :host-context([data-theme="light"]) .hero-copy { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-bg-deep) 20%, transparent) 2.5rem); }
   .hero h1 { font-size: clamp(2.25rem, 11vw, 3.25rem); }
   .hero-actions, .hero-actions .app-button { width: 100%; }
   .paths { grid-template-columns: 1fr; margin-bottom: var(--space-16); }

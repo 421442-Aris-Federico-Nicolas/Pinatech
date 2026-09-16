@@ -10,6 +10,7 @@ import { AuthService } from './core/auth/auth.service';
 import { CartService } from './core/cart/cart.service';
 import { DeploymentVersionService } from './core/deployment/deployment-version.service';
 import { NotificationService, NotificationTone } from './core/notifications/notification.service';
+import { ThemeService } from './core/theme/theme.service';
 import { AppFeedbackComponent } from './shared/ui/feedback/app-feedback.component';
 
 const mobileNavBreakpoint = '(max-width: 960px)';
@@ -24,6 +25,7 @@ const mobileNavBreakpoint = '(max-width: 960px)';
 export class App {
   readonly auth = inject(AuthService);
   readonly cart = inject(CartService);
+  readonly theme = inject(ThemeService);
   readonly menuOpen = signal(false);
   readonly mobileNav = toSignal(
     inject(BreakpointObserver).observe(mobileNavBreakpoint).pipe(map((state) => state.matches)),
