@@ -11,11 +11,11 @@ describe('payment pricing', () => {
   });
 
   it('converts inclusive displayed-price bounds to exact list-price bounds in cents', () => {
-    expect(bankTransferPrice(40.13).total).toBe(36.12);
-    expect(bankTransferPrice(40.14).total).toBe(36.13);
-    expect(bankTransferPrice(40.15).total).toBe(36.13);
-    expect(bankTransferPrice(40.16).total).toBe(36.14);
-    expect(listPriceForTransferMinimum(36.13)).toBe(40.14);
-    expect(listPriceForTransferMaximum(36.13)).toBe(40.15);
+    expect(bankTransferPrice(40.13).total).toBe(34.11);
+    expect(bankTransferPrice(40.14).total).toBe(34.12);
+    expect(bankTransferPrice(40.15).total).toBe(34.13);
+    expect(bankTransferPrice(40.16).total).toBe(34.14);
+    expect(listPriceForTransferMinimum(36.13)).toBe(42.51);
+    expect(listPriceForTransferMaximum(36.13)).toBe(42.51);
   });
 });

@@ -1,4 +1,4 @@
-export const DEFAULT_BANK_TRANSFER_DISCOUNT_RATE = 0.1;
+export const DEFAULT_BANK_TRANSFER_DISCOUNT_RATE = 0.15;
 const NATIONAL_TAX_FACTOR = 1.105;
 
 export interface PaymentPrice {

@@ -185,9 +185,9 @@ class OrderControllerTest {
         verify(orders).save(savedOrder.capture());
         assertEquals(new BigDecimal("251.05"), savedOrder.getValue().getSubtotal());
         assertEquals(new BigDecimal("0.00"), savedOrder.getValue().getPaymentSurcharge());
-        assertEquals(new BigDecimal("25.11"), savedOrder.getValue().getPaymentDiscount());
-        assertEquals(new BigDecimal("225.94"), savedOrder.getValue().getTotal());
-        assertEquals(new BigDecimal("25.11"), response.getBody().paymentDiscount());
+        assertEquals(new BigDecimal("37.66"), savedOrder.getValue().getPaymentDiscount());
+        assertEquals(new BigDecimal("213.39"), savedOrder.getValue().getTotal());
+        assertEquals(new BigDecimal("37.66"), response.getBody().paymentDiscount());
     }
 
     @Test

@@ -50,11 +50,11 @@ describe('ProductComponent', () => {
     fixture.detectChanges();
     const first = fixture.nativeElement.querySelector('[data-variant-id="11"]') as HTMLButtonElement;
     expect(fixture.nativeElement.textContent).toContain('Precio especial por transferencia');
-    expect(fixture.nativeElement.textContent).toContain('10% menos');
+    expect(fixture.nativeElement.textContent).toContain('15% menos');
     expect(fixture.nativeElement.textContent).toContain('Precio de lista / Mercado Pago');
     expect(fixture.nativeElement.textContent).toContain('Retiro sin costo');
     expect(fixture.nativeElement.textContent).not.toContain('recargo');
-    expect(fixture.componentInstance.transferPricing().total).toBe(90);
+    expect(fixture.componentInstance.transferPricing().total).toBe(85);
     first.focus();
     first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     fixture.detectChanges();

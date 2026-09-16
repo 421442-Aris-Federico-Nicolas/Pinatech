@@ -13,7 +13,7 @@ Mercado Pago Checkout Pro, manually reviewed bank transfers and Zipnova home del
   "onlinePaymentsEnabled": true,
   "deliveryQuotesEnabled": true,
   "mercadoPagoSurchargeRate": 0,
-  "bankTransferDiscountRate": 0.10,
+  "bankTransferDiscountRate": 0.15,
   "paymentMethods": ["MERCADO_PAGO", "BANK_TRANSFER"],
   "deliveryMethods": ["ZIPNOVA"],
   "fulfillmentMethods": ["PICKUP", "DELIVERY"]
@@ -83,7 +83,7 @@ separate item so its original total remains payable.
 ## Bank transfer flow
 
 1. Angular creates an idempotent order with immutable `paymentMethod=BANK_TRANSFER`.
-2. The backend applies a 10% discount once to the complete product subtotal, rounds it to two
+2. The backend applies a 15% discount once to the complete product subtotal, rounds it to two
    decimals with `HALF_UP`, reserves stock and exposes the snapshotted account only to the owner.
 3. The owner has 24 hours to upload one JPEG, PNG or PDF proof of at most 5 MiB.
 4. Images are regenerated; PDF active content is rejected and each page is rendered to a sanitized PNG preview.

@@ -129,7 +129,7 @@ export class GuestCheckoutComponent {
     this.verificationNotice() ? 'guest-code-notice' : '',
     this.verificationError() ? 'guest-code-error' : '',
   ].filter(Boolean).join(' '));
-  readonly transferPricing = computed(() => bankTransferPrice(this.cart.total(), this.capabilities()?.bankTransferDiscountRate ?? .1));
+  readonly transferPricing = computed(() => bankTransferPrice(this.cart.total(), this.capabilities()?.bankTransferDiscountRate ?? .15));
   readonly mercadoPagoPricing = computed(() => listPrice(this.cart.total()));
   readonly selectedPricing = computed(() => this.selectedPaymentMethod() === 'BANK_TRANSFER' ? this.transferPricing() : this.mercadoPagoPricing());
   readonly selectedShippingCost = computed(() => this.selectedFulfillmentMethod() === 'DELIVERY' ? this.selectedShippingQuote()?.amount ?? 0 : 0);

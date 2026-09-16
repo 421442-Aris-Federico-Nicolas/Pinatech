@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GuestOrderService {
-    private static final BigDecimal TRANSFER_DISCOUNT = new BigDecimal("0.10");
+    private static final BigDecimal TRANSFER_DISCOUNT = new BigDecimal("0.15");
     private final CustomerOrderRepository orders;
     private final ProductVariantRepository variants;
     private final OrderStockService stock;
