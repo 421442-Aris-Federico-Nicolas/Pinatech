@@ -16,3 +16,7 @@ springdoc:
 logging:
   level:
     com.computerstore: WARN
+
+app:
+  edge-protection:
+    max-requests-per-window: 100000

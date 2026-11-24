@@ -21,6 +21,8 @@ springdoc:
     enabled: false
 
 app:
+  edge-protection:
+    client-ip-header: ${CLIENT_IP_HEADER:CF-Connecting-IP}
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN}
     allowed-origin-patterns: ""

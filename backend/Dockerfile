@@ -24,6 +24,17 @@ RUN apt-get update \
 COPY --from=build /app/target/computer-store-api-*.jar application.jar
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# Memory footprint. Railway bills RAM per minute, so the JVM gets a small fixed heap instead of 75 % of the host.
+# - Xmx384m covers four concurrent 12 MP uploads plus their WebP derivatives (load-tested).
+# - G1 periodic GC + low heap free ratios + native heap trimming hand memory back to the OS after an admin upload
+#   spike; SerialGC idles lower but keeps the spike forever.
+# - C1-only JIT: the store's CPU idles near 0, so peak throughput is not worth the C2 compiler's memory.
+# - MALLOC_ARENA_MAX stops glibc from keeping one malloc arena per thread.
+# Measured under the same workload: ~355 MiB after idling vs ~840 MiB with -XX:MaxRAMPercentage=75.
+# Railway/compose can override JAVA_TOOL_OPTIONS; keep them in step (backend/railway.env.example).
+ENV MALLOC_ARENA_MAX=2 \
+    JAVA_TOOL_OPTIONS="-XX:+UseG1GC -Xms64m -Xmx384m -XX:G1PeriodicGCInterval=30000 -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30 -XX:TieredStopAtLevel=1 -XX:+UnlockExperimentalVMOptions -XX:TrimNativeHeapInterval=30000 -XX:+ExitOnOutOfMemoryError"
+
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

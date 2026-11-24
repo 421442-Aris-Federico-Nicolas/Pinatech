@@ -7,6 +7,9 @@ The production topology uses these public origins:
 - PostgreSQL: Supabase Session Pooler over TLS.
 - Uploaded images: a Railway Volume mounted at `/app/uploads`.
 
+Cloudflare rules, the origin secret, JVM memory settings and scanner protection are described in
+[edge-protection.md](edge-protection.md).
+
 For additive API changes, deploy Railway first because the Vercel build embeds the final API
 origin. For removed or incompatible API behavior, deploy a frontend that no longer depends on
 the old contract first and keep the deprecated backend contract during a bounded compatibility

@@ -179,7 +179,10 @@ services:
       MP_REFUND_RECONCILIATION_INTERVAL_MS: ${MP_REFUND_RECONCILIATION_INTERVAL_MS:-60000}
       FILE_STORAGE_ROOT: /app/uploads
       PRIVATE_DOCUMENTS_SUBROOT: ${PRIVATE_DOCUMENTS_SUBROOT:-bank-transfer-proofs}
-      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError
+      JAVA_TOOL_OPTIONS: -XX:+UseG1GC -Xms64m -Xmx384m -XX:G1PeriodicGCInterval=30000 -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30 -XX:TieredStopAtLevel=1 -XX:+UnlockExperimentalVMOptions -XX:TrimNativeHeapInterval=30000 -XX:+ExitOnOutOfMemoryError
+      MALLOC_ARENA_MAX: "2"
+      # Caddy terminates TLS here, not Cloudflare: do not trust CF-Connecting-IP.
+      CLIENT_IP_HEADER: ""
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health/readiness || exit 1"]
       interval: 15s
