@@ -20,7 +20,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 class EdgeProtectionFilterTest {
 
-    private static final String SECRET = "0123456789abcdef0123456789abcdef";
+    private static final String ORIGIN_HEADER_VALUE = "edge-test-".repeat(4);
 
     private final MutableClock clock = new MutableClock();
 
@@ -209,13 +209,13 @@ class EdgeProtectionFilterTest {
 
     @Test
     void rejectsRequestsThatBypassTheEdgeWhenAnOriginSecretIsConfigured() throws Exception {
-        EdgeProtectionFilter filter = filter(settings().withOriginSecret(SECRET));
+        EdgeProtectionFilter filter = filter(settings().withOriginSecret(ORIGIN_HEADER_VALUE));
 
         Result direct = run(filter, get("/api/products", "198.51.100.7"));
         Result wrongSecret = run(filter, withHeader(get("/api/products", "198.51.100.7"),
                 EdgeProtectionFilter.ORIGIN_SECRET_HEADER, "not-the-secret"));
         Result viaEdge = run(filter, withHeader(get("/api/products", "198.51.100.7"),
-                EdgeProtectionFilter.ORIGIN_SECRET_HEADER, SECRET));
+                EdgeProtectionFilter.ORIGIN_SECRET_HEADER, ORIGIN_HEADER_VALUE));
         Result healthCheck = run(filter, get("/actuator/health/readiness", "10.0.0.2"));
 
         assertEquals(403, direct.status());
