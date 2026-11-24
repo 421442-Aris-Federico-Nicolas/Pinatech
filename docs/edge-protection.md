@@ -62,24 +62,19 @@ ever fails with an out-of-memory restart, raise `-Xmx` to 448m.
 **WAF custom rule: scanners.** Security → WAF → Custom rules → Create, action **Block**:
 
 ```text
-(http.host eq "api.pinatech.com.ar") and (
-  not starts_with(http.request.uri.path, "/api/")
-  or http.request.uri.path contains "/."
-  or lower(http.request.uri.path) contains ".php"
-  or lower(http.request.uri.path) contains "phpinfo"
-)
+(http.host eq "api.pinatech.com.ar" and not http.request.uri.path contains "/.well-known/" and (not http.request.uri.path contains "/api/" or http.request.uri.path contains "/." or http.request.uri.path contains ".php" or http.request.uri.path contains "phpinfo"))
 ```
 
-Railway health checks reach the container directly and are not affected.
+Paste it with **Edit expression**, not into the builder's Value box. The dashboard rejected versions using
+`starts_with()`, `lower()` and `wildcard`; `eq`, `contains` and `not` work on the free plan. `/.well-known/`
+stays open so Railway can renew the certificate of the custom domain. Railway health checks reach the
+container directly and are not affected.
 
 **Rate limiting rule: JSON API floods.** Security → WAF → Rate limiting rules → Create. The free plan allows one
 rule with short periods; use the closest values the dashboard offers.
 
 ```text
-(http.host eq "api.pinatech.com.ar" and starts_with(http.request.uri.path, "/api/")
- and not http.request.uri.path contains "/images/"
- and not starts_with(http.request.uri.path, "/api/payments/webhooks/")
- and not starts_with(http.request.uri.path, "/api/shipping/webhooks/"))
+(http.host eq "api.pinatech.com.ar" and http.request.uri.path contains "/api/" and not http.request.uri.path contains "/images/" and not http.request.uri.path contains "/webhooks/")
 ```
 
 Characteristics: IP. Threshold: 50 requests per 10 seconds. Action: Block for 10 seconds. Images are
